@@ -1,0 +1,24 @@
+* text=auto
+* text eol=lf
+*.txt eol=lf
+*.py eol=lf
+*.js eol=lf
+*.json eol=lf
+*.vue eol=lf
+*.css eol=lf
+*.html eol=lf
+*.yml eol=lf
+*.yaml eol=lf
+*.md eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
