@@ -1,0 +1,66 @@
+# Backend - Python & Django
+maims-project/backend/db.sqlite3
+maims-project/backend/env/
+maims-project/backend/venv/
+maims-project/backend/.venv/
+maims-project/backend/__pycache__/
+maims-project/backend/*.py[cod]
+maims-project/backend/*$py.class
+maims-project/backend/*.so
+maims-project/backend/.Python
+maims-project/backend/build/
+maims-project/backend/develop-eggs/
+maims-project/backend/dist/
+maims-project/backend/downloads/
+maims-project/backend/eggs/
+maims-project/backend/.eggs/
+maims-project/backend/lib/
+maims-project/backend/lib64/
+maims-project/backend/parts/
+maims-project/backend/sdist/
+maims-project/backend/var/
+maims-project/backend/wheels/
+maims-project/backend/*.egg-info/
+maims-project/backend/.installed.cfg
+maims-project/backend/*.egg
+maims-project/backend/.env
+maims-project/backend/.env.local
+maims-project/backend/staticfiles/
+maims-project/backend/media/
+maims-project/backend/uploads/
+
+# Frontend - Node.js & Vue
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/.idea
+frontend/.vscode
+frontend/.DS_Store
+frontend/*.suo
+frontend/*.ntvs*
+frontend/*.njsproj
+frontend/*.sln
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS
+Thumbs.db
+.DS_Store
