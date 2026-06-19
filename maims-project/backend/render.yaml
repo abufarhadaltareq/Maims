@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: maims-backend
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
+    startCommand: "gunicorn core.wsgi"
+    envVars:
+      - key: DEBUG
+        value: false
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+    routes:
+      - type: http
+        source: /
+        destination: http://localhost:8000
+
+databases:
+  - name: maims-db
+    databaseName: maims
+    user: maims_user
+    region: oregon
+    plan: free
+    postgreSQL: true
