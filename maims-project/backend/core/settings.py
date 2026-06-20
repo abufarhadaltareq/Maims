@@ -147,14 +147,14 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
 # Replace these with your actual details or environment variables:
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'farhadaltareq@gmail.com')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'pgszfukqjebmkbnh')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 
 # The sender address customers will see
-DEFAULT_FROM_EMAIL = f'MAIMS APP <{EMAIL_HOST_USER}>'
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@maims.app')
 
 # The Admin email address that receives store notifications
-ADMIN_RECEIVER_EMAIL = os.environ.get('ADMIN_RECEIVER_EMAIL', 'farhadaltareq@gmail.com')
+ADMIN_RECEIVER_EMAIL = os.environ.get('ADMIN_RECEIVER_EMAIL', '')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
