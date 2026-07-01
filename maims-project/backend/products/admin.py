@@ -1,40 +1,31 @@
 from django.contrib import admin
-from .models import Category, Product, Order, OrderItem, ProductMedia
-
-# Keep your existing Category and Product registrations if they are already here!
-@admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'slug']
-    prepopulated_fields = {'slug': ('name',)}
+from .models import Category, Collection, Product, ProductMedia, CurrencyPrice
 
 class ProductMediaInline(admin.TabularInline):
     model = ProductMedia
     extra = 1
-    fields = ['media_type', 'title', 'file', 'external_url', 'order']
 
+# 🌟 Inline addition for regional prices
+class CurrencyPriceInline(admin.TabularInline):
+    model = CurrencyPrice
+    extra = 2  # Shows two default blank slots for currencies immediately
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'parent', 'slug']
+    prepopulated_fields = {'slug': ('name',)}
+
+@admin.register(Collection)
+class CollectionAdmin(admin.ModelAdmin):
+    list_display = ['name', 'slug', 'is_active']
+    prepopulated_fields = {'slug': ('name',)}
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'price', 'stock', 'date_added', 'size_options']
-    list_editable = ['price', 'stock']
+    list_display = ['name', 'brand_name', 'fabric_type', 'stitching_type', 'material_type', 'stock']
+    list_filter = ['category', 'collection']
+    search_fields = ['name', 'brand_name']
     prepopulated_fields = {'slug': ('name',)}
-    inlines = [ProductMediaInline]
-    search_fields = ['name', 'slug', 'description', 'size_options']
-    list_filter = ['stock']
-
-
-# 🌟 NEW: Show Order Items inside the Order detail page cleanly
-class OrderItemInline(admin.TabularInline):
-    model = OrderItem
-    extra = 0
-    readonly_fields = ['product', 'price', 'quantity']
-
-
-# 🌟 NEW: Customize how Orders appear in your Admin list view
-@admin.register(Order)
-class OrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'first_name', 'last_name', 'email', 'total_amount', 'is_paid', 'created_at']
-    list_filter = ['is_paid', 'created_at']
-    search_fields = ['id', 'first_name', 'last_name', 'email', 'stripe_payment_intent_id']
-    ordering = ['-created_at']
-    inlines = [OrderItemInline]
+    
+    # Combined multi-media and multi-price inputs together
+    inlines = [ProductMediaInline, CurrencyPriceInline]

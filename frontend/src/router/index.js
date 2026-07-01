@@ -1,12 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router'
+
+// Views
 import HomeView from '../views/HomeView.vue'
-import ProductDetail from '../views/ProductDetail.vue' // 🌟 This matches your actual filename
+import SearchView from '../views/SearchView.vue' // Added missing import
+import ProductDetail from '../views/ProductDetail.vue'
 import CartView from '../views/CartView.vue'
 import CheckoutView from '../views/CheckoutView.vue'
 import OrderHistoryView from '../views/OrderHistoryView.vue'
 import SignUpView from '../views/SignUpView.vue'
 import LogInView from '../views/LogInView.vue'
-import ProfileView from '../views/ProfileView.vue' // 🌟 Add this import at the top
+import ProfileView from '../views/ProfileView.vue'
 
 const routes = [
   {
@@ -15,7 +18,11 @@ const routes = [
     component: HomeView
   },
   {
-    // 🌟 Unified: This matches the product.slug strings sent from your HomeView links
+    path: '/search',
+    name: 'search',
+    component: SearchView 
+  },
+  {
     path: '/products/:slug',
     name: 'product-detail',
     component: ProductDetail
@@ -24,6 +31,11 @@ const routes = [
     path: '/category/:category_slug',
     name: 'category',
     component: HomeView
+  },
+  {
+    path: '/new-arrivals',
+    name: 'new-arrivals',
+    component: () => import('../views/NewArrivalsView.vue')
   },
   {
     path: '/cart',
@@ -53,8 +65,7 @@ const routes = [
   {
     path: '/profile',
     name: 'Profile',
-    component: ProfileView,
-    // Optional: Add a meta tag here if you have navigation guards set up for logged-in users
+    component: ProfileView
   }
 ]
 

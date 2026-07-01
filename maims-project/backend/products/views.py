@@ -22,18 +22,29 @@ STRIPE_PUBLISHABLE_KEY = settings.STRIPE_PUBLISHABLE_KEY
 # --- 🌟 RESTORED: PRODUCT VIEWS ---
 
 class LatestProductsList(APIView):
-    """
-    Handles fetching the newest items for the homepage 'New Arrivals' section.
-    """
     permission_classes = [AllowAny]
 
     def get(self, request, format=None):
-        # Grabs the 4 most recent products
-        products = Product.objects.all()[0:4]
+        category_slug = request.query_params.get('category', '').strip()
+        
+        # This prints directly inside your Django server terminal window!
+        print(f"\n--- DEBUG: Incoming category filter slug: '{category_slug}' ---")
+
+        if category_slug and category_slug != 'undefined':
+            try:
+                category = Category.objects.get(slug=category_slug)
+                products = Product.objects.filter(category=category)
+                print(f"--- DEBUG: Found category! Returning {products.count()} items. ---\n")
+            except Category.DoesNotExist:
+                print(f"--- DEBUG: Category slug '{category_slug}' not found in Database! ---\n")
+                return Response([]) 
+        else:
+            products = Product.objects.all()
+            print(f"--- DEBUG: No filter. Returning all {products.count()} inventory items. ---\n")
+
         serializer = ProductSerializer(products, many=True)
         return Response(serializer.data)
-
-
+    
 class ProductDetail(APIView):
     """
     Handles fetching data for an individual product's detail page.

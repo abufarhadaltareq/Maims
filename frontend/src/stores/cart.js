@@ -3,9 +3,18 @@ import { defineStore } from 'pinia'
 export const useCartStore = defineStore('cart', {
   state: () => ({
     items: JSON.parse(localStorage.getItem('cart_items')) || [],
+    // Add currency state, defaulting to 'PKR' or grabbing from storage
+    currentCurrency: localStorage.getItem('selected_currency') || 'PKR',
   }),
   
   actions: {
+    // Currency Action
+    setCurrency(currency) {
+      this.currentCurrency = currency
+      localStorage.setItem('selected_currency', currency)
+    },
+
+    // Cart Actions
     addToCart(product, selectedSize = '', quantity = 1) {
       const existingItem = this.items.find(item => item.product.id === product.id && item.size === selectedSize)
       if (existingItem) {

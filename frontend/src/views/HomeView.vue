@@ -1,8 +1,7 @@
 <template>
   <div class="home-page font-brand text-brand-text">
     
-    <div class="hero-section relative h-[450px] overflow-hidden bg-black flex items-center justify-center text-center px-4" style="perspective: 1800px;">
-      
+    <div v-if="isHomePage" class="hero-section relative h-[450px] overflow-hidden bg-black flex items-center justify-center text-center px-4" style="perspective: 1800px;">
       <div 
         v-for="(image, index) in config.heroImages" 
         :key="index"
@@ -43,7 +42,6 @@
           <h2 class="text-3xl font-bold tracking-tight mb-2">{{ categoryTitle }}</h2>
           <p class="text-gray-500">Freshly added pieces from our design room.</p>
         </div>
-        
         <router-link 
           v-if="config.enableTrackingPage" 
           to="/order-history" 
@@ -53,84 +51,72 @@
         </router-link>
       </div>
 
-      <div v-if="isLoading" class="text-center py-12 text-gray-400 font-medium">
-        Loading fresh catalog...
-      </div>
-
+      <div v-if="isLoading" class="text-center py-12 text-gray-400 font-medium">Loading fresh catalog...</div>
+      <div v-else-if="products.length === 0" class="text-center py-12 text-gray-500">No items found in this section yet.</div>
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-        <div 
-          v-for="product in products" 
-          :key="product.id" 
-          class="product-card group flex flex-col justify-between"
-        >
-          <router-link :to="`/products/${product.slug}`" class="block overflow-hidden rounded-3xl bg-brand-muted aspect-square mb-4 transform-gpu transition duration-500 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/20">
-            <img 
-              :src="product.get_thumbnail || 'https://placehold.co/400'" 
-              :alt="product.name"
-              class="w-full h-full object-cover object-center group-hover:scale-105 transition duration-300"
-              @error="(e) => e.target.src = 'https://placehold.co/400'"
-            />
+        <div v-for="product in products" :key="product.id" class="product-card group flex flex-col justify-between">
+           <router-link :to="`/products/${product.slug}`" class="block overflow-hidden rounded-3xl bg-brand-muted aspect-square mb-4">
+            <img :src="product.get_thumbnail || 'https://placehold.co/400'" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
           </router-link>
-
           <div>
-            <h3 class="font-bold text-base mb-1 group-hover:underline">
-              <router-link :to="`/products/${product.slug}`">{{ product.name }}</router-link>
-            </h3>
-            <p class="text-brand-accent font-bold text-sm">
-              {{ product.price }} {{ config.currencySymbol }}
-            </p>
+            <p v-if="product.brand_name" class="text-xs uppercase tracking-widest text-gray-400 font-bold mb-0.5">{{ product.brand_name }}</p>
+            <h3 class="font-bold text-base mb-1 group-hover:underline">{{ product.name }}</h3>
+            <p class="text-brand-accent font-bold text-sm">{{ formatPrice(product) }}</p>
           </div>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue' // Added computed
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { BRAND_CONFIG } from '../brand.config.js'
 
+const route = useRoute()
 const config = ref(BRAND_CONFIG)
 const products = ref([])
 const isLoading = ref(true)
-const route = useRoute()
 const categorySlug = ref(route.params.category_slug || '')
-const categoryTitle = ref(categorySlug.value ? `Category: ${categorySlug.value.replace(/-/g, ' ')}` : 'New Arrivals')
+const categoryTitle = ref('New Arrivals')
 
-// 🌟 Slide Tracker States
+// 🌟 FIX: Computed property to detect Home Page
+const isHomePage = computed(() => route.path === '/')
+
 const currentSlide = ref(0)
 let sliderInterval = null
+
+// ... (keep your existing functions: startImageRotation, formatPrice, fetchLatestProducts)
 
 const startImageRotation = () => {
   sliderInterval = setInterval(() => {
     if (config.value.heroImages && config.value.heroImages.length > 0) {
       currentSlide.value = (currentSlide.value + 1) % config.value.heroImages.length
     }
-  }, 3000) // ⏱️ Rotates images automatically every 5 seconds
+  }, 3000)
+}
+
+const formatPrice = (product) => {
+  const currencySymbol = config.value.currencySymbol || 'USD'
+  if (product.prices && product.prices.length > 0) {
+    const regionalPrice = product.prices.find(p => p.currency === currencySymbol)
+    return regionalPrice ? `${regionalPrice.price} ${currencySymbol}` : `${product.price} USD`
+  }
+  return `${product.price} USD`
 }
 
 const fetchLatestProducts = async () => {
   isLoading.value = true
   try {
-    const endpoint = categorySlug.value ? `/api/v1/products/category/${categorySlug.value}/` : '/api/v1/latest-products/'
+    let endpoint = '/api/v1/products/'
+    if (categorySlug.value) endpoint += `?category=${categorySlug.value}`
     const response = await axios.get(endpoint)
-
-    if (Array.isArray(response.data)) {
-      products.value = response.data
-    } else if (response.data && Array.isArray(response.data.products)) {
-      products.value = response.data.products
-    } else {
-      products.value = response.data.results || []
-    }
-
-    categoryTitle.value = categorySlug.value
-      ? `Category: ${categorySlug.value.replace(/-/g, ' ')}`
-      : 'New Arrivals'
+    products.value = response.data.results || response.data.products || (Array.isArray(response.data) ? response.data : [])
+    categoryTitle.value = categorySlug.value ? `Category: ${categorySlug.value.replace(/-/g, ' ')}` : 'New Arrivals'
   } catch (error) {
-    console.error('Error loading frontend shelf:', error)
+    console.error('Error loading products:', error)
     products.value = []
   } finally {
     isLoading.value = false
@@ -139,15 +125,15 @@ const fetchLatestProducts = async () => {
 
 onMounted(() => {
   fetchLatestProducts()
-  startImageRotation() // 🌟 Spin up the image timer loop
+  startImageRotation()
 })
 
-watch(route, () => {
-  categorySlug.value = route.params.category_slug || ''
+watch(() => route.params.category_slug, (newSlug) => {
+  categorySlug.value = newSlug || ''
   fetchLatestProducts()
 })
 
 onBeforeUnmount(() => {
-  if (sliderInterval) clearInterval(sliderInterval) // 🧹 Clean up timer memory
+  if (sliderInterval) clearInterval(sliderInterval)
 })
 </script>
