@@ -140,6 +140,14 @@
         </div>
 
         <nav class="flex flex-wrap items-center gap-x-5 gap-y-2 font-semibold">
+          <router-link
+            v-for="legal in LEGAL_LINKS"
+            :key="legal.hash"
+            :to="`/#${legal.hash}`"
+            class="hover:text-black hover:underline"
+          >
+            {{ legal.label }}
+          </router-link>
           <a
             v-if="site.facebookShopUrl"
             :href="site.facebookShopUrl"
@@ -211,6 +219,13 @@ const FOOTER_COLORS = {
   youtube: 'text-[#FF0000]',
   linkedin: 'text-[#0A66C2]',
 }
+
+// Anchors into the legal block rendered at the bottom of the home page.
+const LEGAL_LINKS = [
+  { label: 'Terms & Conditions', hash: 'legal-terms' },
+  { label: 'Privacy', hash: 'legal-privacy' },
+  { label: 'Licence', hash: 'legal-licence' },
+]
 
 const FLAGS = { PT: '🇵🇹', PK: '🇵🇰', US: '🇺🇸', SE: '🇸🇪', BD: '🇧🇩' }
 const activeRegion = computed(() => CURRENCIES.find((c) => c.code === cartStore.currentCurrency) || CURRENCIES[0])

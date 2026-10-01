@@ -75,7 +75,16 @@ const routes = [
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    // Footer legal links point at /#legal-<doc>; the block itself is #legal.
+    if (to.hash) {
+      const el = to.hash.startsWith('#legal-') ? '#legal' : to.hash
+      return { el, top: 80, behavior: 'smooth' }
+    }
+    return { top: 0 }
+  }
 })
 
 router.beforeEach((to) => {

@@ -108,7 +108,6 @@
         <div>
           <h2 class="text-3xl font-bold tracking-tight mb-2">{{ categoryTitle }}</h2>
           <p class="text-gray-500">Freshly added pieces from our design room.</p>
-import Hero3D from '../components/Hero3D.vue'
         </div>
         <router-link 
           v-if="config.enableTrackingPage" 
@@ -134,6 +133,9 @@ import Hero3D from '../components/Hero3D.vue'
         </div>
       </div>
     </div>
+
+    <!-- Terms & Conditions / Privacy / Licence -->
+    <LegalSection v-if="isHomePage" />
   </div>
 </template>
 
@@ -141,6 +143,8 @@ import Hero3D from '../components/Hero3D.vue'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue' // Added computed
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import Hero3D from '../components/Hero3D.vue'
+import LegalSection from '../components/LegalSection.vue'
 import { BRAND_CONFIG } from '../brand.config.js'
 import { useCartStore } from '../stores/cart'
 import { formatProductPrice } from '../utils/pricing.js'
