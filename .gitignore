@@ -5,8 +5,10 @@ maims-project/backend/sqlite_dump.json
 maims-project/backend/env/
 maims-project/backend/venv/
 maims-project/backend/.venv/
-maims-project/backend/__pycache__/
-maims-project/backend/*.py[cod]
+# Match bytecode at any depth (core/, products/, migrations/, ...), not just
+# the backend root; nested __pycache__ previously slipped into commits.
+__pycache__/
+*.py[cod]
 maims-project/backend/*$py.class
 maims-project/backend/*.so
 maims-project/backend/.Python
