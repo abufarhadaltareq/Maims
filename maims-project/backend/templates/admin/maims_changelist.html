@@ -1,0 +1,30 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  {% if show_import_link %}
+    <li><a href="{% url 'admin:products_product_import_csv' %}" class="importlink">Import products from CSV</a></li>
+  {% endif %}
+  {% if show_export_link %}
+    <li><a href="{% url 'admin:products_product_export_csv' %}" class="exportlink">Export all products</a></li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+
+{% block result_list %}
+  {% if order_presets %}
+    <div class="maims-banner">
+      <span class="maims-banner__label">Work queues:</span>
+      {% for preset in order_presets %}
+        <a href="{{ preset.url }}" class="maims-preset">{{ preset.label }}</a>
+      {% endfor %}
+    </div>
+  {% elif restock_count %}
+    <div class="maims-banner">
+      <span class="maims-banner__warn">{{ restock_count }} product{{ restock_count|pluralize }} at {{ restock_level }} units or less.</span>
+      <a href="?stock_level=out" class="maims-preset">Sold out</a>
+      <a href="?stock_level=low" class="maims-preset">Low stock</a>
+      <span class="maims-banner__hint">Tick products, then use “Set stock of selected products to…” to restock in one go.</span>
+    </div>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

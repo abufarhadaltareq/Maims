@@ -1,0 +1,78 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; <a href="{% url 'admin:products_product_changelist' %}">Products</a>
+  &rsaquo; Import from CSV
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main" class="maims-import">
+  <p class="help">
+    Use this for a daily price or stock update instead of opening products one by one.
+    Export your current catalogue first, edit it in a spreadsheet, then upload it back.
+  </p>
+
+  <p>
+    <a class="button" href="{% url 'admin:products_product_export_csv' %}">
+      Step 1 — export the current catalogue
+    </a>
+  </p>
+  <p class="maims-muted maims-import__note">
+    That downloads every product as a spreadsheet, using exactly the columns this form
+    expects below. Edit the stock or price columns, save as CSV, then upload it back.
+  </p>
+
+  <h2>Step 2 — upload your edited file</h2>
+
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <fieldset class="module aligned">
+      {% for field in form %}
+        <div class="form-row">
+          {{ field.errors }}
+          <div>
+            <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+            {{ field }}
+            {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </fieldset>
+
+    <h2>Columns this form understands</h2>
+    <p class="maims-muted">Only the <code>slug</code> column is required — it is how a row is matched to
+       a product. Leave any other column empty to keep the value already in the shop.</p>
+    <pre class="maims-import__sample">{{ example_csv }}</pre>
+
+    <div class="submit-row">
+      <input type="submit" value="Import CSV" class="default">
+      <a href="{% url 'admin:products_product_changelist' %}" class="button cancel-link">Cancel</a>
+    </div>
+  </form>
+
+  {% if report %}
+    <h2>Import report</h2>
+    <p>
+      Read {{ report.total }} row{{ report.total|pluralize }} &rarr;
+      <strong>{{ report.created }} created</strong>,
+      <strong>{{ report.updated }} updated</strong>,
+      <strong>{{ report.skipped }} skipped</strong>.
+      {% if report.errors %}<br><span class="errornote">Some rows were skipped — the reason is in the last column.</span>{% endif %}
+    </p>
+    <table class="maims-import__report">
+      <thead><tr><th>Line</th><th>Slug</th><th>What happened</th></tr></thead>
+      <tbody>
+        {% for line, slug, outcome in report.rows %}
+          <tr class="{% if 'SKIPPED' in outcome %}maims-import__bad{% endif %}">
+            <td>{{ line }}</td><td>{{ slug }}</td><td>{{ outcome }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3">The file had no data rows.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+{% endblock %}

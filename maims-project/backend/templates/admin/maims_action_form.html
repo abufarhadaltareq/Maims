@@ -1,0 +1,45 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; <a href="{% url 'admin:products_order_changelist' %}">Orders</a>
+  &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <form method="post">{% csrf_token %}
+    <p class="maims-muted">
+      This will be written to {{ queryset|length }} selected order{{ queryset|length|pluralize }} and
+      their status will be set to <b>Shipped</b>.
+    </p>
+
+    <fieldset class="module aligned">
+      <div class="form-row">
+        {{ form.tracking_number.errors }}
+        <div>
+          <label for="{{ form.tracking_number.id_for_label }}">{{ form.tracking_number.label }}:</label>
+          {{ form.tracking_number }}
+          <p class="help">{{ form.tracking_number.help_text }}</p>
+        </div>
+      </div>
+    </fieldset>
+
+    <ul class="maims-items">
+      {% for order in queryset %}
+        <li><a href="{{ order.get_absolute_url }}"><strong>#{{ order.pk }}</strong></a>
+          — {{ order.first_name }} {{ order.last_name }} ({{ order.total_amount }} {{ order.currency }})</li>
+      {% endfor %}
+    </ul>
+
+    <div class="submit-row">
+      <input type="hidden" name="action" value="set_tracking_number">
+      <input type="submit" value="Save tracking number" class="default">
+      <a href="{% url 'admin:products_order_changelist' %}" class="button cancel-link">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

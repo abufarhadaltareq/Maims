@@ -50,6 +50,11 @@ ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,1
 # Application definition
 
 INSTALLED_APPS = [
+    # Before django.contrib.admin on purpose: jazzmin ships replacements for
+    # admin/base.html & friends, and app template dirs are searched in order, so
+    # jazzmin's win only if it is listed first. Listing it after silently falls
+    # back to Django's own unstyled theme.
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -61,6 +66,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken', # 🌟 ADD THIS LINE
     'corsheaders',
     'products',
+    'core',
 ]
 
 MIDDLEWARE = [
@@ -79,7 +85,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -192,6 +198,87 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# --- django-jazzmin ------------------------------------------------------------
+# Jazzmin replaces the admin's own theme (jQuery UI, buttons, tables, tabs, the
+# responsive sidebar) with Bootstrap 4. The Maims dashboard, custom change forms
+# and maims.css stay exactly as they are: jazzmin ships its own static files and
+# all Maims templates extend "admin/base_site.html", which jazzmin re-skins.
+# On narrow screens the sidebar collapses behind a "Maims Admin" toggle instead of
+# the two-column squeeze the default theme suffers from.
+# Set JAZZMIN_THEME='user-light' or 'cerulean' to change the palette.
+JAZZMIN_THEME = os.environ.get('JAZZMIN_THEME', 'cerulean')
+JAZZMIN_ADMIN_SITE_TITLE = 'Maims Admin'
+JAZZMIN_WINDOW_TITLE = 'Maims Admin'
+
+JAZZMIN_SETTINGS = {
+    # Branding: drop the AdminLTE placeholder logo and the empty "Copyright 2026"
+    # footer in favour of the shop's own name.
+    'site_title': 'Maims Admin',
+    'site_header': 'Maims Store Admin',
+    'site_brand': 'Maims',
+    'copyright': 'Maims — orders, stock and customers',
+    'welcome_sign': 'Sign in to manage the shop',
+
+    # Real icons instead of the generic grey dot on every model, so the sidebar
+    # can be scanned by shape rather than by reading.
+    'icons': {
+        'auth': 'fas fa-users-cog',
+        'auth.user': 'fas fa-user',
+        'auth.Group': 'fas fa-users',
+        'products': 'fas fa-store',
+        'products.order': 'fas fa-box-open',
+        'products.product': 'fas fa-tag',
+        'products.category': 'fas fa-sitemap',
+        'products.collection': 'fas fa-layer-group',
+        'products.heroslide': 'fas fa-images',
+        'products.sitesettings': 'fas fa-cog',
+    },
+
+    # The sidebar and navbar stay put while you scroll a long product list, and
+    # the "+ Add" button style follows the theme.
+    'navbar_fixed': True,
+    'sidebar_fixed': True,
+    'footer_small_text': True,
+
+    # Change forms are long on this site (product media, multi-currency prices).
+    # Collapsible tabs show one section at a time instead of one long wall.
+    'changeform_format': 'collapsible',
+
+    # Opening a related object (a product from an order, a category from a
+    # product) in a modal keeps the list you came from — no back-and-forth.
+    'related_modal_active': True,
+
+    # A light/dark toggle for staff working a dim packing table at night.
+    'show_theme_chooser': True,
+    'default_theme_mode': 'auto',
+
+    # Open the whole catalogue from the navbar search box.
+    'search_model': 'products.Product',
+
+    # The two views staff open dozens of times a day, reachable from any page.
+    # NB: jazzmin reads "name", not "title", and silently drops any link whose
+    # listed permissions the signed-in staff member does not all hold.
+    'topmenu_links': [
+        {'name': 'Pack today', 'url': '/admin/products/order/?status__exact=new',
+         'icon': 'fas fa-box-open', 'permissions': ['products.view_order']},
+        {'name': 'Awaiting courier', 'url': '/admin/products/order/?status__exact=packed',
+         'icon': 'fas fa-truck', 'permissions': ['products.view_order']},
+        {'name': 'Sold out', 'url': '/admin/products/product/?stock_level=out',
+         'icon': 'fas fa-triangle-exclamation', 'permissions': ['products.view_product']},
+    ],
+
+    # Plain "open the filtered list" shortcuts at the bottom of the Products group.
+    'custom_links': {
+        'products': [
+            {'name': 'Update prices & stock (CSV)',
+             'url': '/admin/products/product/import-csv/',
+             'icon': 'fas fa-file-csv', 'permissions': ['products.change_product']},
+        ],
+    },
+}
+# Project-owned static files (admin/maims.css) live outside the app directories.
+STATICFILES_DIRS = [BASE_DIR / 'static']
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 

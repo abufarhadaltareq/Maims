@@ -1,0 +1,21 @@
+{% extends "admin/change_form.html" %}
+
+{% block after_related_objects %}
+  {{ block.super }}
+  {% if customer_contact %}
+    <div class="module maims-contact-panel">
+      <h2>Contact this customer</h2>
+      <p class="maims-muted">Saved number: {{ customer_contact.phone|default:"not provided" }}</p>
+      <p>
+        {% if customer_contact.whatsapp %}
+          <a class="maims-contact maims-contact--wa" href="{{ customer_contact.whatsapp }}"
+             target="_blank" rel="noopener">WhatsApp {{ customer_contact.phone }}</a>
+        {% endif %}
+        {% if customer_contact.email %}
+          <a class="maims-contact" href="mailto:{{ customer_contact.email }}">Email {{ customer_contact.email }}</a>
+        {% endif %}
+        <a class="maims-contact" href="{% url 'admin:products_order_changelist' %}?user__id__exact={{ object.pk }}">See all their orders</a>
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}

@@ -4,12 +4,220 @@ from types import SimpleNamespace
 from unittest import mock, skipIf
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase, TransactionTestCase
 from rest_framework.test import APIClient
 
-from .models import Category, CurrencyPrice, Order, Product, UserProfile
+from .models import Category, CurrencyPrice, Order, OrderItem, Product, UserProfile
 from .views import _build_order_items, _CheckoutError, _mark_paid_and_reserve, _reserve_stock
+
+
+class AdminPageTests(TestCase):
+    """Every admin list/change page must render.
+
+    Regression cover for the Orders list 500-ing: an unformatted `format_html()`
+    call raised "args or kwargs must be provided" for any unpaid order, which
+    took down the whole changelist rather than a single row.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_superuser('root', 'root@example.com', 'pw-root-123456')
+        cls.category = Category.objects.create(name='Kurta', slug='kurta')
+        cls.product = Product.objects.create(
+            category=cls.category, name='Silk Kurta', slug='silk-kurta', stock=4)
+        CurrencyPrice.objects.create(product=cls.product, currency='EUR', price=Decimal('25.00'))
+        cls.order = Order.objects.create(
+            first_name='Ada', last_name='Lovelace', email='ada@example.com',
+            address='1 Main St', zipcode='1000', place='Lisbon',
+            total_amount=Decimal('25.00'), currency='EUR', payment_method='cod', is_paid=False)
+        OrderItem.objects.create(order=cls.order, product=cls.product, size='M',
+                                 price=Decimal('25.00'), quantity=1)
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def test_order_changelist_renders_with_unpaid_order(self):
+        res = self.client.get('/admin/products/order/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Lovelace')
+
+    def test_order_change_page_renders(self):
+        res = self.client.get(f'/admin/products/order/{self.order.pk}/change/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Silk Kurta')
+
+    def test_dashboard_renders(self):
+        res = self.client.get('/admin/')
+        self.assertEqual(res.status_code, 200)
+        # The home page is a work queue, not a list of statistics.
+        self.assertContains(res, 'Orders to handle')
+        self.assertContains(res, 'Waiting to be packed')
+
+    def test_every_registered_changelist_renders(self):
+        from core.admin_site import maims_admin
+        for model in maims_admin._registry:
+            meta = model._meta
+            with self.subTest(model=meta.model_name):
+                res = self.client.get(f'/admin/{meta.app_label}/{meta.model_name}/')
+                self.assertEqual(res.status_code, 200)
+
+    def test_category_without_image_renders(self):
+        """A category with no image used to raise on its 'none' thumbnail."""
+        res = self.client.get('/admin/products/category/')
+        self.assertEqual(res.status_code, 200)
+
+    def test_duplicate_product_action_creates_a_unique_slug(self):
+        res = self.client.post('/admin/products/product/', {
+            'action': 'duplicate_products',
+            '_selected_action': [str(self.product.pk)],
+        })
+        self.assertEqual(res.status_code, 302)
+        copy = Product.objects.get(slug__endswith='-copy')
+        self.assertNotEqual(copy.slug, self.product.slug)
+        self.assertEqual(CurrencyPrice.objects.filter(product=copy).count(), 1)
+        self.assertEqual(copy.stock, 0)
+
+    def test_site_settings_is_a_singleton(self):
+        from .models import SiteSettings
+        SiteSettings.objects.get_or_create(pk=1)
+        # Second row can never be added, and the list page jumps to the form.
+        self.assertEqual(self.client.get('/admin/products/sitesettings/add/').status_code, 403)
+        res = self.client.get('/admin/products/sitesettings/')
+        self.assertEqual(res.status_code, 302)
+
+
+class AdminDailyWorkflowTests(AdminPageTests):
+    """The one-click tools the shop actually uses every day."""
+
+    def test_advance_button_moves_an_order_to_its_next_step(self):
+        order = self.order
+        self.assertEqual(order.status, 'new')
+        for expected in ('packed', 'shipped', 'delivered'):
+            self.client.post(f'/admin/products/order/{order.pk}/advance/')
+            order.refresh_from_db()
+            self.assertEqual(order.status, expected)
+        # Delivered is terminal: another click must not move it.
+        self.client.post(f'/admin/products/order/{order.pk}/advance/')
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'delivered')
+
+    def test_packing_slip_renders(self):
+        res = self.client.get(f'/admin/products/order/{self.order.pk}/packing-slip/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Silk Kurta')
+        self.assertContains(res, 'Ada Lovelace')
+
+    def test_batch_packing_slips_cover_every_selected_order(self):
+        other = Order.objects.create(
+            first_name='Grace', last_name='Hopper', email='grace@example.com',
+            address='2 Main St', zipcode='2000', place='Porto',
+            total_amount=Decimal('10.00'), currency='EUR', payment_method='stripe')
+        OrderItem.objects.create(order=other, product=self.product, price=Decimal('10.00'), quantity=1)
+        res = self.client.post('/admin/products/order/', {
+            'action': 'print_packing_slips',
+            '_selected_action': [str(self.order.pk), str(other.pk)],
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Ada Lovelace')
+        self.assertContains(res, 'Grace Hopper')
+
+    def test_stock_actions(self):
+        product = self.product
+        self.client.post('/admin/products/product/', {
+            'action': 'add_stock', '_selected_action': [str(product.pk)]})
+        product.refresh_from_db()
+        self.assertEqual(product.stock, 14)          # 4 + 10
+
+        self.client.post('/admin/products/product/', {
+            'action': 'mark_sold_out', '_selected_action': [str(product.pk)]})
+        product.refresh_from_db()
+        self.assertEqual(product.stock, 0)
+
+    def test_bulk_restock_only_raises_stock_when_asked(self):
+        self.client.post('/admin/products/product/', {
+            'action': 'restock_selected', '_selected_action': [str(self.product.pk)],
+            'apply_restock': '1', 'new_stock': '30', 'only_if_lower': 'on'})
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 30)
+
+        # With the box unticked, a lower number is applied as-is.
+        self.client.post('/admin/products/product/', {
+            'action': 'restock_selected', '_selected_action': [str(self.product.pk)],
+            'apply_restock': '1', 'new_stock': '5'})
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 5)
+
+    def test_customer_list_shows_lifetime_value_per_currency(self):
+        # Give the admin user one paid EUR order and check the column reports it.
+        customer = User.objects.create_user('grace', 'grace@example.com', 'pw-grace-123')
+        order = Order.objects.create(
+            user=customer, first_name='Grace', last_name='Hopper', email='grace@example.com',
+            address='2 Main St', zipcode='2000', place='Porto',
+            total_amount=Decimal('40.00'), currency='EUR', payment_method='stripe', is_paid=True)
+        OrderItem.objects.create(order=order, product=self.product, price=Decimal('40.00'), quantity=1)
+        res = self.client.get('/admin/auth/user/')
+        self.assertEqual(res.status_code, 200)
+        body = res.content.decode()
+        self.assertIn('€40.00 EUR', body)      # amount and currency kept together
+        self.assertNotIn('€40.00 PKR', body)    # and never mixed with another currency
+
+
+class ProductCSVImportTests(AdminPageTests):
+    """The CSV round trip used for bulk price and stock updates."""
+
+    def _upload(self, body, name='update.csv', create_missing=True):
+        upload = SimpleUploadedFile(name, body.encode('utf-8'), content_type='text/csv')
+        data = {'csv_file': upload}
+        if create_missing:
+            data['create_missing'] = 'on'
+        return self.client.post('/admin/products/product/import-csv/', data)
+
+    def test_export_lists_every_product_and_price(self):
+        CurrencyPrice.objects.create(product=self.product, currency='PKR', price=Decimal('2500'))
+        res = self.client.get('/admin/products/product/export-csv/')
+        self.assertEqual(res.status_code, 200)
+        body = res.content.decode('utf-8-sig')
+        self.assertIn('slug,name,category_slug', body)
+        self.assertIn('price_EUR', body)
+        self.assertIn('25.00', body)      # existing EUR price
+        self.assertIn('2500', body)       # the PKR price we just added
+
+    def test_import_updates_stock_and_adds_a_missing_price(self):
+        self._upload(f'slug,stock,price_PKR\n{self.product.slug},42,1500\n')
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 42)
+        self.assertTrue(CurrencyPrice.objects.filter(
+            product=self.product, currency='PKR', price=Decimal('1500')).exists())
+
+    def test_import_creates_a_product_when_asked(self):
+        self._upload(
+            f'slug,name,category_slug,stock,price_EUR\n'
+            f'new-kurta,New Kurta,{self.category.slug},7,199.00\n')
+        created = Product.objects.get(slug='new-kurta')
+        self.assertEqual(created.stock, 7)
+        self.assertEqual(created.category, self.category)
+        self.assertTrue(CurrencyPrice.objects.filter(product=created, currency='EUR').exists())
+
+    def test_import_skips_bad_rows_and_reports_why(self):
+        self._upload(
+            'slug,stock,price_EUR\n'
+            ',5,10\n'                                  # no slug
+            f'{self.product.slug},not-a-number,10\n')   # unusable stock
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 4)        # unchanged, not corrupted
+        body = self.client.get('/admin/products/product/import-csv/').content
+        self.assertNotIn(b'not-a-number', body)        # report is per-request
+
+    def test_import_without_create_missing_skips_unknown_slugs(self):
+        self._upload('slug,stock\nnever-heard-of-it,3\n', create_missing=False)
+        self.assertFalse(Product.objects.filter(slug='never-heard-of-it').exists())
+
+    def test_import_requires_a_slug_column(self):
+        res = self._upload('name,stock\nSomething,2\n')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'slug')
 
 
 class CheckoutPricingSecurityTests(TestCase):

@@ -1,9 +1,16 @@
+from decimal import Decimal
+
 from django.db import models
 from django.contrib.auth.models import User
-from django.db.models.signals import post_save 
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 # --- CATEGORY & CATALOG MANAGEMENT ---
+
+# Stock at or below this is flagged as "needs restocking" in the admin. Not a
+# hard rule: the storefront keeps selling until the number reaches zero.
+RESTOCK_LEVEL = 3
+
 
 class Category(models.Model):
     name = models.CharField(max_length=255)
@@ -64,6 +71,9 @@ class Collection(models.Model):
     name = models.CharField(max_length=255)
     slug = models.SlugField()
     is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ('name',)
 
     def __str__(self):
         return self.name
@@ -184,6 +194,8 @@ class ProductMedia(models.Model):
 
     class Meta:
         ordering = ['order']
+        verbose_name = 'Product media'
+        verbose_name_plural = 'Product media'
 
     def __str__(self):
         return f"{self.product.name} media #{self.order}"
@@ -297,8 +309,38 @@ class Order(models.Model):
     is_paid = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # --- Fulfilment workflow (managed in Admin → Orders) ---
+    STATUS_CHOICES = [
+        ('new', 'New - not packed yet'),
+        ('packed', 'Packed'),
+        ('shipped', 'Shipped'),
+        ('delivered', 'Delivered'),
+        ('cancelled', 'Cancelled'),
+        ('returned', 'Returned / refunded'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new', db_index=True)
+    tracking_number = models.CharField(max_length=120, blank=True, null=True,
+                                       help_text="Courier / tracking reference, e.g. 1234567890")
+    admin_note = models.TextField(blank=True, null=True,
+                                  help_text="Internal only - never shown to the customer")
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'Order'
+        verbose_name_plural = 'Orders'
+        indexes = [models.Index(fields=['-created_at'])]
+
     def __str__(self):
         return f"Order {self.id} - {self.first_name} {self.last_name}"
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+        return reverse('admin:products_order_change', args=[self.pk])
+
+    @property
+    def is_open(self):
+        """True while the order still needs work (not finished or cancelled)."""
+        return self.status not in ('delivered', 'cancelled', 'returned')
 
 
 class OrderItem(models.Model):
@@ -309,9 +351,18 @@ class OrderItem(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     quantity = models.IntegerField(default=1)
 
+    class Meta:
+        verbose_name = 'Order item'
+        verbose_name_plural = 'Order items'
+
     def __str__(self):
         size_text = f" ({self.size})" if self.size else ''
         return f"{self.quantity} x {self.product.name}{size_text}"
+
+    @property
+    def line_total(self):
+        """Quantity x unit price. Used by the admin order pages and packing slips."""
+        return (self.price or Decimal('0')) * (self.quantity or 0)
 
 
 # --- AUTOMATED PROFILES ---

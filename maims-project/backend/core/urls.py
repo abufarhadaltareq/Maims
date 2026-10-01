@@ -1,14 +1,16 @@
-from django.contrib import admin
-from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from .views import redirect_root
+from django.contrib import admin
+from django.urls import include, path
 
-# 🌟 REMOVED: from . import views (This was causing the crash!)
+from core.admin_site import maims_admin
+from core.views import redirect_root
 
 urlpatterns = [
     path('', redirect_root),
-    path('admin/', admin.site.urls),
+    # The Maims admin site (branding, dashboard, custom order pages) replaces
+    # the default admin.site.
+    path('admin/', maims_admin.urls),
     path('api/v1/', include('products.urls')),
 ]
 

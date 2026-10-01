@@ -1,0 +1,128 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Packing slip{% if orders|length > 1 %}s ({{ orders|length }}){% endif %}{% endblock %}
+
+{% block extrastyle %}{{ block.super }}
+  <style>
+    body { background: #f1f2f4; }
+    .maims-print-bar { position: sticky; top: 0; background: #0F0F12; color: #fff;
+                       padding: 12px 20px; display: flex; gap: 12px; align-items: center;
+                       justify-content: space-between; font-size: 14px; }
+    .maims-print-bar a, .maims-print-bar button { color: #fff; background: #7C3AED;
+        border: 0; padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer;
+        text-decoration: none; }
+    .slip { background: #fff; width: 100%; max-width: 760px; margin: 24px auto; padding: 40px;
+            box-sizing: border-box; }
+    .slip + .slip { page-break-before: always; }
+    .slip-head { display: flex; justify-content: space-between; align-items: flex-start;
+                 border-bottom: 3px solid #0F0F12; padding-bottom: 16px; margin-bottom: 20px; }
+    .slip-brand { font-size: 22px; font-weight: 800; letter-spacing: .2em; }
+    .slip-ref { text-align: right; font-size: 13px; color: #4b5563; }
+    .slip-ref strong { font-size: 20px; color: #0F0F12; }
+    .slip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+    .slip-block h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
+                     color: #6b7280; margin: 0 0 6px; }
+    .slip-block p { margin: 0; line-height: 1.6; font-size: 14px; }
+    .slip-big { font-size: 22px; }
+    table.slip-items { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    table.slip-items th { text-align: left; font-size: 11px; text-transform: uppercase;
+                          letter-spacing: .08em; color: #6b7280; border-bottom: 1px solid #d1d5db;
+                          padding: 8px 6px; }
+    table.slip-items td { padding: 10px 6px; border-bottom: 1px solid #f3f4f6; font-size: 14px; }
+    table.slip-items td.num, table.slip-items th.num { text-align: right; }
+    .slip-total { margin-top: 14px; text-align: right; font-size: 16px; }
+    .slip-note { margin-top: 26px; padding: 14px; background: #f9fafb; border: 1px solid #e5e7eb;
+                 border-radius: 8px; font-size: 13px; color: #374151; white-space: pre-wrap; }
+    .slip-empty { color: #b91c1c; font-weight: 700; }
+    @media print {
+      body { background: #fff; }
+      .maims-print-bar { display: none; }
+      .slip { margin: 0; max-width: none; padding: 16px; box-shadow: none; }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="maims-print-bar">
+  <span>Packing slip{% if orders|length > 1 %}s for {{ orders|length }} orders{% endif %}</span>
+  <span>
+    <button type="button" onclick="window.print()">Print</button>
+    <a href="{% url 'admin:products_order_changelist' %}">Back to orders</a>
+  </span>
+</div>
+
+{% for order in orders %}
+<div class="slip">
+  <div class="slip-head">
+    <div>
+      <div class="slip-brand">MAIMS</div>
+      <div style="font-size:12px;color:#6b7280;">{{ site.store_name|default:"Premium Fashion" }}</div>
+    </div>
+    <div class="slip-ref">
+      <strong>Order #{{ order.pk }}</strong><br>
+      Placed {{ order.created_at|date:"d M Y, H:i" }}<br>
+      {{ order.get_payment_method_display }} &middot;
+      {% if order.is_paid %}<strong>PAID</strong>{% else %}<strong>UNPAID</strong>{% endif %}
+    </div>
+  </div>
+
+  <div class="slip-grid">
+    <div class="slip-block">
+      <h3>Ship to</h3>
+      <p class="slip-big"><strong>{{ order.first_name }} {{ order.last_name }}</strong></p>
+      <p>{{ order.address }}<br>{{ order.zipcode }} {{ order.place }}</p>
+      {% if order.phone %}<p>Phone: {{ order.phone }}</p>{% endif %}
+      <p>Email: {{ order.email }}</p>
+    </div>
+    <div class="slip-block">
+      <h3>Delivery</h3>
+      <p>Status: <strong>{{ order.get_status_display }}</strong></p>
+      {% if order.tracking_number %}
+        <p>Tracking: <strong>{{ order.tracking_number }}</strong></p>
+      {% else %}
+        <p class="slip-empty">No tracking number yet</p>
+      {% endif %}
+      <p>Payment: {{ order.get_payment_method_display }}</p>
+    </div>
+  </div>
+
+  <table class="slip-items">
+    <thead>
+      <tr>
+        <th style="width:44px;">Qty</th>
+        <th>Product</th>
+        <th>Size</th>
+        <th>Stitching</th>
+        <th class="num">Price</th>
+        <th class="num">Line total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in order.items.all %}
+        <tr>
+          <td>{{ item.quantity }}</td>
+          <td><strong>{{ item.product.name }}</strong><br>
+              <span style="font-size:11px;color:#6b7280;">{{ item.product.slug }}</span></td>
+          <td>{{ item.size|default:"One size" }}</td>
+          <td>{{ item.get_stitching_selected_display }}</td>
+          <td class="num">{{ item.price }}</td>
+          <td class="num"><strong>{{ item.line_total }}</strong></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="slip-empty">This order has no items.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="slip-total">
+    Total: <strong>{{ order.total_amount }} {{ order.currency }}</strong>
+    &middot; {{ order.currency }} &middot; pay: {{ order.get_payment_method_display }}
+  </div>
+
+  {% if order.admin_note %}
+    <div class="slip-note">{{ order.admin_note }}</div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<div id="content-main" class="maims-home">
+
+  <p class="maims-home__summary">
+    <strong>{{ orders_today }}</strong> order{{ orders_today|pluralize }} today
+    &middot; <strong>{{ open_orders }}</strong> still to fulfil
+    &middot; <a href="{% url 'admin:products_order_changelist' %}">All orders</a>
+  </p>
+
+  {# The queues the shop works through, in the order they must be handled. #}
+  <section class="maims-block">
+    <h2>Orders to handle</h2>
+    <table class="maims-queue-table">
+      <tbody>
+        {% for queue in queues %}
+          <tr>
+            <td><a href="{{ queue.url }}">{{ queue.label }}</a></td>
+            <td class="maims-queue-table__count">{{ queue.count }}</td>
+          </tr>
+        {% endfor %}
+        <tr>
+          <td><a href="{% url 'admin:products_order_changelist' %}?status__exact=new&amp;status__exact=packed&amp;status__exact=shipped">Everything not yet delivered</a></td>
+          <td class="maims-queue-table__count">{{ open_orders }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  {# What each model controls on the storefront. #}
+  <section class="maims-block">
+    <h2>Store data</h2>
+    <ul class="maims-storelist">
+      <li>
+        <a href="{% url 'admin:products_product_changelist' %}">Products</a>
+        <span>Name, description, price per currency, stock, photos and videos. Stock is editable from the list.</span>
+      </li>
+      <li>
+        <a href="{% url 'admin:products_category_changelist' %}">Categories</a>
+        <span>The product sections. Tick "show on homepage" and set the order to control the "Shop by Category" strip.</span>
+      </li>
+      <li>
+        <a href="{% url 'admin:products_collection_changelist' %}">Collections</a>
+        <span>Seasonal groups such as "Festive" or "Summer basics", used to group products.</span>
+      </li>
+      <li>
+        <a href="{% url 'admin:products_heroslide_changelist' %}">Homepage hero slides</a>
+        <span>The rotating banner at the top of the home page: image, heading and button.</span>
+      </li>
+      <li>
+        <a href="{% url 'admin:products_sitesettings_changelist' %}">Store settings</a>
+        <span>WhatsApp number, which payment methods are offered, and the Facebook and social links in the header and footer.</span>
+      </li>
+      <li>
+        <a href="{% url 'admin:auth_user_changelist' %}">Customers</a>
+        <span>Registered customers, their saved delivery address and their order history.</span>
+      </li>
+    </ul>
+  </section>
+
+</div>
+{% endblock %}

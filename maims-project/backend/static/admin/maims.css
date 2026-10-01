@@ -1,0 +1,98 @@
+/* Maims admin.
+ *
+ * Layered on top of jazzmin (AdminLTE + Bootstrap), which already styles the
+ * shell, the tables, the forms and the buttons. So this file only covers the
+ * things jazzmin cannot know about: the home page layout, the one-click order
+ * controls, the inline badges, and the CSV import report. Anything that only
+ * restyled Django's default theme has been removed.
+ */
+
+:root {
+  --maims-ink: #0F0F12;
+  --maims-accent: #7C3AED;
+  --maims-line: #e5e7eb;
+  --maims-muted: #6b7280;
+}
+
+/* --- Home page ------------------------------------------------------------- */
+.maims-home__summary {
+  font-size: 14px; color: var(--maims-muted); margin: 0 0 22px;
+}
+.maims-home__summary strong { color: var(--maims-ink); }
+
+.maims-block { margin-bottom: 30px; max-width: 720px; }
+.maims-block h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--maims-muted); margin: 0 0 8px;
+}
+
+.maims-queue-table { width: 100%; border-collapse: collapse; background: #fff; }
+.maims-queue-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--maims-line); font-size: 14px;
+}
+.maims-queue-table tr:last-child td { border-bottom: 0; }
+.maims-queue-table a { color: var(--maims-ink); font-weight: 600; text-decoration: none; }
+.maims-queue-table a:hover { text-decoration: underline; }
+.maims-queue-table__count { text-align: right; width: 60px; font-weight: 800; }
+
+.maims-storelist { list-style: none; margin: 0; padding: 0; background: #fff; }
+.maims-storelist li { padding: 12px 14px; border-bottom: 1px solid var(--maims-line); }
+.maims-storelist li:last-child { border-bottom: 0; }
+.maims-storelist a { font-weight: 700; color: var(--maims-ink); text-decoration: none; }
+.maims-storelist a:hover { text-decoration: underline; }
+.maims-storelist span { display: block; font-size: 12px; color: var(--maims-muted); margin-top: 2px; }
+
+/* --- Changelist toolbar (order presets, restock warning) -------------------- */
+.maims-banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  background: #f8faff; border: 1px solid var(--maims-line); border-radius: 10px;
+  padding: 10px 12px; margin-bottom: 12px; font-size: 12px;
+}
+.maims-banner__label { font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--maims-muted); }
+.maims-banner__warn { font-weight: 700; color: #92400e; }
+.maims-banner__hint { color: var(--maims-muted); }
+.maims-preset {
+  display: inline-block;
+  padding: 5px 11px; border: 1px solid var(--maims-line); border-radius: 999px;
+  background: #fff; text-decoration: none; color: var(--maims-ink); font-weight: 600;
+}
+.maims-preset:hover { border-color: var(--maims-ink); }
+
+/* --- The one-click "next step" button on each order row -------------------- */
+.maims-next {
+  background: var(--maims-ink); color: #fff; border: 0; border-radius: 999px;
+  padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.maims-next:hover { background: var(--maims-accent); }
+.maims-done { color: #166534; font-size: 12px; font-weight: 700; }
+
+/* --- Contact buttons (WhatsApp / email) ------------------------------------ */
+.maims-contact {
+  display: inline-block; padding: 6px 12px; margin: 0 6px 6px 0; border-radius: 999px;
+  border: 1px solid var(--maims-line); background: #fff; text-decoration: none;
+  font-size: 12px; font-weight: 700; color: var(--maims-ink);
+}
+.maims-contact:hover { border-color: var(--maims-ink); }
+.maims-contact--wa { background: #dcfce7; border-color: #86efac; color: #166534; }
+.maims-contact-panel { margin-top: 18px; }
+
+/* --- Inline badges in list columns ----------------------------------------- */
+.maims-badge {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: .02em; white-space: nowrap;
+}
+.maims-nothumb { font-size: 11px; color: var(--maims-muted); }
+.maims-items { margin: 8px 0; padding-left: 18px; line-height: 1.7; }
+
+/* --- CSV import report ----------------------------------------------------- */
+.maims-import__sample, .maims-import__report {
+  background: #f9fafb; border: 1px solid var(--maims-line); border-radius: 8px;
+  padding: 10px 12px; font-size: 12px; overflow-x: auto;
+}
+.maims-import__report { width: 100%; border-collapse: collapse; }
+.maims-import__report th, .maims-import__report td { padding: 6px 8px; border-bottom: 1px solid var(--maims-line); text-align: left; }
+.maims-import__bad { background: #fef2f2; }
+.maims-import__note { font-size: 12px; }
+
+/* --- One width fix: the bulk-action dropdown is unreadably narrow by default */
+#changelist .actions select { min-width: 280px; }
