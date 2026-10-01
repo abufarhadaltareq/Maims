@@ -12,7 +12,7 @@
       </div>
 
       <form v-else @submit.prevent="saveProfile" class="p-8 space-y-6">
-        
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
           <div>
             <label class="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1">Username</label>
@@ -21,6 +21,24 @@
           <div>
             <label class="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1">Email Address</label>
             <p class="font-bold text-gray-800">{{ profile.email }}</p>
+          </div>
+          <div>
+            <label class="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1">First Name</label>
+            <input
+              v-model="profile.first_name"
+              type="text"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+              placeholder="First name"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1">Last Name</label>
+            <input
+              v-model="profile.last_name"
+              type="text"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+              placeholder="Last name"
+            />
           </div>
         </div>
 
@@ -75,14 +93,51 @@
           {{ message }}
         </div>
 
-        <div class="pt-2">
-          <button 
-            type="submit" 
+        <div class="pt-2 space-y-3">
+          <button
+            type="submit"
             :disabled="saving"
             class="w-full bg-blue-600 text-white py-3 rounded-lg font-black uppercase text-sm tracking-wider hover:bg-blue-700 disabled:bg-gray-300 transition shadow-sm"
           >
             {{ saving ? 'Saving Changes...' : 'Save Profile Defaults' }}
           </button>
+          <button
+            type="button"
+            @click="logout"
+            class="w-full bg-white text-gray-700 border border-gray-200 py-3 rounded-lg font-black uppercase text-sm tracking-wider hover:bg-gray-50 transition shadow-sm"
+          >
+            Log Out
+          </button>
+        </div>
+
+        <hr class="border-gray-100" />
+
+        <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+          <h3 class="text-sm font-black text-gray-700 uppercase tracking-wide mb-3">Change Password</h3>
+          <div class="space-y-3">
+            <input
+              v-model="pw.current"
+              type="password"
+              autocomplete="current-password"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+              placeholder="Current password"
+            />
+            <input
+              v-model="pw.next"
+              type="password"
+              autocomplete="new-password"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+              placeholder="New password (min. 8 characters)"
+            />
+            <button
+              type="button"
+              @click="updatePassword"
+              :disabled="pwSaving"
+              class="w-full bg-gray-800 text-white py-2.5 rounded-lg font-black uppercase text-xs tracking-wider hover:bg-black disabled:bg-gray-300 transition"
+            >
+              {{ pwSaving ? 'Updating…' : 'Update Password' }}
+            </button>
+          </div>
         </div>
 
       </form>
@@ -92,11 +147,18 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
+import { useAuthStore } from '../stores/auth'
+
+const router = useRouter()
+const auth = useAuthStore()
 
 const profile = ref({
   username: '',
   email: '',
+  first_name: '',
+  last_name: '',
   phone: '',
   address: '',
   zipcode: '',
@@ -107,6 +169,8 @@ const loading = ref(true)
 const saving = ref(false)
 const message = ref('')
 const isError = ref(false)
+const pw = ref({ current: '', next: '' })
+const pwSaving = ref(false)
 
 const fetchProfile = async () => {
   try {
@@ -143,4 +207,31 @@ const saveProfile = async () => {
 onMounted(() => {
   fetchProfile()
 })
+
+const logout = async () => {
+  await auth.logout()
+  router.push('/')
+}
+
+const updatePassword = async () => {
+  if (!pw.value.current || !pw.value.next) {
+    message.value = 'Enter your current and new password.'
+    isError.value = true
+    return
+  }
+  pwSaving.value = true
+  message.value = ''
+  isError.value = false
+  try {
+    await auth.changePassword(pw.value.current, pw.value.next)
+    message.value = 'Password updated successfully!'
+    pw.value = { current: '', next: '' }
+    setTimeout(() => { message.value = '' }, 3000)
+  } catch (e) {
+    isError.value = true
+    message.value = e.response?.data?.error || 'Failed to update password.'
+  } finally {
+    pwSaving.value = false
+  }
+}
 </script>

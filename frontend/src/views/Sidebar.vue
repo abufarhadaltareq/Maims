@@ -11,8 +11,18 @@
     </div>
 
     <!-- Navigation Tree Links -->
-    <nav class="space-y-2">
-      <div v-for="item in menuStructure" :key="item.name" class="border-b border-gray-50 pb-2 last:border-none">
+    <div v-if="loading" class="px-3 py-6 text-xs text-gray-400 font-medium">Loading collections…</div>
+    <div v-else-if="loadError" class="px-3 py-4 text-xs text-red-500 bg-red-50 rounded-xl">
+      Couldn't load categories. <button @click="fetchCategories" class="underline font-bold">Retry</button>
+    </div>
+    <nav v-else class="space-y-2">
+      <router-link
+        to="/"
+        class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-800 font-semibold text-sm hover:bg-slate-50 transition-all"
+      >
+        <span class="text-lg">🛍️</span><span>All Products</span>
+      </router-link>
+      <div v-for="item in menuStructure" :key="item.slug || item.name" class="border-b border-gray-50 pb-2 last:border-none">
         
         <!-- Parent Header Action Toggle -->
         <button
@@ -22,7 +32,11 @@
         >
           <div class="flex items-center gap-3">
             <span class="text-lg opacity-80 group-hover:scale-110 transition-transform">{{ item.icon }}</span>
-            <span class="tracking-wide group-hover:text-black">{{ item.name }}</span>
+            <router-link v-if="item.slug" :to="`/category/${item.slug}`" @click.stop class="tracking-wide group-hover:text-black flex items-center gap-2">
+              {{ item.name }}
+              <span v-if="item.count" class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-bold">{{ item.count }}</span>
+            </router-link>
+            <span v-else class="tracking-wide group-hover:text-black">{{ item.name }}</span>
           </div>
           
           <div class="flex items-center gap-2">
@@ -51,62 +65,73 @@
       </div>
     </nav>
 
-    <!-- Additional Premium UI Modules (Standard for High-End E-commerce) -->
-    <div class="mt-12 pt-6 border-t border-gray-100 space-y-6 px-2">
-      <div>
-        <h3 class="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400 mb-3">
-          Customer Service
-        </h3>
-        <ul class="space-y-2 text-xs font-medium text-slate-500">
-          <li><a href="#" class="hover:text-black transition-colors">Track Order</a></li>
-          <li><a href="#" class="hover:text-black transition-colors">Worldwide Shipping</a></li>
-          <li><a href="#" class="hover:text-black transition-colors">Easy Returns</a></li>
-        </ul>
-      </div>
-    </div>
+
   </aside>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
+
+const ICONS = ['👗', '✨', '🧥', '👜', '👟', '💎', '🧣', '👒', '🧵', '⚡']
 
 // Track active toggle states dynamically
-const openCategories = ref({
-  'Women Clothing': true,
-  'Jewellery': false
-})
+const openCategories = ref({})
+const backendCategories = ref([])
+const loading = ref(true)
+const loadError = ref(false)
 
 const toggleCategory = (name) => {
   openCategories.value[name] = !openCategories.value[name]
 }
 
-// Structured tree cleanly wrapping your database slugs to look like LAAM
-const menuStructure = ref([
-  {
-    name: 'Women Clothing',
-    icon: '👗',
-    badge: 'New',
-    subcategories: [
-      { name: 'Pakistani Pret', slug: 'pakistani' },
-      { name: 'Jamdani Heritage', slug: 'jamdani' },
-      { name: 'Stitched Luxury', slug: 'stiched' },
-      { name: 'Unstitched Fabrics', slug: 'unstiched' }
-    ]
-  },
-  {
-    name: 'Jewellery',
-    icon: '✨',
-    subcategories: [
-      { name: 'Necklaces & Sets', slug: 'jewelarry' }
-    ]
-  },
-  {
-    name: 'Ready To Ship',
-    icon: '⚡',
-    badge: 'Hot',
-    subcategories: []
+const iconFor = (index, name) => {
+  const n = (name || '').toLowerCase()
+  if (n.includes('jewel')) return '✨'
+  if (n.includes('women') || n.includes('dress') || n.includes('cloth')) return '👗'
+  if (n.includes('men')) return '🧥'
+  if (n.includes('bag')) return '👜'
+  if (n.includes('shoe')) return '👟'
+  if (n.includes('ship') || n.includes('ready')) return '⚡'
+  return ICONS[index % ICONS.length]
+}
+
+// Build menu from backend: top-level parents with nested children.
+const fallbackMenu = [
+  { name: 'Women Clothing', slug: '', icon: '👗', badge: 'New', count: 0, subcategories: [] },
+  { name: 'Jewellery', slug: '', icon: '✨', badge: '', count: 0, subcategories: [] },
+]
+
+const menuStructure = computed(() => {
+  if (!backendCategories.value.length) return fallbackMenu
+  return backendCategories.value.map((cat, i) => ({
+    name: cat.name,
+    slug: cat.slug,
+    icon: iconFor(i, cat.name),
+    badge: i === 0 ? 'New' : '',
+    count: cat.product_count || 0,
+    subcategories: (cat.children || []).map((c) => ({ name: c.name, slug: c.slug })),
+  }))
+})
+
+const fetchCategories = async () => {
+  loading.value = true
+  loadError.value = false
+  try {
+    const res = await axios.get('/api/v1/categories/')
+    backendCategories.value = Array.isArray(res.data) ? res.data : []
+    backendCategories.value.forEach((cat, i) => {
+      if (i === 0 || (cat.children && cat.children.length)) openCategories.value[cat.name] = i === 0
+    })
+  } catch (e) {
+    console.error('Sidebar categories failed:', e)
+    loadError.value = true
+  } finally {
+    loading.value = false
   }
-])
+}
+
+onMounted(fetchCategories)
 </script>
 
 <style scoped>

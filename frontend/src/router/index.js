@@ -20,7 +20,7 @@ const routes = [
   {
     path: '/search',
     name: 'search',
-    component: SearchView 
+    component: SearchView
   },
   {
     path: '/products/:slug',
@@ -47,31 +47,45 @@ const routes = [
     name: 'checkout',
     component: CheckoutView
   },
-  { 
+  {
     path: '/order-history',
     name: 'order-history',
-    component: OrderHistoryView
+    component: OrderHistoryView,
+    meta: { requiresAuth: true }
   },
   {
     path: '/sign-up',
     name: 'SignUp',
-    component: SignUpView
+    component: SignUpView,
+    meta: { guestOnly: true }
   },
   {
     path: '/log-in',
     name: 'LogIn',
-    component: LogInView
+    component: LogInView,
+    meta: { guestOnly: true }
   },
   {
     path: '/profile',
     name: 'Profile',
-    component: ProfileView
+    component: ProfileView,
+    meta: { requiresAuth: true }
   }
 ]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes
+})
+
+router.beforeEach((to) => {
+  const token = localStorage.getItem('token')
+  if (to.meta.requiresAuth && !token) {
+    return { path: '/log-in', query: { redirect: to.fullPath } }
+  }
+  if (to.meta.guestOnly && token) {
+    return { path: typeof to.query.redirect === 'string' ? to.query.redirect : '/' }
+  }
 })
 
 export default router

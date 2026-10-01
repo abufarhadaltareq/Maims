@@ -1,17 +1,25 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useCartStore } from '../stores/cart'
+import { useSiteStore } from '../stores/site'
 import axios from 'axios'
 import { loadStripe } from '@stripe/stripe-js'
+import { getProductDisplayPrice } from '../utils/pricing.js'
 
 // --- State ---
 const cartStore = useCartStore()
+const site = useSiteStore()
 const isSuccess = ref(false)
+const successMethod = ref('stripe')
+const successOrderId = ref(null)
+const successWhatsappLink = ref('')
 const isProcessing = ref(false)
 const serverError = ref('')
 const orderId = ref(null)
 const stripe = ref(null)
 const cardElement = ref(null)
+const stripeReady = ref(false)
+const paymentMethod = ref('stripe') // stripe | cod | whatsapp
 
 // --- Form Data ---
 const form = ref({
@@ -26,23 +34,35 @@ const form = ref({
 })
 
 // --- Computed ---
-const totalCartCost = computed(() => {
-  if (!cartStore?.items) return 0
-  return cartStore.items.reduce((total, item) => {
-    return total + (item.product.price * item.quantity)
-  }, 0)
-})
+const itemPrice = (item) =>
+  getProductDisplayPrice(item.product || {}, cartStore.currentCurrency).numeric
+
+const totalCartCost = computed(() => cartStore.cartPricing.subtotal)
 
 const formattedItems = computed(() => {
   return cartStore.items.map(item => ({
     product_id: item.product.id,
-    quantity: item.quantity,
-    price: item.product.price,
+    quantity: item.quantity || 1,
+    price: itemPrice(item).toFixed(2),
     selectedSize: item.size || ''
   }))
 })
 
+const basePayload = computed(() => ({
+  first_name: form.value.first_name,
+  last_name: form.value.last_name,
+  email: form.value.email,
+  phone: `${form.value.country_code} ${form.value.phone}`,
+  address: form.value.address,
+  zipcode: form.value.zipcode,
+  place: form.value.place,
+  total_amount: totalCartCost.value.toFixed(2),
+  currency: cartStore.currentCurrency,
+  items: formattedItems.value,
+}))
+
 const initializeStripe = async () => {
+  if (!site.stripeEnabled) return
   try {
     const response = await axios.get('/api/v1/stripe-key/')
     const publishableKey = response.data.publishableKey
@@ -67,6 +87,7 @@ const initializeStripe = async () => {
       }
     })
     cardElement.value.mount('#card-element')
+    stripeReady.value = true
   } catch (err) {
     serverError.value = 'Unable to initialize payment form.'
     console.error(err)
@@ -74,6 +95,10 @@ const initializeStripe = async () => {
 }
 
 onMounted(async () => {
+  await site.fetchSettings()
+  // Default to first available method if admin disabled Stripe.
+  if (!site.stripeEnabled && site.codEnabled) paymentMethod.value = 'cod'
+  else if (!site.stripeEnabled && !site.codEnabled && site.whatsappEnabled) paymentMethod.value = 'whatsapp'
   try {
     const response = await axios.get('/api/v1/profile/')
     if (response.data) {
@@ -83,12 +108,35 @@ onMounted(async () => {
     console.warn('Profile not loaded (this is fine if no user is logged in).')
   }
 
-  await initializeStripe()
+  if (site.stripeEnabled) await initializeStripe()
 })
 
 const submitCheckoutForm = async () => {
   isProcessing.value = true
   serverError.value = ''
+
+  if (!cartStore.items.length) {
+    serverError.value = 'Your bag is empty.'
+    isProcessing.value = false
+    return
+  }
+
+  // COD / WhatsApp: no card needed.
+  if (paymentMethod.value === 'cod' || paymentMethod.value === 'whatsapp') {
+    try {
+      const res = await axios.post('/api/v1/checkout/', { ...basePayload.value, payment_method: paymentMethod.value })
+      successMethod.value = res.data.payment_method || paymentMethod.value
+      successOrderId.value = res.data.order_id
+      successWhatsappLink.value = res.data.whatsapp_link || ''
+      cartStore.clearCart()
+      isSuccess.value = true
+    } catch (err) {
+      serverError.value = err.response?.data?.error || 'Could not place your order. Please try again.'
+    } finally {
+      isProcessing.value = false
+    }
+    return
+  }
 
   if (!stripe.value || !cardElement.value) {
     serverError.value = 'Payment provider is not ready. Please refresh and try again.'
@@ -97,17 +145,7 @@ const submitCheckoutForm = async () => {
   }
 
   try {
-    const checkoutResponse = await axios.post('/api/v1/checkout/', {
-      first_name: form.value.first_name,
-      last_name: form.value.last_name,
-      email: form.value.email,
-      phone: `${form.value.country_code} ${form.value.phone}`,
-      address: form.value.address,
-      zipcode: form.value.zipcode,
-      place: form.value.place,
-      total_amount: totalCartCost.value,
-      items: formattedItems.value
-    })
+    const checkoutResponse = await axios.post('/api/v1/checkout/', { ...basePayload.value, payment_method: 'stripe' })
 
     const clientSecret = checkoutResponse.data.client_secret
     orderId.value = checkoutResponse.data.order_id
@@ -140,6 +178,8 @@ const submitCheckoutForm = async () => {
       })
 
       cartStore.clearCart()
+      successMethod.value = 'stripe'
+      successOrderId.value = orderId.value
       isSuccess.value = true
     } else {
       serverError.value = 'Payment was not completed. Please try again.'
@@ -163,10 +203,28 @@ const submitCheckoutForm = async () => {
         </svg>
       </div>
       <h1 class="text-3xl font-black tracking-tight text-gray-900">Thank You For Your Order!</h1>
-      <p class="text-gray-500 text-sm max-w-sm mx-auto">Your payment has been successfully completed. We are preparing your packages for shipment.</p>
-      <router-link to="/" class="block bg-blue-600 text-white font-bold px-6 py-3.5 rounded-xl hover:bg-blue-700 transition shadow-sm mt-4">
-        Continue Shopping
-      </router-link>
+      <p v-if="successOrderId" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Order #{{ successOrderId }}</p>
+      <p class="text-gray-500 text-sm max-w-sm mx-auto">
+        <span v-if="successMethod === 'stripe'">Your payment has been successfully completed. We are preparing your packages for shipment.</span>
+        <span v-else-if="successMethod === 'cod'">Your order is placed — pay in cash when it arrives. We'll contact you to confirm.</span>
+        <span v-else>Your order is saved. Tap below to send it to us on WhatsApp and confirm.</span>
+      </p>
+      <a
+        v-if="successMethod === 'whatsapp' && successWhatsappLink"
+        :href="successWhatsappLink"
+        target="_blank" rel="noopener"
+        class="block bg-[#25D366] text-white font-bold px-6 py-3.5 rounded-xl hover:brightness-95 transition shadow-sm"
+      >
+        Send Order on WhatsApp
+      </a>
+      <div class="flex gap-3">
+        <router-link to="/" class="flex-1 block bg-blue-600 text-white font-bold px-6 py-3.5 rounded-xl hover:bg-blue-700 transition shadow-sm">
+          Continue Shopping
+        </router-link>
+        <router-link to="/order-history" class="flex-1 block bg-gray-100 text-gray-800 font-bold px-6 py-3.5 rounded-xl hover:bg-gray-200 transition shadow-sm">
+          Track Order
+        </router-link>
+      </div>
     </div>
 
     <div v-else-if="!cartStore?.items || cartStore.items.length === 0" class="text-center py-12">
@@ -218,13 +276,61 @@ const submitCheckoutForm = async () => {
           </div>
 
           <div class="bg-white border border-gray-100 rounded-xl p-6 shadow-sm space-y-4">
+            <h2 class="text-xl font-bold tracking-tight mb-2">Payment Method</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                v-if="site.stripeEnabled"
+                type="button"
+                @click="paymentMethod = 'stripe'"
+                :class="paymentMethod === 'stripe' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'"
+                class="border-2 rounded-xl p-3 text-left transition"
+              >
+                <p class="font-bold text-sm">💳 Card</p>
+                <p class="text-[11px] text-gray-500">Visa / Mastercard via Stripe</p>
+              </button>
+              <button
+                v-if="site.codEnabled"
+                type="button"
+                @click="paymentMethod = 'cod'"
+                :class="paymentMethod === 'cod' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'"
+                class="border-2 rounded-xl p-3 text-left transition"
+              >
+                <p class="font-bold text-sm">💵 Cash on Delivery</p>
+                <p class="text-[11px] text-gray-500">Pay when it arrives</p>
+              </button>
+              <button
+                v-if="site.whatsappEnabled"
+                type="button"
+                @click="paymentMethod = 'whatsapp'"
+                :class="paymentMethod === 'whatsapp' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'"
+                class="border-2 rounded-xl p-3 text-left transition"
+              >
+                <p class="font-bold text-sm">💬 WhatsApp Order</p>
+                <p class="text-[11px] text-gray-500">Confirm on chat</p>
+              </button>
+            </div>
+            <p v-if="!site.stripeEnabled && !site.codEnabled && !site.whatsappEnabled" class="text-sm text-red-500">
+              No payment methods are enabled. Please contact the store.
+            </p>
+          </div>
+
+          <div v-if="paymentMethod === 'stripe'" class="bg-white border border-gray-100 rounded-xl p-6 shadow-sm space-y-4">
             <h2 class="text-xl font-bold tracking-tight mb-4">Payment Details</h2>
             <div id="card-element" class="p-3.5 border border-gray-200 rounded-lg bg-gray-50/50"></div>
+            <p class="text-[11px] text-gray-400">Secured by Stripe. We never store your card number.</p>
             <p v-if="serverError" class="text-sm text-red-500">{{ serverError }}</p>
+          </div>
+          <div v-else class="bg-blue-50 border border-blue-100 rounded-xl p-5 text-sm text-blue-900">
+            <p v-if="paymentMethod === 'cod'" class="font-semibold">No card needed — pay cash on delivery. We'll confirm by phone/WhatsApp.</p>
+            <p v-else class="font-semibold">No card needed — your order is saved, then sent to our WhatsApp Business number with one tap.</p>
+            <p v-if="serverError" class="text-sm text-red-500 mt-2">{{ serverError }}</p>
           </div>
 
           <button type="submit" :disabled="isProcessing" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition disabled:opacity-70">
-            {{ isProcessing ? 'Processing...' : `Pay ${totalCartCost.toFixed(2)} €` }}
+            <span v-if="isProcessing">Processing...</span>
+            <span v-else-if="paymentMethod === 'stripe'">Pay {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
+            <span v-else-if="paymentMethod === 'cod'">Place COD Order · {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
+            <span v-else>Place WhatsApp Order · {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
           </button>
         </form>
 
@@ -235,11 +341,11 @@ const submitCheckoutForm = async () => {
               <span class="font-semibold">{{ item.product.name }}</span>
               <p v-if="item.size" class="text-xs text-gray-500">Size: {{ item.size }}</p>
             </div>
-            <span>{{ (item.product.price * item.quantity).toFixed(2) }} €</span>
+            <span>{{ (itemPrice(item) * (item.quantity || 0)).toFixed(2) }} {{ cartStore.currentCurrency }}</span>
           </div>
           <div class="flex justify-between font-bold text-xl pt-4">
             <span>Total:</span>
-            <span>{{ totalCartCost.toFixed(2) }} €</span>
+            <span>{{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
           </div>
         </div>
       </div>

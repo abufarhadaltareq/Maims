@@ -16,17 +16,35 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load local .env (STRIPE keys, SECRET_KEY, etc.) — silently skipped if absent.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / '.env')
+except ImportError:  # python-dotenv not installed: rely on real environment vars
+    pass
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-l88&4z9wxa^19^suqzf3q+^_*7n7o0*rm+qr9@l8wqo6zdtzgc'
+# The fallback below is a dev convenience ONLY — it is validated against DEBUG
+# so it can never silently ship to production.
+_INSECURE_DEV_KEY = 'django-insecure-l88&4z9wxa^19^suqzf3q+^_*7n7o0*rm+qr9@l8wqo6zdtzgc'
+SECRET_KEY = os.environ.get('SECRET_KEY', _INSECURE_DEV_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Default to False so a missing env var fails closed instead of leaking tracebacks.
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = []
+# Fail fast if production is misconfigured with the public fallback key.
+if not DEBUG and SECRET_KEY == _INSECURE_DEV_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        'SECRET_KEY environment variable must be set to a strong, unique value when DEBUG=False.'
+    )
+
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
 
 
 # Application definition
@@ -79,22 +97,63 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {}
+# PostgreSQL is the supported runtime database. SQLite is no longer used as a
+# silent fallback (an unset/unreachable database should fail loudly, not quietly
+# write to a local file). Configuration is resolved in this order so the same
+# code runs locally, under docker-compose, and on Railway/Render/Heroku:
+#
+#   1. DATABASE_URL                    single URL — PaaS providers inject this
+#   2. POSTGRES_* / PG* discrete vars  docker-compose, manual setups
+#   3. local-development defaults      mirror docker-compose.yml
+#
+# Escape hatch: export DB_ENGINE=sqlite for throwaway local runs / the SQLite→
+# PostgreSQL data dump. Never set it in production.
 
-if os.environ.get('POSTGRES_DB'):
-    DATABASES['default'] = {
+def _postgres_from_url(url):
+    """Parse postgresql://user:pass@host:port/db into a Django DATABASES dict."""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ('postgres', 'postgresql'):
+        raise ValueError(f'DATABASE_URL must use the postgresql:// scheme, got {parsed.scheme!r}')
+    return {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB'),
-        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
-        'HOST': os.environ.get('POSTGRES_HOST', '127.0.0.1'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        'NAME': parsed.path.lstrip('/') or 'maims_db',
+        'USER': parsed.username or 'maims_user',
+        'PASSWORD': parsed.password or '',
+        'HOST': parsed.hostname or '127.0.0.1',
+        'PORT': str(parsed.port or 5432),
+    }
+
+
+def _postgres_from_env():
+    """Build a PostgreSQL config from discrete environment variables."""
+    return {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB') or os.environ.get('PGDATABASE') or 'maims_db',
+        'USER': os.environ.get('POSTGRES_USER') or os.environ.get('PGUSER') or 'maims_user',
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD') or os.environ.get('PGPASSWORD') or 'maims_password',
+        'HOST': os.environ.get('POSTGRES_HOST') or os.environ.get('PGHOST') or '127.0.0.1',
+        'PORT': str(os.environ.get('POSTGRES_PORT') or os.environ.get('PGPORT') or 5432),
+    }
+
+
+if os.environ.get('DB_ENGINE', 'postgresql').lower() == 'sqlite':
+    # Explicit opt-in only (local dev / data migration). Not a default.
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
 else:
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    _database_url = os.environ.get('DATABASE_URL')
+    _config = _postgres_from_url(_database_url) if _database_url else _postgres_from_env()
+    # Reuse connections between requests when talking to PostgreSQL. Kept at 0
+    # (no persistence) by default so short-lived/test processes stay predictable;
+    # production should set DB_CONN_MAX_AGE (e.g. 600).
+    _config['CONN_MAX_AGE'] = int(os.environ.get('DB_CONN_MAX_AGE', '0'))
+    DATABASES = {'default': _config}
 
 
 # Password validation
@@ -132,9 +191,16 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-CORS_ALLOW_ALL_ORIGINS = True
+
+# CORS is allow-listed by default. Allow-all is only enabled when the operator
+# explicitly opts in — it is NEVER auto-enabled just because DEBUG is on.
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False').lower() in ('true', '1', 'yes')
+CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').split(',') if o.strip()]
+# Auth uses the Authorization header (token), not cookies, so credentials aren't needed.
+CORS_ALLOW_CREDENTIALS = False
 
 # STRIPE CONFIGURATION
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
@@ -156,10 +222,36 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@maims.app')
 # The Admin email address that receives store notifications
 ADMIN_RECEIVER_EMAIL = os.environ.get('ADMIN_RECEIVER_EMAIL', '')
 
+# --- Transport & cookie hardening ---
+SECURE_CONTENT_TYPE_NOSNIFF = True          # X-Content-Type-Options: nosniff
+X_FRAME_OPTIONS = 'DENY'                    # clickjacking protection (admin included)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+# Secure cookies only once HTTPS is guaranteed (local dev is plain http).
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+# Trust the proxy's X-Forwarded-Proto header (Railway/Render/Heroku terminate TLS).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True              # force https
+    SECURE_HSTS_SECONDS = 31536000          # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
     ],
-
-
+    # Fail closed: any view that forgets to declare permissions is private.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    # Scoped throttles attached to sensitive endpoints (login/register/checkout).
+    'DEFAULT_THROTTLE_RATES': {
+        'auth': os.environ.get('THROTTLE_AUTH', '10/min'),
+        'checkout': os.environ.get('THROTTLE_CHECKOUT', '30/hour'),
+    },
 }

@@ -1,5 +1,7 @@
 # Backend - Python & Django
 maims-project/backend/db.sqlite3
+# Temporary dump produced by scripts/migrate_sqlite_to_postgres.sh
+maims-project/backend/sqlite_dump.json
 maims-project/backend/env/
 maims-project/backend/venv/
 maims-project/backend/.venv/

@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+@theme {
+  /* 🌟 GLOBAL MULTI-BRAND UTILITIES (Tailwind v4) */
+  /* Change these Hex codes whenever you clone the code for a new brand */
+  --color-brand-primary: #0F0F12;    /* Primary ink (buttons, headings, badges) */
+  --color-brand-secondary: #ffffff;  /* Background structures */
+  --color-brand-accent: #7C3AED;     /* Highlights, accents, tags */
+  --color-brand-muted: #f3f4f6;      /* Shading layout blocks */
+  --color-brand-text: #1f2937;       /* Main readable copy texts */
+
+  --font-brand: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}

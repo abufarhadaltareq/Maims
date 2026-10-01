@@ -5,7 +5,9 @@ import App from './App.vue'
 import router from './router'
 import './assets/style.css'
 
-axios.defaults.baseURL = '/'
+// In dev, Vite proxy handles /api/* -> 127.0.0.1:8000.
+// In production (Vercel), VITE_API_URL points at the deployed Django backend.
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || '/'
 const existingToken = localStorage.getItem('token')
 if (existingToken) {
   axios.defaults.headers.common['Authorization'] = 'Token ' + existingToken

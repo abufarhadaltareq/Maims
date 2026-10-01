@@ -40,27 +40,41 @@
             </div>
             
             <div class="flex items-center gap-2 pt-2">
-              <button 
+              <button
                 @click="cartStore.decrementQuantity(item.product?.id, item.size)"
                 class="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition text-sm font-bold"
               >
                 -
               </button>
-              <span class="w-8 text-center font-bold text-sm">
-                {{ item.item_quantity || item.quantity }}
-              </span>
-              <button 
+              <input
+                :value="item.quantity"
+                @change="(e) => cartStore.setQuantity(item.product?.id, item.size, e.target.value)"
+                type="number" min="1" max="99"
+                class="w-12 text-center font-bold text-sm border border-gray-200 rounded-md py-1"
+              />
+              <button
                 @click="cartStore.incrementQuantity(item.product?.id, item.size)"
-                class="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition text-sm font-bold"
+                :disabled="item.product?.stock != null && item.quantity >= item.product.stock"
+                title="Add one"
+                class="w-7 h-7 flex items-center justify-center border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition text-sm font-bold disabled:opacity-40"
               >
                 +
               </button>
+              <button
+                @click="cartStore.removeItem(item.product?.id, item.size)"
+                class="ml-2 text-xs text-gray-400 hover:text-red-600 underline"
+              >
+                Remove
+              </button>
             </div>
+            <p v-if="item.product?.stock != null && item.quantity >= item.product.stock" class="text-[11px] text-amber-600 font-semibold">
+              Only {{ item.product.stock }} in stock
+            </p>
           </div>
 
           <div class="text-right pl-2">
             <p class="font-extrabold text-base whitespace-nowrap">
-              {{ (getItemDisplayPrice(item).numeric * (item.item_quantity || item.quantity || 0)).toFixed(2) }} {{ cartStore.currentCurrency }}
+              {{ (getItemDisplayPrice(item).numeric * (item.quantity || 0)).toFixed(2) }} {{ cartStore.currentCurrency }}
             </p>
           </div>
         </div>
@@ -97,12 +111,23 @@
           </span>
         </div>
 
-        <router-link 
-          to="/checkout" 
+        <router-link
+          to="/checkout"
           class="block w-full text-center bg-blue-600 text-white font-bold py-3.5 rounded-lg shadow hover:bg-blue-700 transition duration-200 mt-4"
         >
           Proceed to Checkout
         </router-link>
+
+        <a
+          v-if="site.whatsappEnabled && whatsappCartLink"
+          :href="whatsappCartLink"
+          target="_blank" rel="noopener"
+          class="flex items-center justify-center gap-2 w-full text-center bg-[#25D366] text-white font-bold py-3 rounded-lg shadow hover:brightness-95 transition duration-200"
+        >
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.4 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.9-4.3-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5s.8 1.9.8 2c.1.1.1.3 0 .5-.3.6-.6.8-.4 1.1.6 1.1 1.4 1.8 2.4 2.4.3.2.5.1.7-.1l.8-.9c.2-.3.4-.2.7-.1l2 1c.3.1.5.2.6.4 0 .1 0 .6-.5 1.5z"/></svg>
+          Order via WhatsApp
+        </a>
+        <p v-if="site.whatsappEnabled" class="text-[11px] text-gray-400 text-center">Sends your bag as a WhatsApp message — pay on chat.</p>
       </div>
 
     </div>
@@ -110,69 +135,37 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useCartStore } from '../stores/cart'
+import { useSiteStore } from '../stores/site'
+import { getProductDisplayPrice } from '../utils/pricing.js'
 
 const cartStore = useCartStore()
+const site = useSiteStore()
 
-// Core currency exchange rates index matching your other views
-const ratesToUSD = {
-  'SEK': 0.095,
-  'PKR': 0.0036,
-  'EUR': 1.08,
-  'BDT': 0.0085,
-  'USD': 1.0
-}
+const getItemDisplayPrice = (item) =>
+  getProductDisplayPrice(item.product || {}, cartStore.currentCurrency)
 
-// 🌟 DYNAMIC CURRENCY CALCULATOR FOR A NESTED CART ITEM PRODUCT
-const getItemDisplayPrice = (item) => {
-  const selectedCurrency = cartStore.currentCurrency // e.g., 'BDT'
-  const product = item.product || {}
-  
-  // 1. If the nested product has a specific prices array from the database, try to find an exact match
-  if (product.prices && Array.isArray(product.prices)) {
-    const regionalPrice = product.prices.find(p => p.currency === selectedCurrency)
-    if (regionalPrice) {
-      return {
-        numeric: parseFloat(regionalPrice.price),
-        string: `${Number(regionalPrice.price).toFixed(2)} ${selectedCurrency}`
-      }
-    }
-    
-    // 2. Fallback: If no exact match exists, convert using the first available currency object from the array
-    const backupPriceObj = product.prices[0]
-    if (backupPriceObj) {
-      const basePrice = Number(backupPriceObj.price)
-      const baseCurrency = backupPriceObj.currency
-      
-      const rateInUSD = ratesToUSD[baseCurrency] || 1.0
-      const targetRateFromUSD = ratesToUSD[selectedCurrency] || 1.0
-      
-      const convertedPrice = (basePrice * rateInUSD) / targetRateFromUSD
-      return {
-        numeric: convertedPrice,
-        string: `${convertedPrice.toFixed(2)} ${selectedCurrency}`
-      }
-    }
-  }
-
-  // 3. Absolute fallback: convert from the item's fallback base price property
-  return {
-    numeric: parseFloat(product.price || 0),
-    string: `${Number(product.price || 0).toFixed(2)} ${selectedCurrency}`
-  }
-}
-
-// 🌟 DYNAMICALLY COMPUTE THE ABSOLUTE COMBINED CART VALUATION (Fixes white screen)
+// Single source: store getter keeps cart + checkout totals identical.
 const cartTotalDisplayPrice = computed(() => {
-  const selectedCurrency = cartStore.currentCurrency
-  
-  const total = cartStore.items.reduce((sum, item) => {
-    const qty = item.item_quantity || item.quantity || 0
-    const priceInfo = getItemDisplayPrice(item)
-    return sum + (priceInfo.numeric * qty)
-  }, 0)
+  const { subtotal, currency } = cartStore.cartPricing
+  return `${subtotal.toFixed(2)} ${currency}`
+})
 
-  return `${total.toFixed(2)} ${selectedCurrency}`
+const waLines = computed(() =>
+  cartStore.items.map((item) => {
+    const qty = item.quantity || 0
+    const unit = getItemDisplayPrice(item).numeric
+    const size = item.size ? ` (${item.size})` : ''
+    return `• ${qty} x ${item.product?.name}${size} — ${(unit * qty).toFixed(2)} ${cartStore.currentCurrency}`
+  })
+)
+
+const whatsappCartLink = computed(() =>
+  site.whatsappOrderLink(null, waLines.value, `Total: ${cartTotalDisplayPrice.value}`)
+)
+
+onMounted(() => {
+  site.fetchSettings()
 })
 </script>

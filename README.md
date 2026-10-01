@@ -31,7 +31,7 @@ A modern, full-stack e-commerce application built with Vue 3 + Vite frontend and
         ├── core/            # Django project settings
         ├── products/        # Products, orders, categories app
         ├── manage.py        # Django management script
-        └── db.sqlite3       # Database (SQLite / PostgreSQL)
+        └── .env             # Local config (PostgreSQL, Stripe, …)
 ```
 
 ## Quick Start
@@ -48,7 +48,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run migrations
+# PostgreSQL must be running (see "Database" below), then create the schema
 python3 manage.py migrate
 
 # Create superuser (admin)
@@ -59,6 +59,34 @@ python3 manage.py runserver
 ```
 
 Backend runs on: `http://localhost:8000`
+
+#### Database (PostgreSQL)
+
+The backend requires PostgreSQL (there is no SQLite fallback). Start one with
+Docker and point the app at it:
+
+```bash
+docker-compose up -d db    # PostgreSQL 15 → localhost:5432
+```
+
+No Docker or sudo? `./scripts/pg.sh` runs a self-contained PostgreSQL 18
+unpacked into `~/.local/pgsql` (see DEPLOYMENT.md — "Without Docker or root
+access"):
+
+```bash
+./scripts/pg.sh init      # first time: initdb + create role/database
+./scripts/pg.sh start     # afterwards: start the server
+```
+
+It is registered in your crontab (`@reboot` + a 5-minute `ensure` heartbeat), so
+it starts automatically on boot and restarts itself if it ever stops.
+
+```env
+DATABASE_URL=postgresql://maims_user:maims_password@127.0.0.1:5432/maims_db
+```
+
+Existing SQLite data can be copied over with
+`./scripts/migrate_sqlite_to_postgres.sh`.
 
 ### Frontend Setup
 
@@ -111,6 +139,7 @@ This project uses **Stripe** for payments. To enable:
 ```
 DEBUG=True
 SECRET_KEY=your_secret_key
+DATABASE_URL=postgresql://maims_user:maims_password@127.0.0.1:5432/maims_db
 STRIPE_SECRET_KEY=your_stripe_secret
 STRIPE_PUBLISHABLE_KEY=your_stripe_publishable
 ALLOWED_HOSTS=localhost,127.0.0.1
@@ -130,7 +159,7 @@ VITE_API_URL=http://localhost:8000
 
 ### Backend Deployment
 - Deploy to **Heroku**, **Railway**, **Render**, or **DigitalOcean**
-- Requirements: Python 3.9+, PostgreSQL recommended
+- Requirements: Python 3.11+, PostgreSQL (required)
 - See deployment guides in documentation
 
 ## Technologies Used
@@ -148,7 +177,7 @@ VITE_API_URL=http://localhost:8000
 - Django REST Framework
 - Token Authentication
 - Stripe Python SDK
-- SQLite / PostgreSQL
+- PostgreSQL
 
 ## License
 

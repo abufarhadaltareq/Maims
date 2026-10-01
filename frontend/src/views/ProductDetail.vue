@@ -94,6 +94,18 @@
               {{ product.in_stock ? 'Add to Cart' : 'Out of Stock' }}
             </button>
             <p v-if="product.size_options && product.size_options.length > 0 && !selectedSize" class="text-sm text-red-500">Please choose a size before adding to cart.</p>
+
+            <a
+              v-if="site.whatsappEnabled && whatsappProductLink"
+              :href="whatsappProductLink"
+              target="_blank"
+              rel="noopener"
+              class="flex items-center justify-center gap-2 w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-[#25D366] hover:brightness-95"
+            >
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.4 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.9-4.3-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5s.8 1.9.8 2c.1.1.1.3 0 .5-.3.6-.6.8-.4 1.1.6 1.1 1.4 1.8 2.4 2.4.3.2.5.1.7-.1l.8-.9c.2-.3.4-.2.7-.1l2 1c.3.1.5.2.6.4 0 .1 0 .6-.5 1.5z"/></svg>
+              Order via WhatsApp
+            </a>
+            <p v-if="site.whatsappEnabled" class="text-xs text-gray-400 text-center">Questions or pay-on-chat orders — we reply fast on WhatsApp.</p>
           </div>
 
           <p v-if="showSuccessMessage" class="mt-4 text-emerald-600 font-semibold flex items-center gap-2">
@@ -167,6 +179,7 @@ import { ref, onMounted, computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { useCartStore } from '../stores/cart'
+import { useSiteStore } from '../stores/site'
 
 // 1. Core States defined first
 const product = ref(null)
@@ -179,6 +192,19 @@ const lightboxIndex = ref(0)
 
 const route = useRoute()
 const cartStore = useCartStore()
+const site = useSiteStore()
+
+// WhatsApp order link prefilled with this product + selected size
+const whatsappProductLink = computed(() => {
+  if (!product.value) return ''
+  const size = selectedSize.value ? ` (Size: ${selectedSize.value})` : ''
+  const price = formatDisplayPrice.value
+  return site.whatsappOrderLink(
+    null,
+    [`• 1 x ${product.value.name}${size} — ${price}`],
+    `Product: ${window.location.origin}/products/${route.params.slug}`
+  )
+})
 
 // 2. Fetch API Data
 const fetchProductData = async () => {
@@ -207,6 +233,7 @@ const fetchProductData = async () => {
 
 onMounted(() => {
   fetchProductData()
+  site.fetchSettings()
   window.addEventListener('keydown', handleKeyDown)
 })
 

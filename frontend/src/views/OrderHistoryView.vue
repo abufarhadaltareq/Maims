@@ -27,14 +27,17 @@
             </div>
             <div>
               <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">Payment Status</p>
-              <span class="inline-block text-[11px] bg-green-500 text-white px-2.5 py-0.5 rounded-full font-extrabold uppercase tracking-wide">
-                Paid
+              <span
+                :class="order.is_paid ? 'bg-green-500' : 'bg-amber-500'"
+                class="inline-block text-[11px] text-white px-2.5 py-0.5 rounded-full font-extrabold uppercase tracking-wide"
+              >
+                {{ order.is_paid ? 'Paid' : 'Unpaid' }}
               </span>
             </div>
           </div>
           <div class="text-right">
             <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">Grand Total</p>
-            <p class="text-lg font-black text-emerald-400">{{ formatPrice(order.total_amount) }} €</p>
+            <p class="text-lg font-black text-emerald-400">{{ formatPrice(order.total_amount) }} {{ order.currency || '' }}</p>
           </div>
         </div>
 
@@ -89,14 +92,16 @@
                   <p class="text-xs text-gray-500 font-semibold mt-1">
                     Quantity: <span class="text-gray-800 font-bold bg-gray-100 px-2 py-0.5 rounded">{{ item.quantity }}</span> 
                     <span class="text-gray-300 mx-2.5">|</span> 
-                    Unit Price: <span class="text-gray-700 font-medium">{{ formatPrice(item.price) }} €</span>
+                    Unit Price: <span class="text-gray-700 font-medium">{{ formatPrice(item.price) }} {{ order.currency || '' }}</span>
+                    <span v-if="item.size" class="text-gray-300 mx-2.5">|</span>
+                    <span v-if="item.size">Size: {{ item.size }}</span>
                   </p>
                 </div>
               </div>
 
               <div class="text-right">
                 <p class="font-black text-gray-900 text-base">
-                  {{ formatPrice(item.price * item.quantity) }} €
+                  {{ formatPrice(item.price * item.quantity) }} {{ order.currency || '' }}
                 </p>
               </div>
             </div>
