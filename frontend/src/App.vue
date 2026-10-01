@@ -2,7 +2,7 @@
   <div class="min-h-screen flex flex-col font-brand text-gray-900 bg-white">
     <!-- Header Block -->
     <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
-      <div v-if="brand.announcement" class="bg-[#0F0F12] text-white">
+      <div v-if="brand.announcement" class="bg-gradient-brand text-white">
         <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-8 flex items-center justify-center">
           <p class="text-[11px] font-medium tracking-wide text-center truncate">{{ brand.announcement }}</p>
         </div>
@@ -26,7 +26,7 @@
         <!-- Central Search Context -->
         <div class="flex-1 max-w-xl min-w-0">
           <div class="group relative w-full">
-            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-black transition-colors">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-accent transition-colors">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path>
               </svg>
@@ -35,7 +35,7 @@
             v-model="searchQuery" 
             @keyup.enter="performSearch" 
             placeholder="Search for products..." 
-            class="w-full bg-gray-50 border border-gray-200 rounded-full py-2.5 pl-11 pr-4 text-sm outline-none focus:border-black focus:bg-white focus:ring-4 focus:ring-black/5 transition"
+            class="w-full bg-gray-50 border border-gray-200 rounded-full py-2.5 pl-11 pr-4 text-sm outline-none focus:border-brand-accent focus:bg-white focus:ring-4 focus:ring-brand-accent/10 transition"
           >
           </div>
         </div>
@@ -76,7 +76,7 @@
               <path d="M3 6h18" stroke-width="2" stroke-linecap="round"></path>
               <path d="M16 10a4 4 0 0 1-8 0" stroke-width="2" stroke-linecap="round"></path>
             </svg>
-            <span v-if="cartStore.cartTotalLength > 0" class="absolute -top-0.5 -right-0.5 bg-[#0F0F12] text-white text-[10px] min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full font-bold ring-2 ring-white">
+            <span v-if="cartStore.cartTotalLength > 0" class="absolute -top-0.5 -right-0.5 bg-gradient-brand text-white text-[10px] min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full font-bold ring-2 ring-white">
               {{ cartStore.cartTotalLength }}
             </span>
           </router-link>
@@ -132,7 +132,7 @@
     </div>
 
     <!-- Footer with admin-driven Facebook / WhatsApp links -->
-    <footer class="border-t border-gray-100 bg-gray-50/70 px-6 py-8 font-brand text-sm text-gray-500">
+    <footer class="footer-gradient-top bg-gray-50/70 px-6 py-8 font-brand text-sm text-gray-500">
       <div class="max-w-[1600px] mx-auto flex flex-col md:flex-row items-center justify-between gap-5">
         <div class="flex items-center gap-3">
           <BrandLogo size="sm" :show-tagline="false" />
@@ -143,8 +143,8 @@
           <router-link
             v-for="legal in LEGAL_LINKS"
             :key="legal.hash"
-            :to="`/#${legal.hash}`"
-            class="hover:text-black hover:underline"
+            :to="`/legal#${legal.hash}`"
+            class="hover:text-brand-accent hover:underline"
           >
             {{ legal.label }}
           </router-link>
@@ -220,7 +220,7 @@ const FOOTER_COLORS = {
   linkedin: 'text-[#0A66C2]',
 }
 
-// Anchors into the legal block rendered at the bottom of the home page.
+// Footer links into the dedicated /legal page (opens the matching tab).
 const LEGAL_LINKS = [
   { label: 'Terms & Conditions', hash: 'legal-terms' },
   { label: 'Privacy', hash: 'legal-privacy' },

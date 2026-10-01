@@ -43,7 +43,7 @@ const whatsappLink = computed(() =>
 // Background colours for the floating dock buttons.
 const DOCK_COLORS = {
   facebook: 'bg-[#1877F2]',
-  instagram: 'bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5]',
+  instagram: 'bg-linear-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5]',
   tiktok: 'bg-black',
   twitter: 'bg-black',
   youtube: 'bg-[#FF0000]',

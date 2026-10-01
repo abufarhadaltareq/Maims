@@ -2,12 +2,12 @@
 
 @theme {
   /* 🌟 GLOBAL MULTI-BRAND UTILITIES (Tailwind v4) */
-  /* Change these Hex codes whenever you clone the code for a new brand */
-  --color-brand-primary: #000000;    /* Primary focus (buttons, headings) */
+  /* Kept in sync with src/assets/style.css (the stylesheet actually imported). */
+  --color-brand-primary: #17102b;    /* Deep royal ink (buttons, headings) */
   --color-brand-secondary: #ffffff;  /* Background structures */
-  --color-brand-accent: #10b981;     /* Highlights, currency tags, badges */
-  --color-brand-muted: #f3f4f6;      /* Shading layout blocks */
-  --color-brand-text: #1f2937;       /* Main readable copy texts */
+  --color-brand-accent: #db2777;     /* Highlights, accents, tags */
+  --color-brand-muted: #f5f3ff;      /* Shading layout blocks */
+  --color-brand-text: #2b2440;       /* Main readable copy texts */
 
   --font-brand: "Inter", system-ui, -apple-system, sans-serif;
 }

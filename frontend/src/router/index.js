@@ -18,6 +18,13 @@ const routes = [
     component: HomeView
   },
   {
+    // Terms, privacy and licence. Linked from the footer; the hash
+    // (/legal#legal-terms) opens the matching tab.
+    path: '/legal',
+    name: 'legal',
+    component: () => import('../views/LegalView.vue')
+  },
+  {
     path: '/search',
     name: 'search',
     component: SearchView

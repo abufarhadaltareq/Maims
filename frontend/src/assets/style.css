@@ -1,13 +1,86 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   Maims theme tokens (Tailwind v4)
+   Re-skin the whole store by editing these hex codes — every `brand-*` utility
+   and the gradients below read from them.
+   ============================================================================ */
 @theme {
-  /* 🌟 GLOBAL MULTI-BRAND UTILITIES (Tailwind v4) */
-  /* Change these Hex codes whenever you clone the code for a new brand */
-  --color-brand-primary: #0F0F12;    /* Primary ink (buttons, headings, badges) */
+  --color-brand-primary: #17102b;    /* Deep royal ink — headings, dark surfaces */
   --color-brand-secondary: #ffffff;  /* Background structures */
-  --color-brand-accent: #7C3AED;     /* Highlights, accents, tags */
-  --color-brand-muted: #f3f4f6;      /* Shading layout blocks */
-  --color-brand-text: #1f2937;       /* Main readable copy texts */
+  --color-brand-accent: #db2777;     /* Accent — prices, badges, active states */
+  --color-brand-muted: #f5f3ff;      /* Soft violet shading blocks */
+  --color-brand-text: #2b2440;       /* Main readable copy */
 
   --font-brand: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   Gradient palette, exposed as CSS variables so the utilities below (and any
+   inline styles) share one source of truth. Change the three stops to re-tint
+   the entire store.
+   --------------------------------------------------------------------------- */
+:root {
+  --grad-from: #4f46e5;   /* Indigo */
+  --grad-via: #9333ea;    /* Violet */
+  --grad-to: #ec4899;     /* Pink   */
+  --grad-angle: 120deg;
+  --brand-glow: 0 18px 40px -18px rgba(147, 51, 234, 0.55);
+}
+
+/* Custom utilities (Tailwind v4) — declared with @utility so they also work
+   with variants such as hover: and group-hover:. */
+
+/* Solid brand gradient — bars, buttons, badges. */
+@utility bg-gradient-brand {
+  background-image: linear-gradient(var(--grad-angle), var(--grad-from), var(--grad-via) 50%, var(--grad-to));
+}
+
+/* Reversed stops, for alternating surfaces. */
+@utility bg-gradient-brand-rev {
+  background-image: linear-gradient(var(--grad-angle), var(--grad-to), var(--grad-via) 50%, var(--grad-from));
+}
+
+/* Faint tint for large section backgrounds. */
+@utility bg-gradient-brand-soft {
+  background-image: linear-gradient(var(--grad-angle), #eef2ff, #faf5ff 50%, #fdf2f8);
+}
+
+/* Gradient text on light backgrounds. */
+@utility text-gradient-brand {
+  background-image: linear-gradient(var(--grad-angle), var(--grad-from), var(--grad-via) 45%, var(--grad-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Brighter gradient text for the dark hero. */
+@utility text-gradient-light {
+  background-image: linear-gradient(120deg, #ffffff, #e9d5ff 45%, #fbcfe8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Soft brand glow for elevated / interactive elements. */
+@utility shadow-brand {
+  box-shadow: var(--brand-glow);
+}
+
+/* Thin gradient rule across the top of the footer. */
+@utility footer-gradient-top {
+  border-top: 2px solid transparent;
+  border-image: linear-gradient(var(--grad-angle), var(--grad-from), var(--grad-via), var(--grad-to)) 1;
+}
+
+/* Gentle lift on product cards so the grid feels alive on hover. */
+.product-card {
+  transition: transform 0.3s ease;
+}
+.product-card:hover {
+  transform: translateY(-4px);
+}
+
+body {
+  margin: 0;
 }

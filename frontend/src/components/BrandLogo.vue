@@ -8,7 +8,14 @@
       fill="none"
       aria-hidden="true"
     >
-      <rect width="40" height="40" rx="12" fill="#0F0F12" />
+      <defs>
+        <linearGradient id="maimsLogoGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#4f46e5" />
+          <stop offset="0.5" stop-color="#9333ea" />
+          <stop offset="1" stop-color="#ec4899" />
+        </linearGradient>
+      </defs>
+      <rect width="40" height="40" rx="12" fill="url(#maimsLogoGrad)" />
       <path
         d="M13 27.5V12.5L20 22.5L27 12.5V27.5"
         stroke="#FFFFFF"
@@ -24,7 +31,7 @@
         class="brand-wordmark font-semibold uppercase text-gray-900 transition-colors group-hover:text-black"
         :class="size === 'sm' ? 'text-base' : 'text-lg'"
       >
-        MA<span class="text-[#7C3AED]">I</span>MS
+        MA<span class="text-brand-accent">I</span>MS
       </span>
       <span
         v-if="showTagline"

@@ -5,7 +5,7 @@
       <h2 class="text-xs font-bold uppercase tracking-[0.25em] text-gray-400">
         Shop Collections
       </h2>
-      <span class="bg-black text-[10px] font-bold text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+      <span class="bg-gradient-brand text-[10px] font-bold text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
         2026
       </span>
     </div>
@@ -137,7 +137,7 @@ onMounted(fetchCategories)
 <style scoped>
 /* Scoped active state match for Vue Router link tree highlighting */
 .router-link-active {
-  color: #000000 !important;
+  color: #db2777 !important;
   font-weight: 700;
 }
 

@@ -12,11 +12,11 @@
         :key="slide.id || index"
         class="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ease-in-out transform-gpu"
         :class="index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'"
-        :style="{ backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${slide.image_url})`, transform: index === currentSlide ? 'translateZ(0)' : 'translateZ(-10px)' }"
+        :style="{ backgroundImage: `linear-gradient(120deg, rgba(79,70,229,0.55), rgba(147,51,234,0.35) 50%, rgba(236,72,153,0.55)), url(${slide.image_url})`, transform: index === currentSlide ? 'translateZ(0)' : 'translateZ(-10px)' }"
       ></div>
 
       <div class="max-w-2xl text-white relative z-20 backdrop-blur-sm bg-black/20 p-8 rounded-2xl border border-white/10">
-        <h1 class="text-5xl md:text-6xl font-extrabold mb-4 tracking-tight drop-shadow-lg text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
+        <h1 class="text-5xl md:text-6xl font-extrabold mb-4 tracking-tight drop-shadow-lg text-gradient-light">
           {{ heroSlides[currentSlide]?.title }}
         </h1>
         <p v-if="heroSlides[currentSlide]?.subtitle" class="text-xl md:text-2xl mb-8 opacity-90 drop-shadow-sm font-light">
@@ -27,7 +27,7 @@
           v-if="heroSlides[currentSlide]?.button_text"
           :to="isInternalLink(heroSlides[currentSlide]?.button_link) ? heroSlides[currentSlide].button_link : undefined"
           :href="!isInternalLink(heroSlides[currentSlide]?.button_link) ? heroSlides[currentSlide].button_link : undefined"
-          class="inline-block bg-white text-black font-bold px-8 py-4 rounded-full shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:shadow-[0_0_25px_rgba(255,255,255,0.5)] hover:scale-105 transition-all duration-300 active:scale-95 uppercase tracking-widest text-sm"
+          class="inline-block bg-gradient-brand text-white font-bold px-8 py-4 rounded-full shadow-[0_0_25px_rgba(147,51,234,0.55)] hover:shadow-[0_0_35px_rgba(236,72,153,0.65)] hover:scale-105 transition-all duration-300 active:scale-95 uppercase tracking-widest text-sm"
         >
           {{ heroSlides[currentSlide]?.button_text }}
         </component>
@@ -38,7 +38,7 @@
             :key="item.id || index"
             @click="goToSlide(index)"
             class="w-2.5 h-2.5 rounded-full transition-all duration-300"
-            :class="index === currentSlide ? 'bg-white scale-125' : 'bg-white/40'"
+            :class="index === currentSlide ? 'bg-gradient-brand scale-125' : 'bg-white/40'"
           ></button>
         </div>
       </div>
@@ -48,7 +48,7 @@
     <div v-if="isHomePage && showcase.length" class="max-w-7xl mx-auto px-6 pt-14">
       <div class="flex items-end justify-between mb-6">
         <div>
-          <h2 class="text-3xl font-bold tracking-tight mb-1">Shop by Category</h2>
+          <h2 class="text-3xl font-bold tracking-tight mb-1 text-gradient-brand">Shop by Category</h2>
           <p class="text-gray-500">Curated collections — pick a lane, find your fit.</p>
         </div>
       </div>
@@ -65,11 +65,11 @@
             class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
             loading="lazy"
           />
-          <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
+          <div class="absolute inset-0 bg-linear-to-t from-brand-primary/80 via-brand-primary/20 to-transparent"></div>
           <div class="absolute bottom-0 left-0 right-0 p-5 text-left text-white">
             <p class="text-[11px] uppercase tracking-[0.25em] opacity-80 font-bold">{{ entry.category.product_count }} items</p>
             <h3 class="text-xl font-extrabold leading-tight">{{ entry.category.name }}</h3>
-            <span class="inline-block mt-2 text-xs font-bold bg-white text-black px-3 py-1.5 rounded-full group-hover:bg-black group-hover:text-white transition">Shop now →</span>
+            <span class="inline-block mt-2 text-xs font-bold bg-gradient-brand text-white px-3 py-1.5 rounded-full shadow-brand group-hover:scale-105 transition">Shop now →</span>
           </div>
         </router-link>
       </div>
@@ -83,14 +83,14 @@
             <h2 class="text-2xl font-bold tracking-tight mb-1">{{ entry.category.name }}</h2>
             <p v-if="entry.category.description" class="text-gray-500 text-sm max-w-xl">{{ entry.category.description }}</p>
           </div>
-          <router-link :to="`/category/${entry.category.slug}`" class="text-sm font-semibold underline hover:text-gray-600 whitespace-nowrap ml-4">
+          <router-link :to="`/category/${entry.category.slug}`" class="text-sm font-semibold text-brand-accent underline decoration-brand-accent/40 hover:decoration-brand-accent whitespace-nowrap ml-4">
             View all →
           </router-link>
         </div>
         <div v-if="entry.products.length === 0" class="text-gray-400 text-sm py-6">No items in this category yet.</div>
         <div v-else class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
           <div v-for="product in entry.products" :key="product.id" class="product-card group flex flex-col justify-between">
-            <router-link :to="`/products/${product.slug}`" class="block overflow-hidden rounded-3xl bg-brand-muted aspect-square mb-3">
+            <router-link :to="`/products/${product.slug}`" class="block overflow-hidden rounded-3xl bg-brand-muted aspect-square mb-3 transition-shadow duration-300 group-hover:shadow-brand">
               <img :src="product.get_thumbnail || 'https://placehold.co/400'" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" :alt="product.name" loading="lazy" />
             </router-link>
             <div>
@@ -106,7 +106,7 @@
     <div id="latest-products" class="max-w-7xl mx-auto px-6 py-16">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-10">
         <div>
-          <h2 class="text-3xl font-bold tracking-tight mb-2">{{ categoryTitle }}</h2>
+          <h2 class="text-3xl font-bold tracking-tight mb-2 text-gradient-brand">{{ categoryTitle }}</h2>
           <p class="text-gray-500">Freshly added pieces from our design room.</p>
         </div>
         <router-link 
@@ -122,7 +122,7 @@
       <div v-else-if="products.length === 0" class="text-center py-12 text-gray-500">No items found in this section yet.</div>
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
         <div v-for="product in products" :key="product.id" class="product-card group flex flex-col justify-between">
-           <router-link :to="`/products/${product.slug}`" class="block overflow-hidden rounded-3xl bg-brand-muted aspect-square mb-4">
+           <router-link :to="`/products/${product.slug}`" class="block overflow-hidden rounded-3xl bg-brand-muted aspect-square mb-4 transition-shadow duration-300 group-hover:shadow-brand">
             <img :src="product.get_thumbnail || 'https://placehold.co/400'" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
           </router-link>
           <div>
@@ -134,8 +134,6 @@
       </div>
     </div>
 
-    <!-- Terms & Conditions / Privacy / Licence -->
-    <LegalSection v-if="isHomePage" />
   </div>
 </template>
 
@@ -144,7 +142,6 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue' // Added 
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import Hero3D from '../components/Hero3D.vue'
-import LegalSection from '../components/LegalSection.vue'
 import { BRAND_CONFIG } from '../brand.config.js'
 import { useCartStore } from '../stores/cart'
 import { formatProductPrice } from '../utils/pricing.js'
