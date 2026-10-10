@@ -1,2 +1,5 @@
-web: gunicorn core.wsgi --log-file -
-release: python manage.py migrate
+web: gunicorn core.wsgi --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-3} --timeout 60 --access-logfile - --error-logfile -
+# Railway ignores `release` when a Dockerfile is the builder, so the same
+# migration step also runs at the start of the web process. It is idempotent
+# and skips itself when nothing is pending.
+release: python manage.py migrate --noinput

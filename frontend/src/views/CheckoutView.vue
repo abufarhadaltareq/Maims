@@ -21,6 +21,27 @@ const cardElement = ref(null)
 const stripeReady = ref(false)
 const paymentMethod = ref('stripe') // stripe | cod | whatsapp
 
+// --- Idempotency ---
+// One key per checkout attempt. It stays the same for every retry of the SAME
+// attempt (double-clicked button, flaky connection, an axios retry) and is only
+// regenerated once an order succeeds. The backend resolves a repeated key to the
+// order it already created, so a retry can never produce a duplicate order,
+// double-decrement stock, or charge the card twice for one basket.
+const idempotencyKey = ref('')
+
+const newIdempotencyKey = () =>
+  globalThis.crypto?.randomUUID
+    ? globalThis.crypto.randomUUID()
+    : `maims-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+
+// Same body, different header: the backend reads the key from the header only.
+const postCheckout = (paymentMethodValue) =>
+  axios.post(
+    '/api/v1/checkout/',
+    { ...basePayload.value, payment_method: paymentMethodValue },
+    { headers: { 'Idempotency-Key': idempotencyKey.value } }
+  )
+
 // --- Form Data ---
 const form = ref({
   first_name: '',
@@ -30,7 +51,10 @@ const form = ref({
   phone: '',
   address: '',
   place: '',
-  zipcode: ''
+  zipcode: '',
+  // WhatsApp Business may only open a conversation with someone who asked for
+  // it, so this stays opt-in and is re-checked on the server before every send.
+  whatsapp_opt_in: false
 })
 
 // --- Computed ---
@@ -59,6 +83,7 @@ const basePayload = computed(() => ({
   total_amount: totalCartCost.value.toFixed(2),
   currency: cartStore.currentCurrency,
   items: formattedItems.value,
+  whatsapp_opt_in: form.value.whatsapp_opt_in,
 }))
 
 const initializeStripe = async () => {
@@ -95,6 +120,7 @@ const initializeStripe = async () => {
 }
 
 onMounted(async () => {
+  idempotencyKey.value = newIdempotencyKey()
   await site.fetchSettings()
   // Default to first available method if admin disabled Stripe.
   if (!site.stripeEnabled && site.codEnabled) paymentMethod.value = 'cod'
@@ -124,11 +150,13 @@ const submitCheckoutForm = async () => {
   // COD / WhatsApp: no card needed.
   if (paymentMethod.value === 'cod' || paymentMethod.value === 'whatsapp') {
     try {
-      const res = await axios.post('/api/v1/checkout/', { ...basePayload.value, payment_method: paymentMethod.value })
+      const res = await postCheckout(paymentMethod.value)
       successMethod.value = res.data.payment_method || paymentMethod.value
       successOrderId.value = res.data.order_id
       successWhatsappLink.value = res.data.whatsapp_link || ''
       cartStore.clearCart()
+      // A completed order must not reuse this key; the next basket is a new order.
+      idempotencyKey.value = newIdempotencyKey()
       isSuccess.value = true
     } catch (err) {
       serverError.value = err.response?.data?.error || 'Could not place your order. Please try again.'
@@ -145,7 +173,7 @@ const submitCheckoutForm = async () => {
   }
 
   try {
-    const checkoutResponse = await axios.post('/api/v1/checkout/', { ...basePayload.value, payment_method: 'stripe' })
+    const checkoutResponse = await postCheckout('stripe')
 
     const clientSecret = checkoutResponse.data.client_secret
     orderId.value = checkoutResponse.data.order_id
@@ -180,6 +208,7 @@ const submitCheckoutForm = async () => {
       cartStore.clearCart()
       successMethod.value = 'stripe'
       successOrderId.value = orderId.value
+      idempotencyKey.value = newIdempotencyKey()
       isSuccess.value = true
     } else {
       serverError.value = 'Payment was not completed. Please try again.'
@@ -264,6 +293,20 @@ const submitCheckoutForm = async () => {
                   <input type="text" v-model="form.country_code" required class="w-24 border border-gray-200 rounded-lg p-2.5 text-sm text-center focus:outline-blue-600" />
                   <input type="tel" v-model="form.phone" required class="flex-1 border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600" />
                 </div>
+                <label class="mt-2 flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    v-model="form.whatsapp_opt_in"
+                    class="mt-0.5 rounded border-gray-300 text-brand-accent focus:ring-brand-accent"
+                  />
+                  <span>
+                    Send me order updates on WhatsApp at this number
+                    <span class="block text-gray-500">
+                      We'll text you when your order is accepted, packed, shipped and delivered.
+                      Opt out any time by replying STOP.
+                    </span>
+                  </span>
+                </label>
               </div>
             </div>
 

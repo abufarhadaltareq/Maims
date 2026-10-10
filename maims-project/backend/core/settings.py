@@ -13,6 +13,10 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -50,11 +54,14 @@ ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,1
 # Application definition
 
 INSTALLED_APPS = [
-    # Before django.contrib.admin on purpose: jazzmin ships replacements for
-    # admin/base.html & friends, and app template dirs are searched in order, so
-    # jazzmin's win only if it is listed first. Listing it after silently falls
-    # back to Django's own unstyled theme.
-    'jazzmin',
+    # Unfold must come before django.contrib.admin: it ships replacements for
+    # admin/base.html & friends, and app template dirs are searched in INSTALLED_APPS
+    # order, so Unfold's win only if it is listed first. The unfold.contrib add-ons
+    # give the admin Unfold-styled filters, form widgets and inlines.
+    'unfold',
+    'unfold.contrib.filters',
+    'unfold.contrib.forms',
+    'unfold.contrib.inlines',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -65,12 +72,18 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken', # 🌟 ADD THIS LINE
     'corsheaders',
-    'products',
+    # Explicit AppConfig path: ProductsConfig.ready() imports the order signal
+    # handlers, and Django only calls ready() for the config it is given.
+    'products.apps.ProductsConfig',
     'core',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise serves /static directly from the app process, so admin CSS/JS
+    # keeps working on platforms with no separate CDN or static container. It
+    # must sit directly below SecurityMiddleware to see the security headers.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -199,88 +212,232 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# --- django-jazzmin ------------------------------------------------------------
-# Jazzmin replaces the admin's own theme (jQuery UI, buttons, tables, tabs, the
-# responsive sidebar) with Bootstrap 4. The Maims dashboard, custom change forms
-# and maims.css stay exactly as they are: jazzmin ships its own static files and
-# all Maims templates extend "admin/base_site.html", which jazzmin re-skins.
-# On narrow screens the sidebar collapses behind a "Maims Admin" toggle instead of
-# the two-column squeeze the default theme suffers from.
-# Set JAZZMIN_THEME='user-light' or 'cerulean' to change the palette.
-JAZZMIN_THEME = os.environ.get('JAZZMIN_THEME', 'cerulean')
-JAZZMIN_ADMIN_SITE_TITLE = 'Maims Admin'
-JAZZMIN_WINDOW_TITLE = 'Maims Admin'
-
-JAZZMIN_SETTINGS = {
-    # Branding: drop the AdminLTE placeholder logo and the empty "Copyright 2026"
-    # footer in favour of the shop's own name.
-    'site_title': 'Maims Admin',
-    'site_header': 'Maims Store Admin',
-    'site_brand': 'Maims',
-    'copyright': 'Maims — orders, stock and customers',
-    'welcome_sign': 'Sign in to manage the shop',
-
-    # Real icons instead of the generic grey dot on every model, so the sidebar
-    # can be scanned by shape rather than by reading.
-    'icons': {
-        'auth': 'fas fa-users-cog',
-        'auth.user': 'fas fa-user',
-        'auth.Group': 'fas fa-users',
-        'products': 'fas fa-store',
-        'products.order': 'fas fa-box-open',
-        'products.product': 'fas fa-tag',
-        'products.category': 'fas fa-sitemap',
-        'products.collection': 'fas fa-layer-group',
-        'products.heroslide': 'fas fa-images',
-        'products.sitesettings': 'fas fa-cog',
+# Production static file handling. WhiteNoise's storage hashes filenames
+# (immutable long-cache URLs) and pre-compresses gzip/brotli.
+# In DEBUG we deliberately keep the plain storage so edits show up instantly.
+#
+# ONLY the `staticfiles` bucket may use the manifest backend. The `default` bucket
+# is what serves user uploads (Product.image, category images), and pointing it at
+# a manifest storage makes every `.image.url` raise "Missing staticfiles manifest
+# entry" — the whole catalogue endpoint 500s as soon as one product has a photo.
+STORAGES = {
+    'default': {
+        # Swap this for S3Boto3Storage/ whitenoise-free object storage when the
+        # catalogue outgrows the local disk; nothing else needs to change.
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
     },
+    'staticfiles': {
+        'BACKEND': (
+            'django.contrib.staticfiles.storage.StaticFilesStorage'
+            if DEBUG
+            else 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+        ),
+    },
+}
 
-    # The sidebar and navbar stay put while you scroll a long product list, and
-    # the "+ Add" button style follows the theme.
-    'navbar_fixed': True,
-    'sidebar_fixed': True,
-    'footer_small_text': True,
+# WhiteNoise answer-indexes /static without touching the filesystem.
+WHITENOISE_AUTOREFRESH = DEBUG
+# Never delete the originals; some deployments share staticfiles between builds.
+WHITENOISE_KEEP_ONLY_HASHED_FILES = False
 
-    # Change forms are long on this site (product media, multi-currency prices).
-    # Collapsible tabs show one section at a time instead of one long wall.
-    'changeform_format': 'collapsible',
+# --- django-unfold -------------------------------------------------------------
+# Unfold replaces the admin's own theme with a Tailwind CSS interface (sidebar,
+# dark mode, cards, filters). All Maims templates keep extending
+# "admin/base_site.html", which Unfold supplies, and the project stylesheet
+# (static/admin/maims.css) is injected through UNFOLD["STYLES"] on every page.
+# This dictionary is the single place that brands and arranges the admin.
+UNFOLD = {
+    'SITE_TITLE': 'Maims Admin',
+    'SITE_HEADER': 'Maims Store Admin',
+    'SITE_SUBHEADER': 'Orders, stock and customers',
+    'SITE_SYMBOL': 'storefront',  # Material Symbols icon next to the title
+    'SHOW_HISTORY': True,
+    'SHOW_VIEW_ON_SITE': False,
+    'SHOW_BACK_BUTTON': True,
 
-    # Opening a related object (a product from an order, a category from a
-    # product) in a modal keeps the list you came from — no back-and-forth.
-    'related_modal_active': True,
+    # The dashboard reads its numbers through this callback (see core/admin.py).
+    'DASHBOARD_CALLBACK': 'core.admin.dashboard_callback',
+    # A small header label so it is obvious which environment you are looking at.
+    'ENVIRONMENT': 'core.admin.environment_callback',
 
-    # A light/dark toggle for staff working a dim packing table at night.
-    'show_theme_chooser': True,
-    'default_theme_mode': 'auto',
-
-    # Open the whole catalogue from the navbar search box.
-    'search_model': 'products.Product',
-
-    # The two views staff open dozens of times a day, reachable from any page.
-    # NB: jazzmin reads "name", not "title", and silently drops any link whose
-    # listed permissions the signed-in staff member does not all hold.
-    'topmenu_links': [
-        {'name': 'Pack today', 'url': '/admin/products/order/?status__exact=new',
-         'icon': 'fas fa-box-open', 'permissions': ['products.view_order']},
-        {'name': 'Awaiting courier', 'url': '/admin/products/order/?status__exact=packed',
-         'icon': 'fas fa-truck', 'permissions': ['products.view_order']},
-        {'name': 'Sold out', 'url': '/admin/products/product/?stock_level=out',
-         'icon': 'fas fa-triangle-exclamation', 'permissions': ['products.view_product']},
+    # Maims' own dashboard/changelist styles. The file lives in the project-owned
+    # BASE_DIR/static (on STATICFILES_DIRS), so this resolves in dev and after
+    # collectstatic alike.
+    'STYLES': [
+        lambda request: static('admin/maims.css'),
     ],
 
-    # Plain "open the filtered list" shortcuts at the bottom of the Products group.
-    'custom_links': {
-        'products': [
-            {'name': 'Update prices & stock (CSV)',
-             'url': '/admin/products/product/import-csv/',
-             'icon': 'fas fa-file-csv', 'permissions': ['products.change_product']},
+    'BORDER_RADIUS': '10px',
+
+    # Brand palette: the storefront's violet (#7C3AED) becomes Unfold's primary
+    # colour so the admin and the shop read as one product.
+    'COLORS': {
+        'primary': {
+            '50': '#f5f3ff', '100': '#ede9fe', '200': '#ddd6fe', '300': '#c4b5fd',
+            '400': '#a78bfa', '500': '#8b5cf6', '600': '#7c3aed', '700': '#6d28d9',
+            '800': '#5b21b6', '900': '#4c1d95', '950': '#2e1065',
+        },
+    },
+
+    # The sidebar is the map of the admin: the queues people work from first, then
+    # the catalogue, the customers and the single settings row.
+    'SIDEBAR': {
+        'show_search': True,
+        'show_all_applications': False,
+        'navigation': [
+            {
+                'title': _('Daily work'),
+                'separator': True,
+                'items': [
+                    {'title': _('Dashboard'), 'icon': 'dashboard',
+                     'link': reverse_lazy('admin:index')},
+                    {'title': _('Awaiting our decision'), 'icon': 'inventory_2',
+                     'link': '/admin/products/order/?status__exact=new',
+                     'badge': 'core.admin.new_orders_badge',
+                     'badge_variant': 'warning',
+                     'permission': lambda request: request.user.has_perm('products.view_order')},
+                    {'title': _('Failed notifications'), 'icon': 'notification_important',
+                     'link': '/admin/products/ordernotification/?status__exact=failed',
+                     'badge': 'core.admin.failed_notifications_badge',
+                     'badge_variant': 'danger',
+                     'permission': lambda request: request.user.has_perm('products.view_ordernotification')},
+                    {'title': _('Awaiting courier'), 'icon': 'local_shipping',
+                     'link': '/admin/products/order/?status__exact=packed',
+                     'permission': lambda request: request.user.has_perm('products.view_order')},
+                    {'title': _('Sold out'), 'icon': 'production_quantity_limits',
+                     'link': '/admin/products/product/?stock_level=out',
+                     'permission': lambda request: request.user.has_perm('products.view_product')},
+                ],
+            },
+            {
+                'title': _('Catalogue'),
+                'separator': True,
+                'items': [
+                    {'title': _('Products'), 'icon': 'sell',
+                     'link': reverse_lazy('admin:products_product_changelist')},
+                    {'title': _('Categories'), 'icon': 'category',
+                     'link': reverse_lazy('admin:products_category_changelist')},
+                    {'title': _('Collections'), 'icon': 'layers',
+                     'link': reverse_lazy('admin:products_collection_changelist')},
+                    {'title': _('Homepage hero slides'), 'icon': 'imagesmode',
+                     'link': reverse_lazy('admin:products_heroslide_changelist')},
+                ],
+            },
+            {
+                'title': _('Customers'),
+                'separator': True,
+                'items': [
+                    {'title': _('Customers'), 'icon': 'group',
+                     'link': reverse_lazy('admin:auth_user_changelist')},
+                    {'title': _('Groups'), 'icon': 'workspaces',
+                     'link': reverse_lazy('admin:auth_group_changelist')},
+                    {'title': _('Product reviews'), 'icon': 'rate_review',
+                     'link': reverse_lazy('admin:products_review_changelist'),
+                     'permission': lambda request: request.user.has_perm('products.view_review')},
+                ],
+            },
+            {
+                'title': _('Settings'),
+                'separator': True,
+                'items': [
+                    {'title': _('Store settings'), 'icon': 'settings',
+                     'link': reverse_lazy('admin:products_sitesettings_changelist')},
+                    {'title': _('Update prices & stock (CSV)'), 'icon': 'upload_file',
+                     'link': reverse_lazy('admin:products_product_import_csv'),
+                     'permission': lambda request: request.user.has_perm('products.change_product')},
+                ],
+            },
         ],
     },
+
+    # Quick filter tabs shown above the Orders changelist.
+    'TABS': [
+        {
+            'models': ['products.order'],
+            'items': [
+                {'title': _('To decide'), 'link': '/admin/products/order/?status__exact=new'},
+                {'title': _('To pack'), 'link': '/admin/products/order/?status__exact=accepted'},
+                {'title': _('Packed'), 'link': '/admin/products/order/?status__exact=packed'},
+                {'title': _('In transit'), 'link': '/admin/products/order/?status__exact=shipped'},
+                {'title': _('Unpaid'), 'link': '/admin/products/order/?is_paid__exact=0'},
+            ],
+        },
+    ],
 }
 # Project-owned static files (admin/maims.css) live outside the app directories.
 STATICFILES_DIRS = [BASE_DIR / 'static']
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Uploaded product photos must be served somewhere once DEBUG is False. Django
+# only wires MEDIA_URL up in DEBUG (see core/urls.py), so in production every
+# product image would 404 unless a CDN or object store takes over.
+#
+# This flag lets the app serve its own uploads through core/urls.py so a fresh
+# deploy has working images with zero extra services. It is the pragmatic
+# choice for a single-container shop; set SERVE_MEDIA=False once uploads live in
+# S3/Cloudinary, where MEDIA_URL points at the bucket and this becomes dead code.
+SERVE_MEDIA = os.environ.get('SERVE_MEDIA', 'True').lower() in ('true', '1', 'yes')
+
+# --- Notification links ---------------------------------------------------------
+# Absolute shop/admin URLs embedded in order emails and WhatsApp messages. Without
+# them a customer receives "Review it in the admin" with a bare path, which is
+# useless in an email client.
+FRONTEND_BASE_URL = os.environ.get('FRONTEND_BASE_URL', 'http://localhost:5173').rstrip('/')
+BACKEND_BASE_URL = os.environ.get('BACKEND_BASE_URL', 'http://localhost:8000').rstrip('/')
+
+# --- Logging ------------------------------------------------------------------
+# Print() statements vanish into container stdout without a level or context, and
+# Django's own 4xx/5xx warnings are not emitted unless a handler exists. This
+# gives every module a working `logging.getLogger(__name__)` and keeps
+# django.request at WARNING so broken links and server errors are visible.
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': LOG_LEVEL,
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Request/response failures (404s, 500s, DB errors) are worth surfacing
+        # even when the rest of the app runs quietly.
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.security': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        # DRF logs every auth decision; 'products' keeps its own app logs.
+        'rest_framework': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+}
 
 # CORS is allow-listed by default. Allow-all is only enabled when the operator
 # explicitly opts in — it is NEVER auto-enabled just because DEBUG is on.
@@ -292,16 +449,36 @@ CORS_ALLOW_CREDENTIALS = False
 # STRIPE CONFIGURATION
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+# Signing secret from `stripe listen` / the dashboard webhook endpoint. Without
+# it the webhook endpoint correctly refuses every delivery (signature checks are
+# mandatory), which means card orders are only confirmed by the browser calling
+# confirm_checkout. If a customer pays and then closes the tab, the order stays
+# unpaid and its reserved stock is never released — so say so loudly.
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+
+if STRIPE_SECRET_KEY and not STRIPE_WEBHOOK_SECRET:
+    import logging as _logging
+    _logging.getLogger('core').warning(
+        'STRIPE_WEBHOOK_SECRET is not set. Card payments will only be confirmed '
+        'when the customer returns to the success page; set it to '
+        'https://dashboard.stripe.com/webhooks for reliable order confirmation.'
+    )
 
 # Real Live Email Settings Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-
-# Replace these with your actual details or environment variables:
+# Gmail's SMTP endpoint is hardcoded above, so when no credentials are supplied
+# the real backend would raise on every send. Fall back to the console backend
+# (writes the message to stdout, never to a customer) so order notifications
+# can never take down a request or a management command.
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # The sender address customers will see
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@maims.app')
@@ -330,7 +507,9 @@ if not DEBUG:
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        # Token auth that honours AUTH_TOKEN_MAX_AGE_DAYS instead of accepting
+        # an issued token for ever. See products/authentication.py.
+        'products.authentication.ExpiringTokenAuthentication',
     ],
     # Fail closed: any view that forgets to declare permissions is private.
     'DEFAULT_PERMISSION_CLASSES': [
@@ -342,3 +521,8 @@ REST_FRAMEWORK = {
         'checkout': os.environ.get('THROTTLE_CHECKOUT', '30/hour'),
     },
 }
+
+# A stolen DRF token stays valid forever unless revoked, so tokens issued at
+# signup keep working even after the password changes. This caps that window:
+# after this many days the client gets a 401 and the frontend drops the session.
+AUTH_TOKEN_MAX_AGE_DAYS = int(os.environ.get('AUTH_TOKEN_MAX_AGE_DAYS', '90'))

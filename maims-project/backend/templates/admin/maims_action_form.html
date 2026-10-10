@@ -1,6 +1,13 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
 
+{% comment %}
+Shared confirmation page for the order bulk actions that need one extra input
+before they run: setting a tracking number and declining an order. Everything
+action-specific comes from the view (title, form, wording, submit name), so
+adding a third such action does not mean a third near-identical template.
+{% endcomment %}
+
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Home</a>
@@ -12,32 +19,31 @@
 {% block content %}
 <div id="content-main">
   <form method="post">{% csrf_token %}
-    <p class="maims-muted">
-      This will be written to {{ queryset|length }} selected order{{ queryset|length|pluralize }} and
-      their status will be set to <b>Shipped</b>.
-    </p>
+    <p class="maims-muted">{{ confirm_message }}</p>
 
     <fieldset class="module aligned">
-      <div class="form-row">
-        {{ form.tracking_number.errors }}
-        <div>
-          <label for="{{ form.tracking_number.id_for_label }}">{{ form.tracking_number.label }}:</label>
-          {{ form.tracking_number }}
-          <p class="help">{{ form.tracking_number.help_text }}</p>
+      {% for field in form %}
+        <div class="form-row">
+          {{ field.errors }}
+          <div>
+            <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+            {{ field }}
+            <p class="help">{{ field.help_text }}</p>
+          </div>
         </div>
-      </div>
+      {% endfor %}
     </fieldset>
 
     <ul class="maims-items">
       {% for order in queryset %}
         <li><a href="{{ order.get_absolute_url }}"><strong>#{{ order.pk }}</strong></a>
-          — {{ order.first_name }} {{ order.last_name }} ({{ order.total_amount }} {{ order.currency }})</li>
+          &mdash; {{ order.first_name }} {{ order.last_name }} ({{ order.total_amount }} {{ order.currency }})</li>
       {% endfor %}
     </ul>
 
     <div class="submit-row">
-      <input type="hidden" name="action" value="set_tracking_number">
-      <input type="submit" value="Save tracking number" class="default">
+      <input type="hidden" name="action" value="{{ action_name }}">
+      <input type="submit" value="{{ apply_label }}" class="default">
       <a href="{% url 'admin:products_order_changelist' %}" class="button cancel-link">Cancel</a>
     </div>
   </form>

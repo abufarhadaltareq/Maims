@@ -1,8 +1,8 @@
 /* Maims admin.
  *
- * Layered on top of jazzmin (AdminLTE + Bootstrap), which already styles the
+ * Layered on top of Unfold (Tailwind), which already styles the
  * shell, the tables, the forms and the buttons. So this file only covers the
- * things jazzmin cannot know about: the home page layout, the one-click order
+ * things Unfold cannot know about: the home page layout, the one-click order
  * controls, the inline badges, and the CSV import report. Anything that only
  * restyled Django's default theme has been removed.
  */

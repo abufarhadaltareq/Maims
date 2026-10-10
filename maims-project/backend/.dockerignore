@@ -10,3 +10,9 @@ env
 .venv
 .DS_Store
 db.sqlite3
+
+# Build artefacts and local uploads must not be baked into the image: the image
+# regenerates staticfiles/ during the build, and shipping a developer's media/
+# would leak local uploads and bloat the layer.
+staticfiles
+media

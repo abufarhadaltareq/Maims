@@ -40,7 +40,7 @@ from core.admin_site import maims_admin
 
 from .models import (
     RESTOCK_LEVEL, Category, Collection, CurrencyPrice, HeroSlide, Order, OrderItem,
-    Product, ProductMedia, SiteSettings,
+    OrderNotification, Product, ProductMedia, Review, SiteSettings,
 )
 
 CURRENCY_SYMBOLS = {'USD': '$', 'EUR': '€', 'SEK': 'kr', 'BDT': '৳', 'PKR': 'Rs'}
@@ -57,8 +57,20 @@ STITCHING_LABELS = dict(Product.STITCHING_CHOICES)
 
 # What "the next step" is for an order, used by the one-click advance button and by
 # the reminder text on the order page. Terminal states have no next step.
-NEXT_STATUS = {'new': 'packed', 'packed': 'shipped', 'shipped': 'delivered'}
-NEXT_STATUS_LABEL = {'new': 'Pack it', 'packed': 'Ship it', 'shipped': 'Mark delivered'}
+# The one-click "next step" control on each row. Staff decide on the order before
+# packing starts, so 'new' advances to 'accepted' rather than straight to 'packed'.
+NEXT_STATUS = {
+    'new': 'accepted',
+    'accepted': 'packed',
+    'packed': 'shipped',
+    'shipped': 'delivered',
+}
+NEXT_STATUS_LABEL = {
+    'new': 'Accept',
+    'accepted': 'Pack it',
+    'packed': 'Ship it',
+    'shipped': 'Mark delivered',
+}
 
 
 # --- small presentational helpers -------------------------------------------------
@@ -201,12 +213,66 @@ class TrackingNumberForm(forms.Form):
     )
 
 
+class RejectionReasonForm(forms.Form):
+    """Intermediate page for the "do not take these orders" bulk action."""
+    reason = forms.CharField(
+        label='Why is the shop declining?',
+        max_length=255,
+        widget=forms.Textarea(attrs={'rows': 3}),
+        help_text='Sent to the customer with the rejection, so they are not left guessing.',
+    )
+
+
+class OrderNotificationInline(admin.TabularInline):
+    """
+    Exactly what was sent to this customer (and to the shop) about this order.
+
+    Read-only on purpose: this is an audit trail of outbound messages, and letting
+    staff edit it would destroy the only evidence of what a customer was told.
+    Failed rows can be retried from the orders list action.
+    """
+    model = OrderNotification
+    extra = 0
+    can_delete = False
+    # NOTE: no `max_num = 0` here. max_num caps the formset's total row count, so
+    # setting it to zero hides the *existing* notifications too — the inline
+    # rendered with its headers and no rows. `has_add_permission = False` is what
+    # prevents adding, and `has_change_permission = False` makes the rows read-only.
+    fields = ('created_at', 'event', 'channel', 'audience', 'recipient', 'status', 'error')
+    readonly_fields = fields
+    ordering = ('created_at',)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        # Show, do not edit.
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description='Result')
+    def status(self, obj):
+        colors = {
+            'sent': ('#047857', '#d1fae5'),
+            'failed': ('#991b1b', '#fee2e2'),
+            'skipped': ('#92400e', '#fef3c7'),
+        }
+        return badge(obj.get_status_display().upper(), colors.get(obj.status, ('#111827', '#e5e7eb')))
+
+    @admin.display(description='Sent at')
+    def created_at(self, obj):
+        return obj.sent_at or obj.created_at
+
+
 class OrderAdmin(MaimsModelAdmin):
     change_form_template = 'admin/maims_change_form.html'
     list_display = ('order_ref', 'age', 'customer', 'items_summary', 'total_display',
                     'payment_badge', 'status', 'is_paid', 'next_step')
     list_display_links = ('order_ref',)
-    list_filter = ('status', 'is_paid', 'payment_method', 'currency', 'created_at')
+    list_filter = ('status', 'is_paid', 'payment_method', 'currency', 'whatsapp_opt_in',
+                   'created_at')
     list_editable = ('status',)
     date_hierarchy = 'created_at'
     ordering = ('-created_at',)
@@ -215,25 +281,31 @@ class OrderAdmin(MaimsModelAdmin):
     autocomplete_fields = ('user',)
     readonly_fields = ('order_ref', 'age', 'created_at', 'total_amount',
                        'stripe_payment_intent_id', 'items_block', 'contact_customer')
-    inlines = (OrderItemInline,)
+    inlines = (OrderItemInline, OrderNotificationInline)
     fieldsets = (
         ('Order', {
             'fields': ('order_ref', 'age', 'created_at', 'items_block', 'contact_customer'),
             'description': 'Totals and prices are calculated at checkout and cannot be edited here.'}),
         ('Customer', {
             'fields': ('user', 'first_name', 'last_name', 'email', 'phone',
-                       'address', 'zipcode', 'place')}),
+                       'address', 'zipcode', 'place', 'whatsapp_opt_in'),
+            'description': 'WhatsApp updates are only sent to customers who ticked the '
+                           'opt-in box at checkout.'}),
         ('Payment', {
             'fields': ('total_amount', 'currency', 'payment_method', 'is_paid', 'stripe_payment_intent_id'),
             'description': 'Card payments are confirmed by Stripe automatically. If a status looks wrong, '
                            'fix it with the actions on the orders list.'}),
         ('Fulfilment', {
-            'fields': ('status', 'tracking_number'),
-            'description': 'Set the status here, or use the one-click button on the orders list.'}),
+            'fields': ('status', 'rejection_reason', 'tracking_number'),
+            'description': 'Set the status here, or use the one-click button on the orders list. '
+                           'Every change is emailed (and WhatsApped, if the customer opted in) '
+                           'automatically, and a delivered order publishes a story to the '
+                           'Facebook page.'}),
         ('Internal only', {'fields': ('admin_note',)}),
     )
-    actions = ('mark_paid', 'mark_unpaid', 'mark_packed', 'mark_shipped', 'mark_delivered',
-               'cancel_orders', 'set_tracking_number', 'print_packing_slips')
+    actions = ('accept_orders', 'reject_orders', 'mark_paid', 'mark_unpaid', 'mark_accepted',
+               'mark_packed', 'mark_shipped', 'mark_delivered', 'cancel_orders',
+               'set_tracking_number', 'resend_notifications', 'print_packing_slips')
 
     def get_urls(self):
         # One-click "advance this order to its next step" from the list page.
@@ -272,7 +344,8 @@ class OrderAdmin(MaimsModelAdmin):
     def _presets(self):
         base = reverse('admin:products_order_changelist')
         return [
-            {'label': 'Waiting to be packed', 'url': f"{base}?status__exact=new"},
+            {'label': 'Awaiting our decision', 'url': f"{base}?status__exact=new"},
+            {'label': 'Accepted, waiting to pack', 'url': f"{base}?status__exact=accepted"},
             {'label': 'Packed, waiting for courier', 'url': f"{base}?status__exact=packed"},
             {'label': 'In transit', 'url': f"{base}?status__exact=shipped"},
             {'label': 'Payment not confirmed', 'url': f"{base}?is_paid__exact=0"},
@@ -412,9 +485,110 @@ class OrderAdmin(MaimsModelAdmin):
     # --- bulk actions
 
     def _bulk_set(self, request, queryset, field, value, label):
-        changed = queryset.update(**{field: value})
+        """
+        Apply a field to many orders.
+
+        For `status` this saves each object rather than calling queryset.update(),
+        because queryset.update() bypasses post_save signals — and the signal is
+        what emails/WhatsApps the customer and posts the Facebook story. A bulk
+        "mark shipped" that silently skipped every notification would be far
+        worse than the handful of extra queries a per-object save costs on a list
+        of this size.
+        """
+        if field != 'status':
+            changed = queryset.update(**{field: value})
+        else:
+            changed = 0
+            for order in queryset:
+                if getattr(order, field) == value:
+                    continue  # already there; no save, no notification
+                setattr(order, field, value)
+                order.save(update_fields=[field])
+                changed += 1
+
         self.message_user(request, f'{changed} order{"" if changed == 1 else "s"} marked as {label}.',
                           level=messages.SUCCESS)
+
+    def _set_status(self, request, queryset, value, label):
+        """Status-only variant that always routes through save() so signals fire."""
+        self._bulk_set(request, queryset, 'status', value, label)
+
+    # --- Accept / reject: the shop's decision on whether an order will be taken ---
+
+    @admin.action(description='Accept these orders')
+    def accept_orders(self, request, queryset):
+        """
+        Confirm the shop will fulfil these orders.
+
+        The customer is told the order was accepted. This is deliberately a
+        separate step from 'new': staff review the basket before committing.
+        """
+        self._set_status(request, queryset.exclude(status__in=('accepted', 'rejected')),
+                         'accepted', 'accepted')
+
+    @admin.action(description='Do not take these orders…')
+    def reject_orders(self, request, queryset):
+        """
+        Decline orders, asking for the reason shown to the customer.
+
+        The reason travels with the rejection email/WhatsApp message, so the
+        customer is never told only "rejected" with no explanation. Reuses the
+        same confirmation page as the tracking-number action.
+        """
+        if 'apply_rejection' not in request.POST:
+            form = RejectionReasonForm()
+            return TemplateResponse(request, 'admin/maims_action_form.html', {
+                **self.admin_site.each_context(request),
+                'title': 'Decline orders',
+                'opts': self.model._meta,
+                'queryset': queryset,
+                'form': form,
+                'action_checkbox_name': admin.helpers.ACTION_CHECKBOX_NAME,
+                'action_name': 'reject_orders',
+                'apply_label': 'Decline these orders',
+                'confirm_message': 'The customer will be told the order was declined and why.',
+                'media': self.media,
+            })
+
+        form = RejectionReasonForm(request.POST)
+        if not form.is_valid():
+            self.message_user(request, 'Please give a reason for declining.', level=messages.ERROR)
+            return None
+
+        reason = form.cleaned_data['reason'].strip()
+        changed = 0
+        for order in queryset.exclude(status__in=('delivered', 'returned')):
+            if order.status == 'rejected' and order.rejection_reason == reason:
+                continue
+            order.status = 'rejected'
+            order.rejection_reason = reason
+            order.save(update_fields=['status', 'rejection_reason'])
+            changed += 1
+        self.message_user(
+            request,
+            f'{changed} order{"" if changed == 1 else "s"} declined. '
+            'The customer has been told why.',
+            level=messages.WARNING,
+        )
+        return None
+
+    @admin.action(description='Resend failed notifications')
+    def resend_notifications(self, request, queryset):
+        """Retry anything that previously failed, for the selected orders."""
+        from . import notifications
+
+        total = 0
+        for order in queryset:
+            failed = order.notifications.filter(status='failed').count()
+            if failed:
+                notifications.resend_failed(order)
+                total += failed
+        if total:
+            self.message_user(request, f'Retried {total} failed notification(s).',
+                              level=messages.SUCCESS)
+        else:
+            self.message_user(request, 'Nothing to retry — no failed notifications.',
+                              level=messages.WARNING)
 
     @admin.action(description='1. Mark as PAID')
     def mark_paid(self, request, queryset):
@@ -424,21 +598,25 @@ class OrderAdmin(MaimsModelAdmin):
     def mark_unpaid(self, request, queryset):
         self._bulk_set(request, queryset, 'is_paid', False, 'unpaid')
 
-    @admin.action(description='3. Mark as PACKED')
+    @admin.action(description='3. Mark as ACCEPTED')
+    def mark_accepted(self, request, queryset):
+        self._set_status(request, queryset, 'accepted', 'accepted')
+
+    @admin.action(description='4. Mark as PACKED')
     def mark_packed(self, request, queryset):
-        self._bulk_set(request, queryset, 'status', 'packed', 'packed')
+        self._set_status(request, queryset, 'packed', 'packed')
 
-    @admin.action(description='4. Mark as SHIPPED')
+    @admin.action(description='5. Mark as SHIPPED')
     def mark_shipped(self, request, queryset):
-        self._bulk_set(request, queryset, 'status', 'shipped', 'shipped')
+        self._set_status(request, queryset, 'shipped', 'shipped')
 
-    @admin.action(description='5. Mark as DELIVERED')
+    @admin.action(description='6. Mark as DELIVERED')
     def mark_delivered(self, request, queryset):
-        self._bulk_set(request, queryset, 'status', 'delivered', 'delivered')
+        self._set_status(request, queryset, 'delivered', 'delivered')
 
     @admin.action(description='Cancel selected orders')
     def cancel_orders(self, request, queryset):
-        self._bulk_set(request, queryset, 'status', 'cancelled', 'cancelled')
+        self._set_status(request, queryset, 'cancelled', 'cancelled')
 
     @admin.action(description='Print packing slips for selected orders')
     def print_packing_slips(self, request, queryset):
@@ -461,7 +639,17 @@ class OrderAdmin(MaimsModelAdmin):
             form = TrackingNumberForm(request.POST)
             if form.is_valid():
                 tracking = form.cleaned_data['tracking_number'].strip()
-                changed = queryset.update(tracking_number=tracking, status='shipped')
+                # save() per order, not queryset.update(): moving to 'shipped'
+                # must notify the customer with the tracking number.
+                changed = 0
+                for order in queryset:
+                    order.tracking_number = tracking
+                    if order.status != 'shipped':
+                        order.status = 'shipped'
+                        order.save(update_fields=['tracking_number', 'status'])
+                    else:
+                        order.save(update_fields=['tracking_number'])
+                    changed += 1
                 self.message_user(
                     request,
                     f'Tracking {tracking} saved on {changed} order{"" if changed == 1 else "s"} '
@@ -481,6 +669,12 @@ class OrderAdmin(MaimsModelAdmin):
             'queryset': queryset,
             'form': form,
             'action_checkbox_name': admin.helpers.ACTION_CHECKBOX_NAME,
+            'action_name': 'set_tracking_number',
+            'apply_label': 'Save tracking number',
+            'confirm_message': (
+                'This will be written to every selected order, and each one will be '
+                'marked as Shipped. The customer will be sent the tracking number.'
+            ),
             'media': self.media,
         }
         return TemplateResponse(request, 'admin/maims_action_form.html', context)
@@ -1092,3 +1286,147 @@ maims_admin.register(Category, CategoryAdmin)
 maims_admin.register(Collection, CollectionAdmin)
 maims_admin.register(HeroSlide, HeroSlideAdmin)
 maims_admin.register(SiteSettings, SiteSettingsAdmin)
+
+
+class ReviewAdmin(MaimsModelAdmin):
+    """
+    Moderation queue for product reviews.
+
+    Reviews publish immediately by default — a moderation queue nobody checks is
+    just a delay — but staff can hide one here without deleting it, which matters
+    when a review contains personal data or abuse.
+    """
+
+    list_display = ('product_link', 'stars', 'author', 'verified', 'status_badge',
+                    'short_comment', 'created_at')
+    list_display_links = ('product_link',)
+    list_filter = ('rating', 'is_approved', 'created_at')
+    search_fields = ('comment', 'title', 'product__name', 'user__username', 'user__email')
+    readonly_fields = ('product', 'user', 'order', 'product_name_snapshot', 'created_at')
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+    actions = ('approve_reviews', 'unpublish_reviews')
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('product', 'user', 'order')
+
+    @admin.display(description='Product', ordering='product__name')
+    def product_link(self, obj):
+        return format_html(
+            '<strong><a href="{}">{}</a></strong>',
+            reverse('admin:products_product_change', args=[obj.product_id]),
+            obj.product_name_snapshot or obj.product.name,
+        )
+
+    @admin.display(description='Rating', ordering='rating')
+    def stars(self, obj):
+        return mark_safe('<span style="color:#f59e0b">{}</span>'.format('★' * obj.rating)
+                         + '<span style="color:#e5e7eb">{}</span>'.format('★' * (5 - obj.rating)))
+
+    @admin.display(description='Author')
+    def author(self, obj):
+        return obj.reviewer_name
+
+    @admin.display(boolean=True, description='Verified purchase', ordering='order_id')
+    def verified(self, obj):
+        return obj.is_verified_purchase
+
+    @admin.display(boolean=True, description='Published', ordering='is_approved')
+    def status_badge(self, obj):
+        return obj.is_approved
+
+    @admin.display(description='Comment')
+    def short_comment(self, obj):
+        text = ' '.join((obj.title, obj.comment)).strip()
+        return text[:80] + ('…' if len(text) > 80 else '')
+
+    @admin.action(description='Publish selected reviews')
+    def approve_reviews(self, request, queryset):
+        changed = queryset.update(is_approved=True)
+        self.message_user(request, f'{changed} review(s) published.', level=messages.SUCCESS)
+
+    @admin.action(description='Hide selected reviews')
+    def unpublish_reviews(self, request, queryset):
+        changed = queryset.update(is_approved=False)
+        self.message_user(request, f'{changed} review(s) hidden from the storefront.',
+                          level=messages.WARNING)
+
+
+maims_admin.register(Review, ReviewAdmin)
+
+
+class OrderNotificationAdmin(MaimsModelAdmin):
+    """
+    Read-only log of every outbound message about every order.
+
+    This is the answer to "did the customer actually get the dispatch text?" —
+    staff can filter to failures and retry from the orders list. Editing rows is
+    deliberately not allowed: this is evidence, not content.
+    """
+
+    list_display = ('order_ref', 'event_label', 'channel_badge', 'audience', 'recipient',
+                    'status_badge', 'when', 'problem')
+    list_display_links = ('order_ref',)
+    list_filter = ('status', 'channel', 'audience', 'event')
+    search_fields = ('order__id', 'recipient', 'subject', 'body', 'error')
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+    list_per_page = 50
+    readonly_fields = ('order', 'channel', 'audience', 'event', 'status', 'recipient',
+                       'subject', 'body', 'error', 'created_at', 'sent_at')
+
+    def has_add_permission(self, request):
+        # Rows are written by the notifier, never typed by hand.
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description='Order', ordering='order_id')
+    def order_ref(self, obj):
+        return format_html(
+            '<a href="{}"><strong>#{}</strong></a>',
+            reverse('admin:products_order_change', args=[obj.order_id]), obj.order_id)
+
+    @admin.display(description='Event')
+    def event_label(self, obj):
+        labels = dict(Order.STATUS_CHOICES)
+        return labels.get(obj.event, obj.event.replace('_', ' ').title())
+
+    @admin.display(description='Channel')
+    def channel_badge(self, obj):
+        colors = {
+            'email': ('#1d4ed8', '#dbeafe'),
+            'whatsapp': ('#047857', '#d1fae5'),
+            'facebook': ('#4338ca', '#e0e7ff'),
+        }
+        return badge(obj.get_channel_display(), colors.get(obj.channel, ('#111827', '#e5e7eb')))
+
+    @admin.display(description='To')
+    def audience(self, obj):
+        return obj.get_audience_display()
+
+    @admin.display(description='Result')
+    def status_badge(self, obj):
+        colors = {
+            'sent': ('#047857', '#d1fae5'),
+            'failed': ('#991b1b', '#fee2e2'),
+            'skipped': ('#92400e', '#fef3c7'),
+        }
+        return badge(obj.get_status_display().upper(), colors.get(obj.status, ('#111827', '#e5e7eb')))
+
+    @admin.display(description='When', ordering='created_at')
+    def when(self, obj):
+        return obj.sent_at or obj.created_at
+
+    @admin.display(description='Note')
+    def problem(self, obj):
+        if obj.status == 'failed':
+            return obj.error[:120]
+        if obj.status == 'skipped':
+            return format_html('<span class="maims-muted">{}</span>', obj.error[:120])
+        return '—'
+
+
+maims_admin.register(OrderNotification, OrderNotificationAdmin)

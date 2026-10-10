@@ -6,11 +6,11 @@
    and the gradients below read from them.
    ============================================================================ */
 @theme {
-  --color-brand-primary: #17102b;    /* Deep royal ink — headings, dark surfaces */
+  --color-brand-primary: #2a2350;    /* Soft deep-indigo ink — headings, dark surfaces */
   --color-brand-secondary: #ffffff;  /* Background structures */
-  --color-brand-accent: #db2777;     /* Accent — prices, badges, active states */
-  --color-brand-muted: #f5f3ff;      /* Soft violet shading blocks */
-  --color-brand-text: #2b2440;       /* Main readable copy */
+  --color-brand-accent: #ec4899;     /* Accent — prices, badges, active states */
+  --color-brand-muted: #f6f4ff;      /* Light lavender shading blocks */
+  --color-brand-text: #3a3357;       /* Main readable copy — softer than near-black */
 
   --font-brand: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -21,11 +21,11 @@
    the entire store.
    --------------------------------------------------------------------------- */
 :root {
-  --grad-from: #4f46e5;   /* Indigo */
-  --grad-via: #9333ea;    /* Violet */
-  --grad-to: #ec4899;     /* Pink   */
-  --grad-angle: 120deg;
-  --brand-glow: 0 18px 40px -18px rgba(147, 51, 234, 0.55);
+  --grad-from: #6366f1;   /* Indigo 500 — lighter, brighter */
+  --grad-via: #a855f7;    /* Purple 500 */
+  --grad-to: #f472b6;     /* Pink 400 — soft finish */
+  --grad-angle: 115deg;
+  --brand-glow: 0 16px 36px -20px rgba(168, 85, 247, 0.45);
 }
 
 /* Custom utilities (Tailwind v4) — declared with @utility so they also work
@@ -43,7 +43,7 @@
 
 /* Faint tint for large section backgrounds. */
 @utility bg-gradient-brand-soft {
-  background-image: linear-gradient(var(--grad-angle), #eef2ff, #faf5ff 50%, #fdf2f8);
+  background-image: linear-gradient(var(--grad-angle), #f2f5ff, #faf5ff 50%, #fff0f7);
 }
 
 /* Gradient text on light backgrounds. */

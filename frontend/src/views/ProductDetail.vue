@@ -63,6 +63,22 @@
         <div class="rounded-[2rem] border border-gray-100 bg-white p-8 shadow-lg shadow-slate-200/50">
           <div class="mb-6">
             <h1 class="text-5xl font-extrabold tracking-tight mb-3">{{ product.name }}</h1>
+            <!-- Star rating summary. Jumps to the reviews section below. -->
+            <a
+              v-if="product.review_count"
+              href="#reviews"
+              class="inline-flex items-center gap-1.5 mb-3 text-sm text-gray-500 hover:text-brand-primary transition"
+            >
+              <span class="flex gap-0.5" aria-hidden="true">
+                <span
+                  v-for="star in 5"
+                  :key="star"
+                  class="text-sm"
+                  :class="star <= Math.round(product.average_rating || 0) ? 'text-amber-400' : 'text-gray-200'"
+                >★</span>
+              </span>
+              <span>{{ Number(product.average_rating).toFixed(1) }} ({{ product.review_count }})</span>
+            </a>
             <div class="flex items-center gap-3">
               <span class="text-4xl font-black text-brand-accent">{{ formatDisplayPrice }}</span>
               <span class="inline-flex rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
@@ -117,6 +133,18 @@
 
     <div v-else class="text-center py-12 text-gray-400 font-medium">
       <p>Loading premium product details...</p>
+    </div>
+
+    <!-- Star rating + reviews. Only rendered once the product exists, since the
+         component keys its requests off the slug. -->
+    <ProductReviews v-if="product" :product-slug="product.slug" />
+
+    <div v-if="site.whatsappEnabled" class="mt-10 text-center">
+      <a :href="whatsappProductLink" target="_blank" rel="noopener noreferrer"
+         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-emerald-600 text-emerald-700 text-sm font-medium hover:bg-emerald-50 transition">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.4 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.9-4.3-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5s.8 1.9.8 2c.1.1.1.3 0 .5-.3.6-.6.8-.4 1.1.6 1.1 1.4 1.8 2.4 2.4.3.2.5.1.7-.1l.8-.9c.2-.3.4-.2.7-.1l2 1c.3.1.5.2.6.4 0 .1 0 .6-.5 1.5z"/></svg>
+        Questions about this piece? Ask us on WhatsApp
+      </a>
     </div>
   </div>
 
@@ -180,6 +208,7 @@ import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { useCartStore } from '../stores/cart'
 import { useSiteStore } from '../stores/site'
+import ProductReviews from '../components/ProductReviews.vue'
 
 // 1. Core States defined first
 const product = ref(null)

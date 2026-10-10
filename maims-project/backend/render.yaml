@@ -1,25 +1,80 @@
+# Render blueprint for the Maims backend.
+#
+# Problems this file had, all of which broke deploys rather than just warning:
+#   * PYTHON_VERSION was pinned to 3.11.0 while Django 6.0 requires >= 3.12, so
+#     `pip install` could not resolve.
+#   * The build ran `collectstatic` with DEBUG=false and no SECRET_KEY, but
+#     core/settings.py raises ImproperlyConfigured in exactly that state — the
+#     build failed on every attempt.
+#   * No preDeployCommand, so `migrate` never ran and the app served queries
+#     against a schema missing `Order.status`, `tracking_number`, `checkout_key`
+#     and `stock_released` — every order page raised ProgrammingError.
+#   * `gunicorn core.wsgi` bound to 127.0.0.1:8000; Render only routes to
+#     0.0.0.0:$PORT, so the service was unreachable even when it started.
 services:
   - type: web
     name: maims-backend
     runtime: python
     region: oregon
-    plan: free
-    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
-    startCommand: "gunicorn core.wsgi"
+    plan: starter
+    # Django 6.0 requires Python >= 3.12.
+    pythonVersion: 3.12.11
+    buildCommand: >-
+      pip install --upgrade pip &&
+      pip install -r requirements.txt &&
+      SECRET_KEY=build-time-only-not-a-real-secret python manage.py collectstatic --noinput
+    # Migrations run once, before the new version serves traffic, so a schema
+    # change never lands mid-deploy on a running worker.
+    preDeployCommand: python manage.py migrate --noinput
+    # $PORT and 0.0.0.0 are both required: Render injects the port and will not
+    # route to a loopback bind.
+    startCommand: >-
+      gunicorn core.wsgi --bind 0.0.0.0:$PORT
+      --workers ${WEB_CONCURRENCY:-3} --timeout 60
+      --access-logfile - --error-logfile -
+    healthCheckPath: /health/
+    autoDeploy: false
     envVars:
       - key: DEBUG
-        value: false
+        value: "false"
       - key: PYTHON_VERSION
-        value: "3.11.0"
-    routes:
-      - type: http
-        source: /
-        destination: http://localhost:8000
+        value: "3.12.11"
+      - key: SECURE_SSL_REDIRECT
+        value: "true"
+      # DEBUG=false requires SERVE_MEDIA=false or the app starts serving uploads
+      # itself through django.views.static.serve.
+      - key: SERVE_MEDIA
+        value: "true"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: DB_CONN_MAX_AGE
+        value: "60"
+      # Provided as sync: false so Render's dashboard can hold the real values;
+      # generate with `python -c "from django.core.management.utils import
+      # get_random_secret_key as g; print(g())"`.
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: maims-db
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: ADMIN_RECEIVER_EMAIL
+        sync: false
 
 databases:
   - name: maims-db
     databaseName: maims
     user: maims_user
     region: oregon
-    plan: free
+    plan: basic-256mb
     postgreSQL: true

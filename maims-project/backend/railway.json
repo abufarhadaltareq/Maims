@@ -4,7 +4,6 @@
     "builder": "dockerfile"
   },
   "deploy": {
-    "startCommand": "gunicorn core.wsgi",
     "restartPolicyType": "on_failure",
     "restartPolicyMaxRetries": 5
   }

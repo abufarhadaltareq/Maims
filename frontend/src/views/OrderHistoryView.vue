@@ -41,6 +41,8 @@
           </div>
         </div>
 
+        <OrderStatusTimeline :order="order" />
+
         <div class="bg-gray-50/70 px-6 py-5 border-b border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
           <div>
             <h3 class="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">Delivery Address</h3>
@@ -103,6 +105,13 @@
                 <p class="font-black text-gray-900 text-base">
                   {{ formatPrice(item.price * item.quantity) }} {{ order.currency || '' }}
                 </p>
+                <router-link
+                  v-if="order.status === 'delivered' && item.product && item.product.slug"
+                  :to="`/products/${item.product.slug}#reviews`"
+                  class="mt-2 inline-block text-xs font-bold text-brand-accent hover:underline"
+                >
+                  Rate this item
+                </router-link>
               </div>
             </div>
           </div>
@@ -116,6 +125,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import OrderStatusTimeline from '../components/OrderStatusTimeline.vue'
 
 const orders = ref([])
 const loading = ref(true)

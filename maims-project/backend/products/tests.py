@@ -1,4 +1,5 @@
 import threading
+from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest import mock, skipIf
@@ -6,10 +7,18 @@ from unittest import mock, skipIf
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase, TransactionTestCase, override_settings
+from django.contrib import admin
+from django.urls import Resolver404
+from django.utils import timezone
+
+from core.admin_site import maims_admin
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from .models import Category, CurrencyPrice, Order, OrderItem, Product, UserProfile
+from .models import (
+    Category, CurrencyPrice, Order, OrderItem, Product, Review, SiteSettings, UserProfile,
+)
 from .views import _build_order_items, _CheckoutError, _mark_paid_and_reserve, _reserve_stock
 
 
@@ -53,7 +62,9 @@ class AdminPageTests(TestCase):
         self.assertEqual(res.status_code, 200)
         # The home page is a work queue, not a list of statistics.
         self.assertContains(res, 'Orders to handle')
-        self.assertContains(res, 'Waiting to be packed')
+        # 'new' is the decision queue: staff accept or decline before packing.
+        self.assertContains(res, 'Awaiting our decision')
+        self.assertContains(res, 'Accepted, to pack')
 
     def test_every_registered_changelist_renders(self):
         from core.admin_site import maims_admin
@@ -94,7 +105,9 @@ class AdminDailyWorkflowTests(AdminPageTests):
     def test_advance_button_moves_an_order_to_its_next_step(self):
         order = self.order
         self.assertEqual(order.status, 'new')
-        for expected in ('packed', 'shipped', 'delivered'):
+        # 'accepted' is a real step: staff confirm they will take the order before
+        # packing starts, and the customer is told.
+        for expected in ('accepted', 'packed', 'shipped', 'delivered'):
             self.client.post(f'/admin/products/order/{order.pk}/advance/')
             order.refresh_from_db()
             self.assertEqual(order.status, expected)
@@ -575,3 +588,1034 @@ class OrderIsolationTests(TestCase):
         self.assertEqual(alice_profile.phone, 'alice-phone')   # applied to Alice only
 
 
+class CheckoutIdempotencyTests(TestCase):
+    """A retried checkout POST must not create a second order or reserve stock twice.
+
+    The failure this guards against is a customer double-clicking "Pay", hitting
+    back then forward, or retrying on a flaky connection: each retry used to build
+    a brand new order and decrement inventory again.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.category = Category.objects.create(name='Cat', slug='cat')
+        self.product = Product.objects.create(
+            category=self.category, name='Kurta', slug='kurta', stock=10)
+        CurrencyPrice.objects.create(product=self.product, currency='EUR', price=Decimal('10.00'))
+
+    def _payload(self):
+        return {
+            'first_name': 'Ada', 'last_name': 'Lovelace', 'email': 'ada@example.com',
+            'address': '1 Main St', 'zipcode': '1000', 'place': 'Lisbon',
+            'payment_method': 'cod', 'currency': 'EUR',
+            'items': [{'product_id': self.product.id, 'quantity': 2}],
+        }
+
+    def test_replayed_request_returns_the_original_order(self):
+        key = 'checkout-attempt-abc'
+        first = self.client.post('/api/v1/checkout/', self._payload(),
+                                 format='json', HTTP_IDEMPOTENCY_KEY=key)
+        self.assertEqual(first.status_code, 201, first.content)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 8)
+
+        replay = self.client.post('/api/v1/checkout/', self._payload(),
+                                  format='json', HTTP_IDEMPOTENCY_KEY=key)
+        # 200, not 201: nothing new was created.
+        self.assertEqual(replay.status_code, 200, replay.content)
+        self.assertEqual(replay.data['order_id'], first.data['order_id'])
+
+        self.assertEqual(Order.objects.count(), 1)
+        # Stock decremented exactly once across both requests.
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 8)
+
+    def test_distinct_keys_create_distinct_orders(self):
+        base = self._payload()
+        one = self.client.post('/api/v1/checkout/', base, format='json',
+                               HTTP_IDEMPOTENCY_KEY='attempt-1')
+        two = self.client.post('/api/v1/checkout/', base, format='json',
+                               HTTP_IDEMPOTENCY_KEY='attempt-2')
+        self.assertEqual(one.status_code, 201)
+        self.assertEqual(two.status_code, 201)
+        self.assertNotEqual(one.data['order_id'], two.data['order_id'])
+        self.assertEqual(Order.objects.count(), 2)
+
+    def test_request_without_a_key_still_works(self):
+        res = self.client.post('/api/v1/checkout/', self._payload(), format='json')
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertIsNone(Order.objects.get(id=res.data['order_id']).checkout_key)
+
+    def test_replay_cannot_expose_another_customers_order(self):
+        key = 'shared-key'
+        self.client.post('/api/v1/checkout/', self._payload(), format='json',
+                         HTTP_IDEMPOTENCY_KEY=key)
+
+        # A different logged-in customer guessing the key must not be handed the
+        # first customer's address and email.
+        mallory = User.objects.create_user('mallory', 'm@example.com', 'pw-12345678')
+        self.client.force_authenticate(user=mallory)
+        res = self.client.post('/api/v1/checkout/', self._payload(), format='json',
+                               HTTP_IDEMPOTENCY_KEY=key)
+        # No replay match for her, so it is treated as a fresh checkout.
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertEqual(Order.objects.count(), 2)
+
+    def test_oversized_idempotency_key_is_truncated_not_rejected(self):
+        # Headers are attacker-controlled; a huge key must not reach the column.
+        res = self.client.post('/api/v1/checkout/', self._payload(), format='json',
+                               HTTP_IDEMPOTENCY_KEY='x' * 500)
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertLessEqual(len(Order.objects.get(id=res.data['order_id']).checkout_key), 64)
+
+
+class StockReleaseTests(TestCase):
+    """Refunds and cancellations must put stock back exactly once."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Cat', slug='cat')
+        self.product = Product.objects.create(
+            category=self.category, name='Kurta', slug='kurta', stock=10)
+        CurrencyPrice.objects.create(product=self.product, currency='EUR', price=Decimal('10.00'))
+        self.order = Order.objects.create(
+            first_name='Ada', last_name='Lovelace', email='ada@example.com',
+            address='1 Main St', zipcode='1000', place='Lisbon',
+            total_amount=Decimal('20.00'), currency='EUR', payment_method='cod', is_paid=False)
+        OrderItem.objects.create(order=self.order, product=self.product, size='M',
+                                 price=Decimal('10.00'), quantity=2)
+
+    def test_release_stock_returns_units(self):
+        from .views import _release_stock
+
+        self.assertTrue(_release_stock(self.order))
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 12)
+
+    def test_release_stock_is_idempotent(self):
+        """Stripe retries `charge.refunded` for days; stock must not inflate."""
+        from .views import _release_stock
+
+        self.assertTrue(_release_stock(self.order))
+        self.assertFalse(_release_stock(self.order))
+        self.assertFalse(_release_stock(self.order))
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 12)
+        self.order.refresh_from_db()
+        self.assertTrue(self.order.stock_released)
+
+    def test_refund_on_unpaid_order_does_not_create_phantom_stock(self):
+        """
+        A refund for an order whose stock was never reserved must be ignored.
+
+        Otherwise every failed-but-refunded checkout inflates the catalogue:
+        the customer never paid, yet their units reappear as sellable stock.
+        """
+        from unittest import mock
+
+        from django.test import override_settings
+
+        self.assertFalse(self.order.is_paid)
+        stock_before = self.product.stock
+
+        event = {
+            'type': 'charge.refunded',
+            'data': {'object': {'id': 'ch_123', 'payment_intent': 'pi_refund'}},
+        }
+        Order.objects.filter(pk=self.order.pk).update(stripe_payment_intent_id='pi_refund')
+
+        with override_settings(STRIPE_WEBHOOK_SECRET='whsec_test'):
+            with mock.patch('stripe.Webhook.construct_event', return_value=event):
+                res = self.client.post('/api/v1/stripe-webhook/', {}, format='json')
+
+        self.assertEqual(res.status_code, 200, res.content)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, stock_before)
+        self.order.refresh_from_db()
+        self.assertNotEqual(self.order.status, 'returned')
+
+    def test_refund_on_paid_order_releases_stock_once(self):
+        """The real path: a paid order is restocked and marked returned."""
+        from unittest import mock
+
+        from django.test import override_settings
+
+        _mark_paid_and_reserve(self.order)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 8)   # 10 - 2 reserved
+        Order.objects.filter(pk=self.order.pk).update(stripe_payment_intent_id='pi_refund')
+
+        event = {
+            'type': 'charge.refunded',
+            'data': {'object': {'id': 'ch_123', 'payment_intent': 'pi_refund'}},
+        }
+        with override_settings(STRIPE_WEBHOOK_SECRET='whsec_test'):
+            with mock.patch('stripe.Webhook.construct_event', return_value=event):
+                res = self.client.post('/api/v1/stripe-webhook/', {}, format='json')
+                self.assertEqual(res.status_code, 200, res.content)
+                # Stripe retries the same delivery; the second must be a no-op.
+                res = self.client.post('/api/v1/stripe-webhook/', {}, format='json')
+                self.assertEqual(res.status_code, 200, res.content)
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 10)   # back to the original count
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'returned')
+        self.assertFalse(self.order.is_paid)
+
+
+class SlugUniquenessTests(TestCase):
+    """Slugs are unique at the database level, so `.get(slug=...)` can't 500."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Cat', slug='cat')
+
+    def test_duplicate_product_slug_is_rejected(self):
+        Product.objects.create(category=self.category, name='One', slug='dupe', stock=1)
+        from django.db import IntegrityError, transaction as db_transaction
+
+        with self.assertRaises(IntegrityError):
+            with db_transaction.atomic():
+                Product.objects.create(category=self.category, name='Two', slug='dupe', stock=1)
+
+    def test_duplicate_category_slug_is_rejected(self):
+        from django.db import IntegrityError, transaction as db_transaction
+
+        with self.assertRaises(IntegrityError):
+            with db_transaction.atomic():
+                Category.objects.create(name='Other', slug='cat')
+
+    def test_distinct_slugs_are_fine(self):
+        Product.objects.create(category=self.category, name='One', slug='one', stock=1)
+        Product.objects.create(category=self.category, name='Two', slug='two', stock=1)
+        self.assertEqual(Product.objects.filter(slug__in=['one', 'two']).count(), 2)
+
+
+class ExpiringTokenTests(TestCase):
+    """Tokens must stop working once they exceed AUTH_TOKEN_MAX_AGE_DAYS."""
+
+    def setUp(self):
+        self.user = User.objects.create_user('ada', 'ada@example.com', 'pw-12345678')
+        self.token = Token.objects.create(user=self.user)
+        self.client = APIClient()
+
+    def _age_token_by_days(self, days):
+        from django.utils import timezone
+
+        Token.objects.filter(pk=self.token.pk).update(
+            created=timezone.now() - timedelta(days=days))
+
+    def test_fresh_token_is_accepted(self):
+        res = self.client.get('/api/v1/me/', HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.assertEqual(res.status_code, 200, res.content)
+
+    def test_expired_token_is_rejected_and_revoked(self):
+        # Age the token past the default 90-day limit.
+        self._age_token_by_days(91)
+
+        res = self.client.get('/api/v1/me/', HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.assertEqual(res.status_code, 401)
+        # The stale credential is deleted, not merely refused, so it cannot be
+        # replayed after the limit is raised.
+        self.assertFalse(Token.objects.filter(pk=self.token.pk).exists())
+    def test_token_inside_the_window_still_works(self):
+        self._age_token_by_days(89)
+
+        res = self.client.get('/api/v1/me/', HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.assertEqual(res.status_code, 200, res.content)
+
+    def test_expiry_limit_is_configurable(self):
+        from django.test import override_settings
+
+        with override_settings(AUTH_TOKEN_MAX_AGE_DAYS=1):
+            self._age_token_by_days(2)
+            res = self.client.get('/api/v1/me/', HTTP_AUTHORIZATION=f'Token {self.token.key}')
+            self.assertEqual(res.status_code, 401)
+
+    def test_logout_revokes_the_token(self):
+        """The expiry limit is a ceiling, not a replacement for logout."""
+        res = self.client.post('/api/v1/logout/', {}, format='json',
+                               HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertFalse(Token.objects.filter(pk=self.token.pk).exists())
+
+
+class HealthCheckTests(TestCase):
+    """The orchestrator probe must answer 200 only when the DB is reachable."""
+
+    def test_health_reports_ok(self):
+        res = self.client.get('/health/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()['status'], 'ok')
+        self.assertEqual(res.json()['database'], 'ok')
+
+    def test_health_reports_503_when_database_is_down(self):
+        from unittest import mock
+
+        with mock.patch('core.views.connections') as conns:
+            conns.__getitem__.return_value.cursor.side_effect = Exception('boom')
+            res = self.client.get('/health/')
+        self.assertEqual(res.status_code, 503)
+        body = res.json()
+        self.assertEqual(body['status'], 'unhealthy')
+        # The driver's message could leak host/port/database names.
+        self.assertNotIn('boom', res.content.decode())
+
+    def test_health_needs_no_authentication(self):
+        """A load balancer calls this anonymously; a 401 would mean 'unhealthy'."""
+        res = self.client.get('/health/')
+        self.assertEqual(res.status_code, 200)
+
+    def test_health_is_not_cached(self):
+        res = self.client.get('/health/')
+        self.assertIn('no-cache', res.headers.get('Cache-Control', ''))
+
+
+class OrderHistoryQueryCountTests(TestCase):
+    """The order history must not issue a query per line."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user('ada', 'ada@example.com', 'pw-12345678')
+        self.token = Token.objects.create(user=self.user)
+        self.category = Category.objects.create(name='Cat', slug='cat')
+        self.products = [
+            Product.objects.create(category=self.category, name=f'P{i}', slug=f'p{i}', stock=50)
+            for i in range(3)
+        ]
+        for p in self.products:
+            CurrencyPrice.objects.create(product=p, currency='EUR', price=Decimal('10.00'))
+
+        for n in range(5):
+            order = Order.objects.create(
+                user=self.user, first_name='Ada', last_name='L', email='a@example.com',
+                address='1 Main St', zipcode='1000', place='Lisbon',
+                total_amount=Decimal('20.00'), currency='EUR', payment_method='cod')
+            for product in self.products[:2]:
+                OrderItem.objects.create(order=order, product=product, size='M',
+                                         price=Decimal('10.00'), quantity=1)
+
+    def test_history_is_rendered_in_a_bounded_number_of_queries(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        # Warm the connection/query caches so the count is not inflated by
+        # one-off setup queries.
+        self.client.get('/api/v1/orders/')
+
+        # 8 queries regardless of how many orders/lines/products exist:
+        #   1 token auth, 1 orders, 1 items, 1 products (annotated), 1 prices,
+        #   1 media, 1 annotated categories, 1 category children.
+        # Before the joins this was 26; it then briefly hit 83 when the product
+        # prefetch was combined with select_related, and 27 when the rating was
+        # resolved per product. The count must stay independent of data size.
+        with self.assertNumQueries(8):
+            res = self.client.get('/api/v1/orders/')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(len(res.data), 5)
+
+
+class ProductListingQueryCountTests(TestCase):
+    """
+    Listing products must not fetch each product's prices one row at a time.
+
+    Regression guard for Product.get_price, which looked for an attribute Django
+    never sets (``_prefetched_prices_cache``). The prefetch was silently ignored
+    and every product in the catalogue cost an extra round trip, so a 200-product
+    listing ran 200+ queries.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.category = Category.objects.create(name='Cat', slug='cat')
+        for i in range(20):
+            product = Product.objects.create(
+                category=self.category, name=f'Product {i}', slug=f'product-{i}', stock=10)
+            CurrencyPrice.objects.create(product=product, currency='EUR', price=Decimal('15.00'))
+
+    def test_get_price_uses_the_prefetch_cache(self):
+        products = list(Product.objects.filter(category=self.category).prefetch_related('prices'))
+        with self.assertNumQueries(0):
+            # Reading a price from already-prefetched objects must not query.
+            prices = {p.slug: p.get_price('EUR') for p in products}
+        self.assertEqual(prices['product-0'], Decimal('15.00'))
+
+    def test_get_price_without_prefetch_still_correct(self):
+        product = Product.objects.get(slug='product-0')
+        self.assertEqual(product.get_price('EUR'), Decimal('15.00'))
+
+    def test_get_price_falls_back_when_currency_missing(self):
+        product = Product.objects.get(slug='product-0')
+        # Display fallback: an undefined currency returns the first stored price.
+        self.assertEqual(product.get_price('USD'), Decimal('15.00'))
+
+    def test_get_price_exact_never_falls_back(self):
+        product = Product.objects.get(slug='product-0')
+        # Checkout must reject rather than charge a foreign number.
+        self.assertIsNone(product.get_price_exact('USD'))
+        self.assertEqual(product.get_price_exact('EUR'), Decimal('15.00'))
+
+    def test_catalogue_endpoint_query_count_is_flat(self):
+        res = self.client.get('/api/v1/latest-products/')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(len(res.data), 20)
+
+        # The count must not grow with the catalogue size. 5 queries flat:
+        # products, prices, media, annotated categories, category children.
+        self.client.get('/api/v1/latest-products/')
+        with self.assertNumQueries(5):
+            self.client.get('/api/v1/latest-products/')
+
+
+class ProductionMediaAndStaticTests(TestCase):
+    """
+    Regression cover for two failures that only appear with DEBUG=False.
+
+    1. Pointing the `default` storage bucket at the static manifest backend made
+       every Product.image.url raise "Missing staticfiles manifest entry", so
+       /api/v1/latest-products/ returned 500 as soon as one product had a photo.
+    2. django.conf.urls.static.static() is a deliberate no-op unless DEBUG is
+       True, so using it for the production media route registered nothing and
+       every uploaded image 404'd.
+    """
+
+    def tearDown(self):
+        # urlpatterns are built at import time, so these tests reload the module;
+        # put the real ones back for whatever runs next.
+        _reload_urls(DEBUG=self._original_debug)
+
+    def _original_debug(self):
+        from django.conf import settings as dj_settings
+
+        self._saved_debug = getattr(self, '_saved_debug', dj_settings.DEBUG)
+        return self._saved_debug
+
+    @override_settings(DEBUG=False, ALLOWED_HOSTS=['testserver'])
+    def test_product_image_url_resolves_with_debug_off(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        category = Category.objects.create(name='Cat', slug='cat')
+        product = Product.objects.create(category=category, name='Kurta', slug='k')
+        product.image.save('regression-probe.jpg',
+                           SimpleUploadedFile('x.jpg', b'not-a-real-jpeg'), save=True)
+
+        # Must not raise: the manifest storage must never back the default bucket.
+        with override_settings(
+            STORAGES={
+                'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+                'staticfiles': {
+                    'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+                },
+            }
+        ):
+            self.assertTrue(product.get_image)
+        product.image.delete(save=False)
+
+    def test_media_route_is_registered_when_debug_off(self):
+        """The production branch must actually add a route."""
+        from django.urls import clear_url_caches, resolve
+
+        patterns = _reload_urls(DEBUG=False, SERVE_MEDIA=True)
+        try:
+            matched = resolve('/media/uploads/anything.jpg')
+            self.assertEqual(matched.kwargs['path'], 'uploads/anything.jpg')
+            self.assertTrue(str(matched.kwargs['document_root']).endswith('/media'))
+            self.assertTrue(
+                any('media' in str(p.pattern) for p in patterns),
+                'no media pattern registered with DEBUG=False',
+            )
+        finally:
+            clear_url_caches()
+
+    def test_media_route_absent_when_serve_media_is_off(self):
+        """SERVE_MEDIA=False hands uploads to a CDN; the app must stop serving."""
+        from django.urls import clear_url_caches, resolve
+
+        _reload_urls(DEBUG=False, SERVE_MEDIA=False)
+        try:
+            with self.assertRaises(Resolver404):
+                resolve('/media/uploads/anything.jpg')
+        finally:
+            clear_url_caches()
+
+
+def _reload_urls(**overrides):
+    """Re-evaluate core.urls.urlpatterns under different settings."""
+    import importlib
+
+    import core.urls
+    from django.urls import clear_url_caches
+
+    with override_settings(**overrides):
+        importlib.reload(core.urls)
+        clear_url_caches()
+        return core.urls.urlpatterns
+
+
+# --- ORDER NOTIFICATIONS & FULFILMENT NOTIFICATIONS ---
+
+
+_make_order_counter = 0
+
+
+def _make_order(**overrides):
+    """A minimal paid order with one line, for the notification tests."""
+    global _make_order_counter
+    _make_order_counter += 1
+    n = _make_order_counter
+    # Unique slugs: this helper may be called more than once per test.
+    category, _ = Category.objects.get_or_create(slug=f'cat-{n}', defaults={'name': 'Cat'})
+    product = Product.objects.create(category=category, name='Kurta',
+                                     slug=f'k-{n}', stock=50)
+    CurrencyPrice.objects.create(product=product, currency='EUR', price=Decimal('25.00'))
+    defaults = dict(
+        first_name='Ada', last_name='Lovelace', email='ada@example.com',
+        phone='+351 912345678', address='1 Main St', zipcode='1000', place='Lisbon',
+        total_amount=Decimal('25.00'), currency='EUR', payment_method='cod', is_paid=True,
+    )
+    defaults.update(overrides)
+    order = Order.objects.create(**defaults)
+    OrderItem.objects.create(order=order, product=product, size='M',
+                             price=Decimal('25.00'), quantity=1)
+    return order, product
+
+
+class OrderNotificationTests(TestCase):
+    """
+    The customer must be told exactly once per status change, over the channels
+    they opted into — and a provider failure must never break the order.
+    """
+
+    def setUp(self):
+        self.store = SiteSettings.get()
+        self.store.notification_email = 'shop@example.com'
+        self.store.customer_notifications_enabled = True
+        self.store.customer_whatsapp_notifications = True
+        self.store.save()
+
+        # The order is created inside the commit-capture context: creating an order
+        # is itself an event (it fires the new-order alert), and on_commit callbacks
+        # registered during setUp would otherwise never run inside a TestCase.
+        with mock.patch('products.notifications._send_email') as send, \
+                mock.patch('products.notifications._send_whatsapp') as wa:
+            send.return_value = (True, '')
+            wa.return_value = (True, '')
+            with self.captureOnCommitCallbacks(execute=True):
+                self.order, self.product = _make_order(whatsapp_opt_in=True)
+
+    def _sent(self, **filter_kwargs):
+        return self.order.notifications.filter(status='sent', **filter_kwargs)
+
+    def clear_notifications(self):
+        """Forget prior sends so a fresh status event can be asserted cleanly."""
+        self.order.notifications.all().delete()
+        Order.objects.filter(pk=self.order.pk).update(last_notified_status='')
+
+    def save(self, **fields):
+        """
+        Save the order and run the notifications it queues.
+
+        Notification dispatch is deliberately deferred with transaction.on_commit
+        so a message never describes an order that later rolls back. Inside a
+        TestCase that callback would otherwise never fire, so these tests run it
+        explicitly — which also keeps the deferral honest rather than papering
+        over it.
+        """
+        with self.captureOnCommitCallbacks(execute=True):
+            for name, value in fields.items():
+                setattr(self.order, name, value)
+            self.order.save()
+
+    def test_status_change_emails_the_customer_once(self):
+        self.clear_notifications()
+        with mock.patch('products.notifications._send_email') as send:
+            send.return_value = (True, '')
+            self.save(status='accepted')
+
+        self.assertEqual(self._sent(channel='email', audience='customer').count(), 1)
+        # The body must actually say what happened.
+        body = self._sent(channel='email').first().body
+        self.assertIn('confirmed your order', body)
+        # Subject uses the short customer-facing label, not the staff status text.
+        self.assertIn('Order confirmed', self._sent(channel='email').first().subject)
+
+    def test_repeated_save_does_not_notify_twice(self):
+        """The admin changelist saves every field at once; that is not two events."""
+        self.clear_notifications()
+        with mock.patch('products.notifications._send_email') as send:
+            send.return_value = (True, '')
+            self.save(status='accepted')
+            self.save()          # e.g. admin also typed an internal note
+            self.save()
+
+        self.assertEqual(self._sent(channel='email', audience='customer').count(), 1)
+
+    def test_notification_body_mentions_each_stage(self):
+        expected = {
+            'accepted': 'confirmed your order',
+            'packed': 'packed',
+            'shipped': 'on its way',
+            'delivered': 'delivered',
+        }
+        for status, phrase in expected.items():
+            with self.subTest(status=status):
+                self.clear_notifications()
+                with mock.patch('products.notifications._send_email') as send:
+                    send.return_value = (True, '')
+                    self.save(status=status)
+                self.assertIn(phrase, self._sent(channel='email').first().body)
+
+    def test_shipped_notification_includes_tracking_number(self):
+        self.clear_notifications()
+        with mock.patch('products.notifications._send_email') as send:
+            send.return_value = (True, '')
+            self.save(status='shipped', tracking_number='TRACK-123')
+        self.assertIn('TRACK-123', self._sent(channel='email').first().body)
+
+    def test_rejection_tells_the_customer_the_reason(self):
+        self.clear_notifications()
+        with mock.patch('products.notifications._send_email') as send:
+            send.return_value = (True, '')
+            self.save(status='rejected',
+                      rejection_reason='This fabric line is sold out')
+        body = self._sent(channel='email').first().body
+        self.assertIn('sold out', body)
+        self.assertIn('Nothing has been charged', body)
+
+    def test_returned_status_sends_nothing(self):
+        """The requirement is to notify until delivery; nothing after."""
+        self.clear_notifications()
+        with mock.patch('products.notifications._send_email') as send:
+            send.return_value = (True, '')
+            self.save(status='returned')
+        self.assertFalse(self._sent(channel='email', audience='customer').exists())
+
+    def test_whatsapp_requires_opt_in(self):
+        self.clear_notifications()
+        with mock.patch('products.notifications._send_whatsapp') as send:
+            send.return_value = (True, '')
+            self.save(whatsapp_opt_in=False, status='accepted')
+
+        self.assertFalse(self._sent(channel='whatsapp').exists())
+        skipped = self.order.notifications.get(channel='whatsapp', audience='customer')
+        self.assertEqual(skipped.status, 'skipped')
+        self.assertIn('did not opt in', skipped.error)
+        send.assert_not_called()
+
+    def test_whatsapp_sent_to_normalised_number(self):
+        self.clear_notifications()
+        # Without credentials the message must be skipped, never attempted: a
+        # send would fail and show up as a permanent red alert in the admin.
+        self.store.whatsapp_api_token = 'test-token'
+        self.store.whatsapp_phone_number_id = '123456789'
+        self.store.save()
+
+        with mock.patch('products.notifications._send_whatsapp') as send:
+            send.return_value = (True, '')
+            self.save(status='accepted')
+
+        send.assert_called_once()
+        self.assertEqual(send.call_args[0][0], '351912345678')
+        self.assertEqual(self._sent(channel='whatsapp').count(), 1)
+
+    def test_unconfigured_whatsapp_is_a_skip_not_a_failure(self):
+        self.clear_notifications()
+        self.store.whatsapp_api_token = ''
+        self.store.whatsapp_phone_number_id = ''
+        self.store.save()
+
+        with mock.patch('products.notifications._send_whatsapp') as send:
+            self.save(status='accepted')
+        send.assert_not_called()
+        row = self.order.notifications.get(channel='whatsapp', audience='customer')
+        self.assertEqual(row.status, 'skipped')
+
+    def test_unconfigured_facebook_is_a_skip_not_a_failure(self):
+        self.clear_notifications()
+        self.store.facebook_page_id = ''
+        self.store.facebook_page_access_token = ''
+        self.store.save()
+        with mock.patch('products.notifications._send_email') as email_send:
+            email_send.return_value = (True, '')
+            self.save(status='delivered')
+        self.assertEqual(
+            self.order.notifications.get(channel='facebook').status, 'skipped')
+
+    def test_failed_notification_count_does_not_include_unconfigured(self):
+        """The admin badge must only count genuinely broken sends."""
+        self.clear_notifications()
+        self.store.whatsapp_api_token = ''
+        self.store.whatsapp_phone_number_id = ''
+        self.store.save()
+        with mock.patch('products.notifications._send_email') as email_send:
+            email_send.return_value = (True, '')
+            self.save(status='accepted')
+        self.assertFalse(self.order.notifications.filter(status='failed').exists())
+
+    def test_impossible_phone_number_is_skipped_not_sent(self):
+        """A bad number would be rejected by WhatsApp; record it instead."""
+        self.clear_notifications()
+        with mock.patch('products.notifications._send_whatsapp') as send:
+            send.return_value = (True, '')
+            self.save(phone='123', status='accepted')
+
+        send.assert_not_called()
+        skipped = self.order.notifications.get(channel='whatsapp', audience='customer')
+        self.assertEqual(skipped.status, 'skipped')
+        self.assertIn('international phone number', skipped.error)
+
+    def test_customer_disabled_suppresses_everything(self):
+        self.clear_notifications()
+        self.store.customer_notifications_enabled = False
+        self.store.save()
+        with mock.patch('products.notifications._send_email') as send:
+            self.save(status='accepted')
+        send.assert_not_called()
+
+    def test_provider_failure_is_recorded_and_never_raises(self):
+        """The order must still be saved when email/WhatsApp is down."""
+        self.clear_notifications()
+        with mock.patch('products.notifications._send_email') as send:
+            send.return_value = (False, 'SMTP timeout')
+            self.save(status='accepted')   # must not raise
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'accepted')
+        failed = self.order.notifications.get(status='failed', channel='email')
+        self.assertIn('SMTP timeout', failed.error)
+
+    def test_exploding_provider_does_not_break_the_save(self):
+        self.clear_notifications()
+        with mock.patch('products.notifications._send_email') as send:
+            send.side_effect = RuntimeError('boom')
+            self.save(status='accepted')   # must not raise
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'accepted')
+
+    def test_creating_an_order_alerts_the_shop(self):
+        """
+        The alert fires when the order is placed — i.e. at creation time, not when
+        someone later opens it in the admin.
+        """
+        alert = self.order.notifications.filter(
+            channel='email', audience='admin', event='new').first()
+        self.assertIsNotNone(alert)
+        self.assertEqual(alert.status, 'sent')
+        self.assertIn('#%d' % self.order.pk, alert.subject)
+        self.assertIn('912345678', alert.body)
+
+    def test_new_order_alerts_the_shop_once_only(self):
+        alert_count = self.order.notifications.filter(
+            channel='email', audience='admin', event='new').count()
+        with mock.patch('products.notifications._send_email') as send:
+            self.save(status='new')
+            self.save(status='new')
+        send.assert_not_called()
+        self.assertEqual(
+            self.order.notifications.filter(channel='email', audience='admin',
+                                            event='new').count(),
+            alert_count,
+        )
+
+    def test_no_admin_address_records_a_skip_not_a_failure(self):
+        # No alert address configured: record the skip on a brand new order rather
+        # than mutating an existing one, because re-saving 'new' onto 'new' is
+        # correctly treated as "no change".
+        self.store.notification_email = ''
+        self.store.save()
+        with mock.patch('products.notifications._send_email') as send, \
+                self.captureOnCommitCallbacks(execute=True):
+            send.return_value = (True, '')
+            fresh, _ = _make_order()
+        skipped = fresh.notifications.get(channel='email', audience='admin')
+        self.assertEqual(skipped.status, 'skipped')
+        self.assertIn('No notification address', skipped.error)
+
+    def test_delivery_posts_a_facebook_success_story(self):
+        self.clear_notifications()
+        self.store.facebook_page_id = '12345'
+        self.store.facebook_page_access_token = 'token'
+        self.store.facebook_success_story_template = 'Shipped {product_names} to {place}!'
+        self.store.save()
+        with mock.patch('products.notifications._send_email') as email_send, \
+             mock.patch('products.notifications._post_facebook_story') as fb:
+            email_send.return_value = (True, '')
+            fb.return_value = (True, '')
+            self.save(status='delivered')
+
+        fb.assert_called_once()
+        text = fb.call_args[0][0]
+        self.assertIn('Kurta', text)
+        self.assertIn('Lisbon', text)
+        self.assertEqual(self._sent(channel='facebook').count(), 1)
+
+    def test_success_story_posts_only_once(self):
+        self.clear_notifications()
+        self.store.facebook_page_id = '12345'
+        self.store.facebook_page_access_token = 'token'
+        self.store.save()
+        with mock.patch('products.notifications._send_email') as email_send, \
+             mock.patch('products.notifications._post_facebook_story') as fb:
+            email_send.return_value = (True, '')
+            fb.return_value = (True, '')
+            self.save(status='delivered')
+            self.save()
+            self.save(status='delivered')
+
+        self.assertEqual(fb.call_count, 1)
+
+    def test_success_story_disabled_is_skipped(self):
+        self.clear_notifications()
+        self.store.facebook_post_on_delivery = False
+        self.store.save()
+        with mock.patch('products.notifications._send_email') as email_send:
+            email_send.return_value = (True, '')
+            self.save(status='delivered')
+        self.assertEqual(
+            self.order.notifications.get(channel='facebook').status, 'skipped')
+
+    def test_bulk_admin_action_notifies(self):
+        """queryset.update() would bypass the signal; actions must not."""
+        self.clear_notifications()
+        with mock.patch('products.notifications._send_email') as send:
+            send.return_value = (True, '')
+            from django.contrib.admin.sites import AdminSite
+            from products.admin import OrderAdmin
+
+            admin_instance = OrderAdmin(Order, AdminSite())
+            request = type('R', (), {'user': None, 'session': {}, 'GET': {}, 'POST': {}})()
+            admin_instance.message_user = lambda *a, **k: None
+            queryset = Order.objects.filter(pk=self.order.pk)
+            with self.captureOnCommitCallbacks(execute=True):
+                admin_instance.mark_shipped(request, queryset)
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'shipped')
+        self.assertTrue(self._sent(channel='email', audience='customer').exists())
+
+
+class PhoneNormalizationTests(TestCase):
+    def test_strips_formatting(self):
+        from products.notifications import normalize_phone
+        self.assertEqual(normalize_phone('+351 912 345 678'), '351912345678')
+        self.assertEqual(normalize_phone('(0)351-912-345-678'), '0351912345678')
+
+    def test_international_prefix_is_removed(self):
+        from products.notifications import normalize_phone
+        self.assertEqual(normalize_phone('00351 912 345 678'), '351912345678')
+
+    def test_plausibility_bounds(self):
+        from products.notifications import is_plausible_whatsapp_number
+        self.assertFalse(is_plausible_whatsapp_number('123'))
+        self.assertTrue(is_plausible_whatsapp_number('351912345678'))
+        self.assertFalse(is_plausible_whatsapp_number('1234567890123456789'))
+
+
+# --- REVIEWS ---
+
+
+class ReviewApiTests(TestCase):
+    def setUp(self):
+        from rest_framework.authtoken.models import Token
+
+        self.client = APIClient()
+        self.category = Category.objects.create(name='Cat', slug='cat')
+        self.product = Product.objects.create(category=self.category, name='Kurta',
+                                              slug='kurta', stock=10)
+        self.customer = User.objects.create_user(
+            'ada', 'ada@example.com', 'pw-12345678', first_name='Ada', last_name='Lovelace')
+        self.token = Token.objects.create(user=self.customer)
+
+    def _auth(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+    def _review(self, **overrides):
+        from products.models import Review
+
+        defaults = dict(product=self.product, user=self.customer, rating=5,
+                        comment='Beautiful fabric', product_name_snapshot='Kurta')
+        defaults.update(overrides)
+        return Review.objects.create(**defaults)
+
+    def test_anonymous_can_read_reviews(self):
+        self._review()
+        res = self.client.get(f'/api/v1/products/kurta/reviews/')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(len(res.data['reviews']), 1)
+        self.assertEqual(res.data['average_rating'], 5.0)
+        self.assertEqual(res.data['breakdown']['5'], 1)
+
+    def test_anonymous_cannot_write(self):
+        res = self.client.post(f'/api/v1/products/kurta/reviews/',
+                               {'rating': 5, 'comment': 'Nice'}, format='json')
+        self.assertEqual(res.status_code, 401)
+
+    def test_customer_can_review(self):
+        self._auth()
+        res = self.client.post(f'/api/v1/products/kurta/reviews/',
+                               {'rating': 4, 'title': 'Good', 'comment': 'Nice fit'},
+                               format='json')
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertEqual(res.data['rating'], 4)
+        # Reviews show a first name + last initial, not a full identity.
+        self.assertEqual(res.data['author'], 'Ada L.')
+
+    def test_rating_out_of_range_is_rejected(self):
+        self._auth()
+        res = self.client.post(f'/api/v1/products/kurta/reviews/',
+                               {'rating': 9, 'comment': 'Nice'}, format='json')
+        self.assertEqual(res.status_code, 400)
+
+    def test_empty_comment_is_rejected(self):
+        self._auth()
+        res = self.client.post(f'/api/v1/products/kurta/reviews/',
+                               {'rating': 5, 'comment': '   '}, format='json')
+        self.assertEqual(res.status_code, 400)
+
+    def test_duplicate_review_is_refused_then_updatable(self):
+        self._review(rating=3, comment='First')
+        self._auth()
+        again = self.client.post(f'/api/v1/products/kurta/reviews/',
+                                 {'rating': 5, 'comment': 'Second'}, format='json')
+        self.assertEqual(again.status_code, 409)
+
+        forced = self.client.post(f'/api/v1/products/kurta/reviews/',
+                                  {'rating': 5, 'comment': 'Second', 'force_update': True},
+                                  format='json')
+        self.assertEqual(forced.status_code, 200, forced.content)
+        self.assertEqual(Review.objects.filter(product=self.product).count(), 1)
+        self.assertEqual(Review.objects.get().comment, 'Second')
+
+    def test_verified_purchase_flag_is_not_client_settable(self):
+        self._auth()
+        res = self.client.post(f'/api/v1/products/kurta/reviews/',
+                               {'rating': 5, 'comment': 'Great',
+                                'is_verified_purchase': True}, format='json')
+        self.assertEqual(res.status_code, 201)
+        # No delivered order, so it must not claim to be verified.
+        self.assertFalse(res.data['is_verified_purchase'])
+
+    def test_delivered_order_marks_review_verified(self):
+        order, _ = _make_order(user=self.customer, status='delivered')
+        order.items.update(product=self.product)
+        self._auth()
+        res = self.client.post(f'/api/v1/products/kurta/reviews/',
+                               {'rating': 5, 'comment': 'Bought it'}, format='json')
+        self.assertEqual(res.data['is_verified_purchase'], True)
+
+    def test_unpublished_reviews_are_hidden_from_readers(self):
+        self._review(is_approved=False)
+        res = self.client.get('/api/v1/products/kurta/reviews/')
+        self.assertEqual(len(res.data['reviews']), 0)
+        self.assertEqual(res.data['review_count'], 0)
+
+    def test_product_payload_exposes_rating(self):
+        self._review()
+        res = self.client.get('/api/v1/latest-products/')
+        product = next(p for p in res.data if p['slug'] == 'kurta')
+        self.assertEqual(product['average_rating'], 5.0)
+        self.assertEqual(product['review_count'], 1)
+
+    def test_unrated_product_reports_null_not_error(self):
+        res = self.client.get('/api/v1/latest-products/')
+        product = next(p for p in res.data if p['slug'] == 'kurta')
+        self.assertIsNone(product['average_rating'])
+        self.assertEqual(product['review_count'], 0)
+
+    def test_customer_cannot_delete_another_customers_review(self):
+        from rest_framework.authtoken.models import Token
+
+        mallory = User.objects.create_user('mallory', 'm@example.com', 'pw-12345678')
+        victim = self._review()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=mallory).key}')
+        res = self.client.delete(f'/api/v1/reviews/{victim.pk}/')
+        # 404, not 403: the API must not confirm that someone else's review exists.
+        self.assertEqual(res.status_code, 404)
+        self.assertTrue(Review.objects.filter(pk=victim.pk).exists())
+
+    def test_customer_can_delete_own_review(self):
+        from products.models import Review
+
+        review = self._review()
+        self._auth()
+        res = self.client.delete(f'/api/v1/reviews/{review.pk}/')
+        self.assertEqual(res.status_code, 204)
+        self.assertFalse(Review.objects.filter(pk=review.pk).exists())
+
+    def test_reviews_for_unknown_product_are_404(self):
+        res = self.client.get('/api/v1/products/nope/reviews/')
+        self.assertEqual(res.status_code, 404)
+
+
+class ReviewAdminTests(TestCase):
+    def setUp(self):
+        User.objects.create_superuser('root', 'root@example.com', 'pw-root-123456')
+        self.client.force_login(User.objects.get(username='root'))
+        from products.models import Review
+
+        self.category = Category.objects.create(name='Cat', slug='cat')
+        self.product = Product.objects.create(category=self.category, name='Kurta',
+                                              slug='kurta', stock=1)
+        self.review = Review.objects.create(
+            product=self.product, rating=4, comment='Good one',
+            product_name_snapshot='Kurta')
+
+    def test_changelist_renders(self):
+        res = self.client.get('/admin/products/review/')
+        self.assertEqual(res.status_code, 200)
+
+    def test_review_is_not_editable(self):
+        """Moderation is publish/hide; the reviewer's words are theirs."""
+        res = self.client.get('/admin/products/review/')
+        self.assertEqual(res.status_code, 200)
+
+    def test_hide_and_publish_actions(self):
+        from products.models import Review
+
+        url = '/admin/products/review/'
+        res = self.client.post(url, {
+            'action': 'unpublish_reviews',
+            admin.helpers.ACTION_CHECKBOX_NAME: [str(self.review.pk)],
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(Review.objects.get(pk=self.review.pk).is_approved)
+
+
+class NotificationAdminDisplayTests(TestCase):
+    """The notification log has to actually be visible in the admin."""
+
+    def setUp(self):
+        User.objects.create_superuser('root', 'root@example.com', 'pw-root-123456')
+        self.client.force_login(User.objects.get(username='root'))
+        self.order, _ = _make_order()
+        from products.models import OrderNotification
+
+        OrderNotification.objects.create(
+            order=self.order, channel='email', audience='customer', event='packed',
+            status='sent', recipient='ada@example.com', subject='Your order is packed',
+            body='packed and ready', sent_at=timezone.now())
+        OrderNotification.objects.create(
+            order=self.order, channel='whatsapp', audience='customer', event='packed',
+            status='failed', recipient='351912345678', error='WhatsApp API not configured')
+
+    def test_order_page_lists_the_notifications(self):
+        res = self.client.get(f'/admin/products/order/{self.order.pk}/change/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'ada@example.com')
+        self.assertContains(res, 'packed')
+        self.assertContains(res, 'WhatsApp API not configured')
+
+    def test_notification_changelist_shows_failures(self):
+        res = self.client.get('/admin/products/ordernotification/?status__exact=failed')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, '351912345678')
+
+    def test_rows_are_read_only(self):
+        """The audit trail must not be editable."""
+        from products.admin import OrderNotificationInline
+
+        inline = OrderNotificationInline(Order, maims_admin)
+        request = type('R', (), {})()
+        request.user = User.objects.get(username='root')
+        self.assertFalse(inline.has_add_permission(request))
+        self.assertFalse(inline.has_change_permission(request))
+        self.assertFalse(inline.has_delete_permission(request))
+        # max_num must stay unset: it would cap the formset and hide every row.
+        self.assertNotEqual(inline.max_num, 0)

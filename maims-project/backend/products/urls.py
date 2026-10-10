@@ -30,5 +30,10 @@ urlpatterns = [
     path('change-password/', views.change_password, name='change_password'),
     # Legacy DRF token endpoint kept for back-compat:
     path('token-login/', obtain_auth_token, name='token_login'),
-    path('profile/', views.my_profile, name='my_profile')
+    path('profile/', views.my_profile, name='my_profile'),
+
+    # --- Reviews ---
+    path('products/<slug:slug>/reviews/', views.ProductReviewList.as_view(),
+         name='product_reviews'),
+    path('reviews/<int:pk>/', views.ReviewDetail.as_view(), name='review_detail'),
 ]

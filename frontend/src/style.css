@@ -3,11 +3,11 @@
 @theme {
   /* 🌟 GLOBAL MULTI-BRAND UTILITIES (Tailwind v4) */
   /* Kept in sync with src/assets/style.css (the stylesheet actually imported). */
-  --color-brand-primary: #17102b;    /* Deep royal ink (buttons, headings) */
+  --color-brand-primary: #2a2350;    /* Soft deep-indigo ink (buttons, headings) */
   --color-brand-secondary: #ffffff;  /* Background structures */
-  --color-brand-accent: #db2777;     /* Highlights, accents, tags */
-  --color-brand-muted: #f5f3ff;      /* Shading layout blocks */
-  --color-brand-text: #2b2440;       /* Main readable copy texts */
+  --color-brand-accent: #ec4899;     /* Highlights, accents, tags */
+  --color-brand-muted: #f6f4ff;      /* Shading layout blocks */
+  --color-brand-text: #3a3357;       /* Main readable copy texts */
 
   --font-brand: "Inter", system-ui, -apple-system, sans-serif;
 }

@@ -29,6 +29,20 @@ services:
       DATABASE_URL: postgresql://maims_user:maims_password@db:5432/maims_db
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      # Without this the Stripe webhook endpoint answers 503 and card orders are
+      # only confirmed when the customer returns to the success page.
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Where "new order" notifications are sent. Leave empty to disable; the
+      # console email backend takes over when no SMTP credentials are present.
+      ADMIN_RECEIVER_EMAIL: ${ADMIN_RECEIVER_EMAIL:-}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       db:
         condition: service_healthy
@@ -38,12 +52,18 @@ services:
       - maims-network
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Vite bakes VITE_* vars into the JS at build time, so this must be set
+        # when the image is built, not when the container starts. Defaults to the
+        # in-cluster backend URL for `docker compose up`.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     command: npm run dev
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: http://backend:8000
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     depends_on:
       - backend
     volumes:

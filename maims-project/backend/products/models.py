@@ -14,7 +14,9 @@ RESTOCK_LEVEL = 3
 
 class Category(models.Model):
     name = models.CharField(max_length=255)
-    slug = models.SlugField()
+    # Unique: the public API resolves products with `.get(slug=...)`, so a duplicate
+    # slug turns a single product page into a 500.
+    slug = models.SlugField(unique=True)
     # Enables infinite-depth parent/child categories (e.g., Women -> Clothing -> Unstitched)
     parent = models.ForeignKey('self', related_name='children', on_delete=models.CASCADE, blank=True, null=True)
     # Showcase card image for the "Shop by Category" homepage section
@@ -69,7 +71,9 @@ class HeroSlide(models.Model):
 class Collection(models.Model):
     # Group items by seasonal catalogs (e.g., "Festive Eid Collection", "Summer '26 Basics")
     name = models.CharField(max_length=255)
-    slug = models.SlugField()
+    # Unique: the public API resolves products with `.get(slug=...)`, so a duplicate
+    # slug turns a single product page into a 500.
+    slug = models.SlugField(unique=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -101,7 +105,9 @@ class Product(models.Model):
     category = models.ForeignKey(Category, related_name='products', on_delete=models.CASCADE)
     collection = models.ForeignKey(Collection, related_name='products', on_delete=models.SET_NULL, blank=True, null=True)
     name = models.CharField(max_length=255)
-    slug = models.SlugField()
+    # Unique: the public API resolves products with `.get(slug=...)`, so a duplicate
+    # slug turns a single product page into a 500.
+    slug = models.SlugField(unique=True)
     brand_name = models.CharField(max_length=100, blank=True, null=True, help_text="e.g., Sana Safinaz, Maria.B (Label used for frontend brand filtering)")
     description = models.TextField(blank=True, null=True)
     
@@ -147,7 +153,7 @@ class Product(models.Model):
     def get_price(self, currency='EUR'):
         """Return Decimal price for a currency, falling back to first available price."""
         currency = (currency or 'EUR').upper()
-        prices = getattr(self, '_prefetched_prices_cache', None)
+        prices = self._cached_prices()
         if prices is not None:
             for p in prices:
                 if p.currency == currency:
@@ -160,6 +166,21 @@ class Product(models.Model):
             return exact.price
         first = self.prices.first()
         return first.price if first else None
+
+    def _cached_prices(self):
+        """
+        Return the prefetched CurrencyPrice list, or None when nothing is cached.
+
+        Django exposes prefetch results through ``_prefetched_objects_cache``, keyed
+        by the related accessor name. Reading ``_prefetched_prices_cache`` instead —
+        as this method used to — always missed, so every product paid for a fresh
+        prices query no matter how carefully the queryset had been optimised.
+        That turned a 200-product listing into 200 extra round trips.
+        """
+        cache = getattr(self, '_prefetched_objects_cache', None)
+        if cache is not None:
+            return cache.get('prices')
+        return None
 
     def get_price_exact(self, currency='EUR'):
         """
@@ -178,6 +199,23 @@ class Product(models.Model):
             if cp.currency == currency:
                 return cp.price
         return None
+
+
+    @property
+    def average_rating(self):
+        """Mean star rating across approved reviews, or None when there are none.
+
+        The queryset annotations used by the catalogue endpoints
+        (`rating_average` / `rating_count`) take priority and avoid this query;
+        this property is the correct-but-slower fallback for a single product.
+        """
+        from django.db.models import Avg
+
+        return self.reviews.filter(is_approved=True).aggregate(a=Avg('rating'))['a']
+
+    @property
+    def review_count(self):
+        return self.reviews.filter(is_approved=True).count()
 
 
 class ProductMedia(models.Model):
@@ -256,6 +294,40 @@ class SiteSettings(models.Model):
     stripe_enabled = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # --- Outbound notifications -------------------------------------------------
+    # Everything below is configured here (not in env vars) so the shop can be set
+    # up from the admin. Any blank value disables that channel: a notifier that is
+    # not configured logs a 'skipped' row and moves on, it never raises.
+
+    # Who receives the "new order" alert.
+    notification_email = models.EmailField(blank=True, null=True,
+        help_text="Address that receives a new-order alert. Falls back to ADMIN_RECEIVER_EMAIL.")
+    admin_whatsapp_number = models.CharField(max_length=20, blank=True, null=True,
+        help_text="Digits with country code, e.g. 351912345678 — receives the new-order alert on WhatsApp")
+    # Tell the customer about their own order automatically (confirmation + every
+    # status change up to delivery).
+    customer_notifications_enabled = models.BooleanField(default=True,
+        help_text="Email each customer when their order status changes")
+    customer_whatsapp_notifications = models.BooleanField(default=True,
+        help_text="Also send those updates over WhatsApp, for customers who opted in at checkout")
+
+    # --- WhatsApp Business Cloud API (Meta) -------------------------------------
+    whatsapp_api_token = models.CharField(max_length=255, blank=True, null=True,
+        help_text="Permanent/system-user token from Meta for WhatsApp Cloud API")
+    whatsapp_phone_number_id = models.CharField(max_length=64, blank=True, null=True,
+        help_text="Phone Number ID from WhatsApp > API Setup (not the phone number itself)")
+
+    # --- Facebook page posting ---------------------------------------------------
+    facebook_page_id = models.CharField(max_length=64, blank=True, null=True,
+        help_text="Numeric Page ID — not the page name or URL")
+    facebook_page_access_token = models.CharField(max_length=512, blank=True, null=True,
+        help_text="Page access token with pages_manage_posts permission")
+    facebook_post_on_delivery = models.BooleanField(default=True,
+        help_text="Publish a \"success story\" to the Facebook page when an order is delivered")
+    facebook_success_story_template = models.TextField(blank=True, null=True, default=(
+        "Just shipped {product_names} to {place}! Thank you {first_name} for choosing Maims."
+    ), help_text="Placeholders: {order_id}, {first_name}, {place}, {product_names}, {currency}, {total}")
+
     class Meta:
         verbose_name = 'Site settings'
         verbose_name_plural = 'Site settings'
@@ -307,11 +379,25 @@ class Order(models.Model):
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='stripe')
     stripe_payment_intent_id = models.CharField(max_length=255, blank=True, null=True)
     is_paid = models.BooleanField(default=False)
+    # Client-supplied dedupe key (the `Idempotency-Key` request header). A retried
+    # checkout POST — double-clicked button, flaky mobile network, refresh mid
+    # redirect — must not create a second order or reserve the stock twice.
+    # NULL for orders placed before this existed and for API clients that send no
+    # header; Postgres/MySQL both allow many NULLs under a unique index.
+    checkout_key = models.CharField(max_length=64, blank=True, null=True, unique=True)
+    # Guards the reverse operation: refund/cancel puts stock back exactly once,
+    # no matter how many times the webhook is retried.
+    stock_released = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     # --- Fulfilment workflow (managed in Admin → Orders) ---
+    # 'new' and 'accepted' are distinct on purpose: staff must confirm the shop
+    # can actually fulfil an order before packing starts, and the customer is
+    # told which of those happened.
     STATUS_CHOICES = [
-        ('new', 'New - not packed yet'),
+        ('new', 'New - awaiting shop decision'),
+        ('accepted', 'Accepted - confirmed by the shop'),
+        ('rejected', 'Not taken - declined by the shop'),
         ('packed', 'Packed'),
         ('shipped', 'Shipped'),
         ('delivered', 'Delivered'),
@@ -319,10 +405,35 @@ class Order(models.Model):
         ('returned', 'Returned / refunded'),
     ]
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new', db_index=True)
+    # Shown to the customer in the rejection email/WhatsApp message.
+    rejection_reason = models.CharField(max_length=255, blank=True, null=True,
+        help_text="Shown to the customer when the shop declines the order")
+    # Whether the customer asked to receive order updates over WhatsApp. WhatsApp
+    # only permits business-initiated messages to people who opted in, so this flag
+    # is collected at checkout and enforced again at send time.
+    whatsapp_opt_in = models.BooleanField(default=False)
+    # The status the customer has already been told about. Guarantees exactly one
+    # notification per transition even if an order is saved several times (the admin
+    # changelist saves the whole form, actions save again, and a retry may re-save).
+    last_notified_status = models.CharField(max_length=20, blank=True, default='')
     tracking_number = models.CharField(max_length=120, blank=True, null=True,
                                        help_text="Courier / tracking reference, e.g. 1234567890")
     admin_note = models.TextField(blank=True, null=True,
                                   help_text="Internal only - never shown to the customer")
+
+    # Customer-facing labels. The STATUS_CHOICES text is written for staff
+    # ("Accepted - confirmed by the shop"); these read naturally in an email
+    # subject line or a WhatsApp message.
+    STATUS_MESSAGE_LABELS = {
+        'new': 'Order received',
+        'accepted': 'Order confirmed',
+        'rejected': 'Order declined',
+        'packed': 'Order packed',
+        'shipped': 'Order shipped',
+        'delivered': 'Order delivered',
+        'cancelled': 'Order cancelled',
+        'returned': 'Order returned',
+    }
 
     class Meta:
         ordering = ('-created_at',)
@@ -333,14 +444,28 @@ class Order(models.Model):
     def __str__(self):
         return f"Order {self.id} - {self.first_name} {self.last_name}"
 
+    @property
+    def status_message_label(self):
+        return self.STATUS_MESSAGE_LABELS.get(self.status, self.status.replace('_', ' ').title())
+
     def get_absolute_url(self):
         from django.urls import reverse
         return reverse('admin:products_order_change', args=[self.pk])
 
     @property
     def is_open(self):
-        """True while the order still needs work (not finished or cancelled)."""
-        return self.status not in ('delivered', 'cancelled', 'returned')
+        """True while the order still needs work (not finished or closed)."""
+        return self.status not in ('delivered', 'cancelled', 'returned', 'rejected')
+
+    # Statuses the customer should be told about. 'new' is included because it is
+    # the order confirmation; 'rejected' and 'cancelled' are included because a
+    # customer must never be left wondering why an order vanished. Everything
+    # after 'delivered' is silent, per the requirement to notify until delivery.
+    NOTIFY_STATUSES = ('new', 'accepted', 'rejected', 'packed', 'shipped', 'delivered', 'cancelled')
+
+    @property
+    def should_notify_customer(self):
+        return self.status in self.NOTIFY_STATUSES
 
 
 class OrderItem(models.Model):
@@ -386,3 +511,135 @@ def create_user_profile(sender, instance, created, **kwargs):
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
     instance.profile.save()
+
+# --- OUTBOUND NOTIFICATIONS ---
+
+class OrderNotification(models.Model):
+    """
+    A durable record of every message the shop tried to send about an order.
+
+    Three reasons this is a table rather than a log line:
+
+    1. Staff need to answer "did the customer actually get the dispatch text?"
+      without digging through container logs.
+    2. It makes sending idempotent. A retried webhook or a double-clicked admin
+      button re-enters the notifier; we look for an existing successful row for
+      the same (order, channel, audience, event) and skip instead of messaging a
+      customer twice.
+    3. Failures are visible and retryable instead of vanishing into a logger.
+
+    No send is ever allowed to raise into the caller: a customer's bank must not
+    see a 500 because Meta was briefly unreachable.
+    """
+
+    CHANNELS = [
+        ('email', 'Email'),
+        ('whatsapp', 'WhatsApp'),
+        ('facebook', 'Facebook page'),
+    ]
+    AUDIENCES = [
+        ('customer', 'Customer'),
+        ('admin', 'Shop owner'),
+    ]
+    STATUSES = [
+        ('sent', 'Sent'),
+        ('failed', 'Failed'),
+        ('skipped', 'Skipped'),
+    ]
+
+    order = models.ForeignKey(Order, related_name='notifications', on_delete=models.CASCADE)
+    channel = models.CharField(max_length=20, choices=CHANNELS)
+    audience = models.CharField(max_length=20, choices=AUDIENCES)
+    # The status (or event) this message reports: 'new', 'shipped', 'delivered', ...
+    event = models.CharField(max_length=32)
+    status = models.CharField(max_length=10, choices=STATUSES, db_index=True)
+    recipient = models.CharField(max_length=255, blank=True, default='')
+    subject = models.CharField(max_length=255, blank=True, default='')
+    body = models.TextField(blank=True, default='')
+    # Provider response, trimmed. Never log the access token or full API payload.
+    error = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'Order notification'
+        verbose_name_plural = 'Order notifications'
+        indexes = [
+            # The dedupe lookup is always "for this order, channel and audience".
+            models.Index(fields=['order', 'channel', 'audience']),
+        ]
+
+    def __str__(self):
+        return f"#{self.order_id} {self.channel}/{self.audience} {self.event} ({self.status})"
+
+    @property
+    def is_success(self):
+        return self.status == 'sent'
+
+
+# --- PRODUCT REVIEWS ---
+
+class Review(models.Model):
+    """
+    A star rating plus comment on a product.
+
+    Reviews are tied to a *purchase* rather than only an account: `order` records
+    which delivered order the reviewer bought from, so the storefront can mark the
+    review as verified. A logged-in customer who has never ordered can still
+    review (people do), but it shows as unverified.
+    """
+
+    RATING_CHOICES = [(i, f'{i} star' + ('s' if i != 1 else '')) for i in range(1, 6)]
+
+    product = models.ForeignKey(Product, related_name='reviews', on_delete=models.CASCADE)
+    # SET_NULL so deleting an account does not delete the shop's social proof.
+    user = models.ForeignKey(User, related_name='reviews', on_delete=models.SET_NULL,
+                             blank=True, null=True)
+    order = models.ForeignKey(Order, related_name='reviews', on_delete=models.SET_NULL,
+                              blank=True, null=True,
+                              help_text="Set automatically when the reviewer has a delivered order")
+    rating = models.PositiveSmallIntegerField(choices=RATING_CHOICES)
+    title = models.CharField(max_length=120, blank=True, default='')
+    comment = models.TextField(blank=True, default='')
+    # Staff can hide a review (spam, abuse) without deleting it.
+    is_approved = models.BooleanField(default=True)
+    # Recorded at write time because Order.items is not guaranteed to survive edits,
+    # and the product name shown later may have been renamed.
+    product_name_snapshot = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'Review'
+        verbose_name_plural = 'Reviews'
+        constraints = [
+            # One review per customer per product. NULL users (guests are not
+            # allowed, but a deleted account leaves a NULL) are exempt from the
+            # conflict because SQL treats NULLs as distinct.
+            models.UniqueConstraint(fields=['product', 'user'], name='unique_review_per_user_product'),
+            # Defensive: a rating outside 1..5 must never reach the database even
+            # if a future serializer is edited carelessly.
+            models.CheckConstraint(
+                condition=models.Q(rating__gte=1, rating__lte=5),
+                name='review_rating_between_1_and_5',
+            ),
+        ]
+        indexes = [models.Index(fields=['product', 'is_approved'])]
+
+    def __str__(self):
+        return f"{self.rating}* {self.product_name_snapshot or self.product_id}"
+
+    @property
+    def is_verified_purchase(self):
+        return self.order_id is not None
+
+    @property
+    def reviewer_name(self):
+        """First name + last initial, so reviews carry a name but not an identity."""
+        if self.user_id and self.user:
+            last = (self.user.last_name or '').strip()
+            initial = f"{last[0].upper()}." if last else ''
+            return f"{self.user.first_name or self.user.username} {initial}".strip()
+        return 'Verified customer'

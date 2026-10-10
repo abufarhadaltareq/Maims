@@ -1,15 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-// Views
-import HomeView from '../views/HomeView.vue'
-import SearchView from '../views/SearchView.vue' // Added missing import
-import ProductDetail from '../views/ProductDetail.vue'
-import CartView from '../views/CartView.vue'
-import CheckoutView from '../views/CheckoutView.vue'
-import OrderHistoryView from '../views/OrderHistoryView.vue'
-import SignUpView from '../views/SignUpView.vue'
-import LogInView from '../views/LogInView.vue'
-import ProfileView from '../views/ProfileView.vue'
+// Every route is loaded on demand. These views are large (the home page pulls in
+// the Three.js hero, the checkout pulls in Stripe.js) and statically importing
+// them put the entire storefront in the entry chunk, so a visitor who only wanted
+// the login page still downloaded Three.js.
+const HomeView = () => import('../views/HomeView.vue')
+const SearchView = () => import('../views/SearchView.vue')
+const ProductDetail = () => import('../views/ProductDetail.vue')
+const CartView = () => import('../views/CartView.vue')
+const CheckoutView = () => import('../views/CheckoutView.vue')
+const OrderHistoryView = () => import('../views/OrderHistoryView.vue')
+const SignUpView = () => import('../views/SignUpView.vue')
+const LogInView = () => import('../views/LogInView.vue')
+const ProfileView = () => import('../views/ProfileView.vue')
+const NotFoundView = () => import('../views/NotFoundView.vue')
 
 const routes = [
   {
@@ -77,6 +81,14 @@ const routes = [
     name: 'Profile',
     component: ProfileView,
     meta: { requiresAuth: true }
+  },
+  {
+    // Without a catch-all, an unknown URL matched no route and Vue Router left
+    // <RouterView> empty: a blank page with no way back into the shop. This also
+    // catches the SEO cost of soft-404s for removed product slugs.
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: NotFoundView
   }
 ]
 
@@ -100,7 +112,14 @@ router.beforeEach((to) => {
     return { path: '/log-in', query: { redirect: to.fullPath } }
   }
   if (to.meta.guestOnly && token) {
-    return { path: typeof to.query.redirect === 'string' ? to.query.redirect : '/' }
+    // `?redirect=` can arrive as an array when a URL repeats the parameter, so
+    // only follow it when it is a single string. Never follow a protocol-relative
+    // or absolute URL: that would turn the login page into an open redirect.
+    const target = to.query.redirect
+    if (typeof target === 'string' && target.startsWith('/') && !target.startsWith('//')) {
+      return { path: target }
+    }
+    return { path: '/' }
   }
 })
 

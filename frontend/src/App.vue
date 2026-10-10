@@ -10,16 +10,6 @@
       <div class="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center justify-between gap-3 md:gap-8 h-16">
         
         <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
-          <!-- Mobile Sidebar Toggle button -->
-          <button
-            @click="isSidebarOpen = !isSidebarOpen"
-            class="lg:hidden -ml-1 p-2 text-gray-600 hover:bg-gray-100 hover:text-black rounded-full transition-colors"
-            aria-label="Toggle menu"
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-            </svg>
-          </button>
           <BrandLogo />
         </div>
 
@@ -104,29 +94,14 @@
           </div>
         </div>
       </div>
+      <!-- Aarong-style category row under navbar (replaces sidebar) -->
+      <CategoryNav />
     </header>
 
-    <!-- Content Workspace Wrapper Frame Layout -->
-    <div class="flex flex-1 max-w-[1600px] mx-auto w-full relative">
-      
-      <!-- Premium LAAM-Inspired Responsive Sidebar -->
-      <Sidebar 
-        :class="[
-          'transition-all duration-300 lg:block flex-shrink-0', 
-          isSidebarOpen ? 'fixed inset-y-0 left-0 z-40 w-64 shadow-2xl bg-white border-r border-gray-100 pt-24 lg:pt-0' : 'hidden'
-        ]"
-        @close-mobile-menu="isSidebarOpen = false"
-      />
-
-      <!-- Backdrop Overlay for Mobile Navigation Drawers -->
-      <div 
-        v-if="isSidebarOpen" 
-        @click="isSidebarOpen = false" 
-        class="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 lg:hidden"
-      ></div>
-
+    <!-- Full-width content (no sidebar gutter) -->
+    <div class="flex-1 w-full max-w-[1600px] mx-auto">
       <!-- Main Display Route Target Space Slot -->
-      <main class="flex-1 p-8 min-w-0 bg-white">
+      <main class="w-full px-4 sm:px-6 py-6 min-w-0 bg-white">
         <router-view />
       </main>
     </div>
@@ -195,8 +170,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useCartStore, CURRENCIES } from './stores/cart'
 import { useAuthStore } from './stores/auth'
 import { useSiteStore } from './stores/site'
-// Import your newly created Sidebar.vue component
-import Sidebar from './views/Sidebar.vue'
+// Top category nav (Aarong-style) replaces the old left sidebar
+import CategoryNav from './components/CategoryNav.vue'
 import SocialButtons from './components/SocialButtons.vue'
 import SocialIcon from './components/SocialIcon.vue'
 import BrandLogo from './components/BrandLogo.vue'
@@ -233,13 +208,11 @@ const countryCode = computed(() => activeRegion.value.country)
 const countryFlag = computed(() => FLAGS[activeRegion.value.country] || '🌍')
 
 const searchQuery = ref('')
-const isSidebarOpen = ref(false)
 const isCurrencyOpen = ref(false)
 const isAccountOpen = ref(false)
 
 // Close mobile layout menus automatically when navigating paths
 watch(() => route.path, () => {
-  isSidebarOpen.value = false
   isCurrencyOpen.value = false
   isAccountOpen.value = false
 })

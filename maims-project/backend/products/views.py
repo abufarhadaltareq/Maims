@@ -1,3 +1,5 @@
+import logging
+
 import stripe
 import os
 from decimal import Decimal, ROUND_HALF_UP
@@ -11,14 +13,16 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Q, Count, Prefetch, F
+from django.db.models import Avg, Count, F, Prefetch, Q
 from rest_framework.authtoken.models import Token
-from .models import Category, CurrencyPrice, HeroSlide, Order, OrderItem, Product, SiteSettings, UserProfile
+from .models import Category, CurrencyPrice, HeroSlide, Order, OrderItem, Product, Review, SiteSettings, UserProfile
 from .serializers import (
-    CategorySerializer, HeroSlideSerializer, OrderSerializer, ProductSerializer, SiteSettingsSerializer,
-    UserProfileSerializer,
+    CategorySerializer, HeroSlideSerializer, OrderSerializer, ProductSerializer, ReviewCreateSerializer,
+    ReviewSerializer, SiteSettingsSerializer, UserProfileSerializer,
     RegisterSerializer, UserSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 # 🔑 Make sure STRIPE_SECRET_KEY is added to your settings.py
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -51,8 +55,31 @@ class CheckoutThrottle(_ScopedThrottle):
 # --- 🌟 RESTORED: PRODUCT VIEWS ---
 
 def product_queryset():
-    return Product.objects.select_related('category').prefetch_related(
-        'prices', 'media', Prefetch('category__children')
+    """
+    The one queryset every catalogue endpoint uses.
+
+    Every relationship ProductSerializer touches is joined or prefetched here:
+    prices (for the displayed price), media (the gallery) and category (nested,
+    along with its children and its product count). The nested category serializer
+    otherwise runs a COUNT per product, which turned a 20-item listing into 24
+    queries and a 200-item listing into 200+.
+
+    `category` is prefetched rather than select_related: it cannot be both, and
+    doing both makes Django issue a redundant join plus the prefetch query.
+    """
+    # `rating_average`/`rating_count` are filtered in SQL so the star rating on the
+    # product card costs nothing; Product.average_rating would otherwise run a
+    # query per product.
+    return Product.objects.annotate(
+        rating_average=Avg('reviews__rating', filter=Q(reviews__is_approved=True)),
+        rating_count=Count('reviews', filter=Q(reviews__is_approved=True), distinct=True),
+    ).prefetch_related(
+        'prices',
+        'media',
+        Prefetch(
+            'category',
+            queryset=Category.objects.annotate(product_count=Count('products')).prefetch_related('children'),
+        ),
     )
 
 
@@ -302,6 +329,30 @@ def _reserve_stock(order):
             raise _CheckoutError(f'Sorry, "{product.name}" just went out of stock.')
 
 
+def _release_stock(order):
+    """
+    Put stock back for every line on `order` — at most once for the order.
+
+    Mirrors _reserve_stock: a conditional UPDATE on Order first *claims* the
+    release (`WHERE id = ? AND stock_released = false`). Whoever flips the flag
+    increments the product rows, so a retried `charge.refunded` webhook, a
+    duplicate refund click, or a concurrent cancellation cannot inflate stock
+    above what was actually sold.
+
+    Returns True if this call performed the release.
+    """
+    with transaction.atomic():
+        claimed = Order.objects.filter(pk=order.pk, stock_released=False).update(stock_released=True)
+        if not claimed:
+            return False  # already released by another caller
+
+        for item in order.items.select_related('product').only('product_id', 'quantity'):
+            Product.objects.filter(pk=item.product_id).update(stock=F('stock') + item.quantity)
+
+        logger.info('Released stock for order %s', order.pk)
+        return True
+
+
 def _mark_paid_and_reserve(order):
     """
     Idempotently transition `order` to paid and consume stock EXACTLY ONCE.
@@ -325,7 +376,7 @@ def _mark_paid_and_reserve(order):
             # Payment captured but the item sold out during the payment window.
             # The order stays paid (the customer was charged) so the merchant can
             # refund/backorder; logged for manual follow-up rather than oversold.
-            print("Oversold at payment capture (order id):", order.pk, exc.message)
+            logger.error('Oversold at payment capture (order id %s): %s', order.pk, exc.message)
         return True
 
 
@@ -333,6 +384,67 @@ def _mark_paid_and_reserve(order):
 @permission_classes([AllowAny])
 def site_settings(request):
     return Response(SiteSettingsSerializer(SiteSettings.get()).data)
+
+def _as_bool(value):
+    """Coerce the checkbox/JSON value the client sent into a real boolean."""
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ('true', '1', 'yes', 'on')
+
+
+def _checkout_response_payload(order):
+    """Build the response body for an order that already exists."""
+    payload = {
+        'order_id': order.id,
+        'payment_method': order.payment_method,
+        'order': OrderSerializer(order).data,
+    }
+    if order.payment_method == 'whatsapp':
+        store = SiteSettings.get()
+        lines = [
+            f"{it.quantity} x {it.product.name}" + (f" ({it.size})" if it.size else "")
+            for it in order.items.all()
+        ]
+        msg = (
+            f"{store.whatsapp_greeting or 'Hello! I want to order:'}\n"
+            + "\n".join(lines)
+            + f"\nTotal: {order.total_amount} {order.currency}"
+            + f"\nOrder #{order.id} - {order.first_name} {order.last_name}, "
+              f"{order.address}, {order.zipcode} {order.place}"
+        )
+        payload['whatsapp_link'] = store.whatsapp_link(msg)
+    return payload
+
+
+def _checkout_replay_response(order):
+    """
+    Answer a checkout replay with HTTP 200 — the work already happened, so this is
+    not a failure. The body is shaped exactly like the original response so the
+    frontend's normal success path runs unchanged.
+    """
+    payload = _checkout_response_payload(order)
+    payload['replayed'] = True
+
+    if order.payment_method == 'stripe':
+        # The retry still has to be able to finish paying, so hand back the live
+        # client_secret of the PaymentIntent the first attempt created.
+        if not order.stripe_payment_intent_id:
+            return Response(
+                {'error': 'A previous checkout for this request never reached payment. Please try again.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            intent = stripe.PaymentIntent.retrieve(order.stripe_payment_intent_id)
+        except Exception:
+            logger.exception('Could not re-fetch PaymentIntent for order %s', order.pk)
+            return Response(
+                {'error': 'Unable to resume this payment. Please try again.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        payload['client_secret'] = intent.client_secret
+
+    return Response(payload, status=status.HTTP_200_OK)
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -345,7 +457,20 @@ def checkout(request):
     only — the client's `total_amount` / `price` are never trusted.
     - stripe: PaymentIntent, order unpaid until confirm/webhook.
     - cod/whatsapp: order created immediately, stock reserved at once.
+
+    IDEMPOTENCY: send an `Idempotency-Key` header (the frontend generates one per
+    checkout attempt). A repeated POST carrying a key that already produced an
+    order returns that same order instead of creating a second one, so a
+    double-click, a retried fetch or a refresh mid-redirect cannot double-charge
+    the customer or double-decrement stock. The same key is forwarded to Stripe as
+    the PaymentIntent idempotency key.
     """
+
+    # --- Replay protection ---------------------------------------------------
+    # Long enough for a retry loop, short enough that it cannot collide with a
+    # later, genuinely new order. Headers are untrusted, so bound the length.
+    checkout_key = (request.META.get('HTTP_IDEMPOTENCY_KEY') or '').strip()[:64] or None
+
     data = request.data
     payment_method = str(data.get('payment_method') or 'stripe').lower()
     if payment_method not in ('stripe', 'cod', 'whatsapp'):
@@ -378,6 +503,33 @@ def checkout(request):
 
     order_user = request.user if request.user.is_authenticated else None
 
+    # A retried request with the same key must resolve to the original order.
+    # Checked after the cheap field validation but before any write or stock
+    # reservation. `checkout_key` is globally unique, so the key is first matched
+    # against the caller's own orders; a key that belongs to somebody else is
+    # never honoured (that would leak their address and email) and is dropped so
+    # this caller still gets their own order instead of a constraint crash.
+    replay_order = None
+    if checkout_key:
+        scope = Q(user=order_user) if order_user else Q(user__isnull=True)
+        key_taken = Order.objects.filter(checkout_key=checkout_key)
+        replay_order = (
+            key_taken.filter(scope)
+            .prefetch_related(Prefetch('items', queryset=OrderItem.objects.select_related('product')))
+            .first()
+        )
+        if replay_order is not None:
+            logger.info('Replayed checkout for key %s resolved to order %s',
+                        checkout_key, replay_order.pk)
+            return _checkout_replay_response(replay_order)
+
+        if key_taken.exists():
+            # Someone else's order holds this key. Play it safe: proceed with a
+            # fresh order rather than reusing or exposing theirs.
+            logger.warning('Checkout key already in use by another customer; '
+                           'proceeding without idempotency')
+            checkout_key = None
+
     try:
         # The whole write (order + lines + stock reservation) is atomic: if any
         # step fails, nothing is persisted and no stock is consumed.
@@ -397,6 +549,11 @@ def checkout(request):
                 currency=raw_currency,
                 payment_method=payment_method,
                 is_paid=False,
+                checkout_key=checkout_key,
+                # WhatsApp only allows business-initiated messages to people who
+                # asked for them, so the customer's choice is stored with the
+                # order and re-checked by the notifier before every send.
+                whatsapp_opt_in=_as_bool(data.get('whatsapp_opt_in')),
             )
 
             subtotal = _build_order_items(order, data.get('items', []), raw_currency)
@@ -408,14 +565,10 @@ def checkout(request):
             if payment_method in ('cod', 'whatsapp'):
                 _reserve_stock(order)
                 order.save(update_fields=['total_amount'])
-                payload = {'order_id': order.id, 'payment_method': payment_method,
-                           'order': OrderSerializer(order).data}
-                if payment_method == 'whatsapp':
-                    lines = [f"{it.quantity} x {it.product.name}" + (f" ({it.size})" if it.size else "")
-                             for it in order.items.all()]
-                    msg = (f"{store.whatsapp_greeting or 'Hello! I want to order:'}\n" + "\n".join(lines) +
-                           f"\nTotal: {order.total_amount} {order.currency}\nOrder #{order.id} - {order.first_name} {order.last_name}, {order.address}, {order.zipcode} {order.place}")
-                    payload['whatsapp_link'] = store.whatsapp_link(msg)
+                payload = _checkout_response_payload(order)
+                # Customer/admin notifications are dispatched by the post_save
+                # signal on Order, which defers to on_commit internally — so they
+                # only go out once this transaction actually commits.
                 return Response(payload, status=status.HTTP_201_CREATED)
 
             order.save(update_fields=['total_amount'])
@@ -423,13 +576,21 @@ def checkout(request):
         # 2. Stripe: charge the SERVER-computed subtotal (converted to cents).
         #    Run outside the DB transaction so a slow Stripe call never holds locks.
         amount_in_cents = int((subtotal * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+        intent_kwargs = {
+            'amount': amount_in_cents,
+            'currency': stripe_currency,
+            'automatic_payment_methods': {'enabled': True},
+            'receipt_email': data.get('email'),
+            'metadata': {'customer_email': data.get('email'), 'currency': raw_currency,
+                         'order_id': order.id},
+        }
+        # Belt and braces with `checkout_key`: if this request is retried after
+        # the order row was created but the response never reached the client,
+        # Stripe returns the ORIGINAL intent instead of creating and charging a
+        # second one.
         intent = stripe.PaymentIntent.create(
-            amount=amount_in_cents,
-            currency=stripe_currency,
-            automatic_payment_methods={'enabled': True},
-            receipt_email=data.get('email'),
-            metadata={'customer_email': data.get('email'), 'currency': raw_currency,
-                      'order_id': order.id},
+            idempotency_key=f'order-{order.pk}' if checkout_key else None,
+            **intent_kwargs,
         )
         order.stripe_payment_intent_id = intent.id
         order.save(update_fields=['stripe_payment_intent_id'])
@@ -441,12 +602,14 @@ def checkout(request):
 
     except _CheckoutError as e:
         return Response({'error': e.message}, status=e.status_code)
-    except Exception as e:
-        # Log only the error class — never the message, which can contain secrets.
-        print("Backend Checkout Error:", type(e).__name__)
+    except Exception:
+        # Log the traceback server-side for diagnosis; never the message, which
+        # can contain secrets or payment data. A server fault is a 5xx, not a
+        # 4xx — the client's request was fine and retrying may well succeed.
+        logger.exception('Checkout failed')
         return Response(
             {'error': 'Something went wrong processing your checkout on the server.'},
-            status=status.HTTP_400_BAD_REQUEST
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 @api_view(['GET', 'PUT'])
@@ -509,9 +672,9 @@ def register_user(request):
             # Back-compat for existing frontend code:
             'username': user.username,
         }, status=status.HTTP_201_CREATED)
-    except Exception as e:
+    except Exception:
         # Log only the error class — never the message (can contain secrets/PII).
-        print("Registration Error:", type(e).__name__)
+        logger.exception('Registration failed')
         return Response({'error': 'Failed to create user.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -614,12 +777,53 @@ def change_password(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])  # Only logged-in users can view their history
 def get_orders(request):
-    # Fetch only the orders that belong to the currently logged-in user, newest first
-    orders = Order.objects.filter(user=request.user).order_by('-id')
-    
-    # Serialize the data (which now includes your full product details!)
+    # Fetch only the orders that belong to the currently logged-in user, newest first.
+    # OrderSerializer nests a full ProductSerializer per line, and that touches the
+    # product's prices, media and category (plus the category's children and product
+    # count). Left lazy, every one of those is a separate query per line, so a
+    # customer with 20 past orders issued ~60 queries to render one page. These
+    # joins collapse the whole history into a fixed handful without changing the
+    # payload the frontend receives.
+    orders = (
+        Order.objects
+        .filter(user=request.user)
+        .select_related('user')
+        .prefetch_related(
+            # Prefetching 'items__product' (rather than annotating the OrderItem)
+            # is deliberate: the nested ProductSerializer renders `item.product`,
+            # and select_related builds that product as a fresh, un-annotated
+            # instance per row. This prefetch replaces those instances with one
+            # annotated copy each, which is what makes the star rating free.
+            # It also de-duplicates the product rows, so a basket with the same
+            # shirt in two orders is fetched once.
+            Prefetch(
+                'items__product',
+                queryset=(
+                    Product.objects
+                    .annotate(
+                        rating_average=Avg('reviews__rating', filter=Q(reviews__is_approved=True)),
+                        rating_count=Count('reviews', distinct=True, filter=Q(reviews__is_approved=True)),
+                    )
+                    .prefetch_related(
+                        'prices',
+                        'media',
+                        Prefetch(
+                            'category',
+                            queryset=(
+                                Category.objects
+                                .annotate(product_count=Count('products'))
+                                .prefetch_related('children')
+                            ),
+                        ),
+                    )
+                ),
+            ),
+        )
+        .order_by('-id')
+    )
+
     serializer = OrderSerializer(orders, many=True)
-    
+
     return Response(serializer.data)
 
 
@@ -676,6 +880,12 @@ def confirm_checkout(request):
     return Response({'error': 'Payment has not completed.', 'status': intent.status}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _prepend_note(order, note):
+    """Build an internal note that keeps whatever the staff had already written."""
+    existing = (order.admin_note or '').strip()
+    return f'{note}\n{existing}' if existing else note
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def stripe_webhook(request):
@@ -686,10 +896,18 @@ def stripe_webhook(request):
     not configured we refuse the request rather than accepting an unsigned JSON
     payload (which would let anyone forge `payment_intent.succeeded` and mark
     orders as paid for free).
+
+    Handled events:
+    - payment_intent.succeeded  -> mark paid + reserve stock (once)
+    - payment_intent.payment_failed -> cancel the unpaid order
+    - charge.refunded / charge.dispute.created -> release stock back (once)
+
+    Every branch is keyed off an atomic conditional UPDATE, so Stripe's automatic
+    retries (it retries for up to 3 days) can never double-count.
     """
     payload = request.body
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE', '')
-    webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+    webhook_secret = settings.STRIPE_WEBHOOK_SECRET
     if not webhook_secret:
         return Response({'error': 'Webhook secret not configured.'},
                         status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -700,18 +918,175 @@ def stripe_webhook(request):
 
     event_type = event.get('type', '')
     obj = (event.get('data') or {}).get('object') or {}
-    intent_id = obj.get('id')
+
+    # `payment_intent.*` events carry the intent as the object; charge-level
+    # events (refund, dispute) reference it instead, so pick the right field per
+    # event rather than always reading obj['id'].
+    if event_type.startswith('charge.'):
+        intent_id = obj.get('payment_intent')
+    else:
+        intent_id = obj.get('id')
+
     if not intent_id:
         return Response({'received': True})
 
     try:
         order = Order.objects.get(stripe_payment_intent_id=intent_id)
     except Order.DoesNotExist:
+        # An intent we never created (or an order since deleted). Acknowledge so
+        # Stripe stops retrying; there is nothing for us to reconcile.
+        logger.info('Webhook %s references unknown intent %s', event_type, intent_id)
         return Response({'received': True})
 
     if event_type == 'payment_intent.succeeded':
         # Idempotent + concurrency-safe: only the caller that claims the unpaid
         # order consumes stock, so webhook retries / races with confirm_checkout
         # can never double-decrement inventory.
-        _mark_paid_and_reserve(order)
+        if _mark_paid_and_reserve(order):
+            logger.info('Order %s marked paid via webhook', order.pk)
+
+    elif event_type == 'payment_intent.payment_failed':
+        # The customer never completed payment, so nothing was ever reserved.
+        # Just close the order so it does not sit in the "new" queue forever.
+        updated = Order.objects.filter(pk=order.pk, is_paid=False).exclude(status='cancelled').update(
+            status='cancelled',
+            admin_note=_prepend_note(order, 'Card payment failed.'),
+        )
+        if updated:
+            logger.info('Order %s cancelled after failed payment', order.pk)
+
+    elif event_type in ('charge.refunded', 'charge.dispute.created'):
+        # Only orders we actually charged and reserved stock for are restocked;
+        # a refund on a cash-on-delivery order would create phantom inventory.
+        if not order.is_paid:
+            return Response({'received': True})
+        if _release_stock(order):
+            Order.objects.filter(pk=order.pk).update(
+                status='returned',
+                is_paid=False,
+                admin_note=_prepend_note(order, 'Refunded via Stripe.'),
+            )
+            logger.info('Order %s marked refunded and stock released', order.pk)
+
     return Response({'received': True})
+
+
+# --- REVIEWS ---
+
+class ProductReviewList(APIView):
+    """
+    GET  /api/v1/products/<slug>/reviews/  published reviews for a product
+    POST                            the same URL: write a review (login required)
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [AuthThrottle]
+
+    def get_object(self, slug):
+        # Slugs are unique now, so .get() cannot raise MultipleObjectsReturned.
+        return Product.objects.get(slug=slug)
+
+    def get(self, request, slug):
+        try:
+            product = self.get_object(slug)
+        except Product.DoesNotExist:
+            raise Http404
+
+        reviews = (
+            Review.objects
+            .filter(product=product, is_approved=True)
+            .select_related('user', 'order')
+        )
+        # Star breakdown for the "5 stars — 12" filter row.
+        breakdown = (
+            reviews.values('rating')
+            .annotate(count=Count('id'))
+            .order_by('-rating')
+        )
+        counts = {row['rating']: row['count'] for row in breakdown}
+
+        serializer = ReviewSerializer(reviews, many=True)
+        return Response({
+            'reviews': serializer.data,
+            'average_rating': product.average_rating,
+            'review_count': product.review_count,
+            'breakdown': {str(star): counts.get(star, 0) for star in range(1, 6)},
+        })
+
+    def post(self, request, slug):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Please sign in to leave a review.'},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            product = self.get_object(slug)
+        except Product.DoesNotExist:
+            raise Http404
+
+        serializer = ReviewCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'error': 'Please check your review.',
+                             'errors': serializer.errors},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # One review per customer per product. Updating is friendlier than a hard
+        # 400 when someone genuinely wants to correct their rating.
+        existing = Review.objects.filter(product=product, user=request.user).first()
+        if existing and not request.data.get('force_update'):
+            return Response(
+                {'error': 'You have already reviewed this product. '
+                          'Send force_update=true to change your existing review.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        data = serializer.validated_data
+        # Verified purchase: only orders that actually reached the customer count.
+        order = (
+            Order.objects
+            .filter(user=request.user, status='delivered',
+                    items__product=product)
+            .order_by('-created_at')
+            .distinct()
+            .first()
+        )
+
+        if existing:
+            existing.rating = data['rating']
+            existing.title = data['title']
+            existing.comment = data['comment']
+            # Re-verify on update: the reviewer may now own a delivered order.
+            existing.order = order
+            existing.is_approved = True
+            existing.product_name_snapshot = product.name
+            existing.save()
+            return Response(ReviewSerializer(existing).data, status=status.HTTP_200_OK)
+
+        review = Review.objects.create(
+            product=product,
+            user=request.user,
+            order=order,
+            rating=data['rating'],
+            title=data['title'],
+            comment=data['comment'],
+            product_name_snapshot=product.name,
+        )
+        return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
+
+
+class ReviewDetail(APIView):
+    """
+    DELETE /api/v1/reviews/<id>/  withdraw your own review.
+
+    IDOR GUARD: the lookup is scoped to the requesting user, so deleting another
+    customer's review returns 404 rather than 403 — the API must not confirm that
+    someone else's review id exists.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        deleted, _ = Review.objects.filter(pk=pk, user=request.user).delete()
+        if not deleted:
+            return Response({'error': 'Review not found.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)

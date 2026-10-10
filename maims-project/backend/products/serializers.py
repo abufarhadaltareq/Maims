@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import Product, Category, CurrencyPrice, HeroSlide, Order, OrderItem, SiteSettings, UserProfile, ProductMedia
+from .models import (
+    Product, Category, CurrencyPrice, HeroSlide, Order, OrderItem, ProductMedia,
+    Review, SiteSettings, UserProfile,
+)
 
 # 1. Currency Price Serializer
 class CurrencyPriceSerializer(serializers.ModelSerializer):
@@ -28,7 +31,16 @@ class CategorySerializer(serializers.ModelSerializer):
                   "image_url", "description", "show_on_homepage", "homepage_order")
 
     def get_product_count(self, obj):
-        return getattr(obj, 'product_count', obj.products.count())
+        # NOTE: this must not be written as
+        #   getattr(obj, 'product_count', obj.products.count())
+        # because Python evaluates the default argument eagerly — the COUNT query
+        # ran on every row even when the annotation was already present, and the
+        # result was then thrown away. Splitting the lookup means an annotated
+        # queryset costs nothing and only unannotated ones hit the database.
+        count = getattr(obj, 'product_count', None)
+        if count is not None:
+            return count
+        return obj.products.count()
 
     def get_children(self, obj):
         children = getattr(obj, '_prefetched_children', None)
@@ -60,6 +72,11 @@ class ProductSerializer(serializers.ModelSerializer):
     # Maps properties computed dynamically at the model layer
     in_stock = serializers.BooleanField(source='is_in_stock', read_only=True)
     size_options = serializers.SerializerMethodField()
+    # Star summary for the product page. `rating_average`/`rating_count` are
+    # annotated by the queryset; the fallbacks keep the serializer correct when a
+    # product is fetched without those annotations (e.g. admin, signals).
+    average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -82,7 +99,28 @@ class ProductSerializer(serializers.ModelSerializer):
             "prices",
             "size_options",   # Passes clean parsed array list strings
             "media",          # Resolves empty gallery tray tray issue
+            "average_rating",  # Star average shown under the product title
+            "review_count",    # Number of published reviews
         )
+
+    def get_average_rating(self, obj):
+        # `rating_count` is the marker that the queryset was annotated, NOT
+        # `rating_average`: Avg() returns None for a product with no reviews, and
+        # treating that None as "not annotated" sent every unrated product down
+        # the per-product query fallback — turning a 5-query catalogue page into
+        # one query per product.
+        annotated_count = getattr(obj, 'rating_count', None)
+        if annotated_count is not None:
+            average = getattr(obj, 'rating_average', None)
+            return round(float(average), 1) if average is not None else None
+        # No annotation: fall back to one query for this single product.
+        return obj.average_rating
+
+    def get_review_count(self, obj):
+        annotated = getattr(obj, 'rating_count', None)
+        if annotated is not None:
+            return annotated
+        return obj.review_count
 
     def get_price(self, obj):
         currency = None
@@ -109,6 +147,9 @@ class OrderItemSerializer(serializers.ModelSerializer):
 # 6. Order Serializer
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    # The storefront shows a status timeline, so the customer-facing status has to
+    # be in the payload. `status_label` is the plain-English form used in the UI.
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
         model = Order
@@ -121,7 +162,9 @@ class OrderSerializer(serializers.ModelSerializer):
             "id", "first_name", "last_name", "email", "phone",
             "address", "zipcode", "place", "total_amount", "currency",
             "payment_method",
-            "is_paid", "created_at", "items"
+            "is_paid", "created_at", "items",
+            # Fulfilment progress (read-only for the customer).
+            "status", "status_label", "tracking_number", "rejection_reason",
         )
 
 
@@ -201,3 +244,65 @@ class UserSerializer(serializers.Serializer):
     email = serializers.EmailField(read_only=True)
     first_name = serializers.CharField(read_only=True)
     last_name = serializers.CharField(read_only=True)
+
+# --- REVIEWS ---
+
+class ReviewSummarySerializer(serializers.Serializer):
+    """Product-level rating summary embedded in the product payload."""
+    average = serializers.FloatField(read_only=True)
+    count = serializers.IntegerField(read_only=True)
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    """
+    One customer review.
+
+    `is_verified_purchase` is derived from the linked delivered order rather than
+    being settable, so a client cannot simply POST is_verified_purchase=true.
+    The author is deliberately reduced to first name + last initial: reviews carry
+    social proof without publishing a customer's full name.
+    """
+
+    product_slug = serializers.CharField(source='product.slug', read_only=True)
+    author = serializers.CharField(source='reviewer_name', read_only=True)
+    is_verified_purchase = serializers.BooleanField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = Review
+        fields = ('id', 'product_slug', 'author', 'rating', 'title', 'comment',
+                  'is_verified_purchase', 'created_at')
+        read_only_fields = ('id', 'product_slug', 'author', 'is_verified_purchase',
+                            'created_at')
+
+    def validate_rating(self, value):
+        if not 1 <= value <= 5:
+            raise serializers.ValidationError('Please choose between 1 and 5 stars.')
+        return value
+
+    def validate_comment(self, value):
+        value = (value or '').strip()
+        if not value:
+            raise serializers.ValidationError('Please write a short comment.')
+        if len(value) > 2000:
+            raise serializers.ValidationError('Please keep your review under 2000 characters.')
+        return value
+
+
+class ReviewCreateSerializer(serializers.Serializer):
+    """Write path, where rating and comment arrive as plain request data."""
+
+    rating = serializers.IntegerField(min_value=1, max_value=5)
+    title = serializers.CharField(max_length=120, required=False, allow_blank=True, default='')
+    comment = serializers.CharField(allow_blank=True, default='')
+
+    def validate(self, attrs):
+        comment = (attrs.get('comment') or '').strip()
+        if not comment:
+            raise serializers.ValidationError({'comment': 'Please write a short comment.'})
+        if len(comment) > 2000:
+            raise serializers.ValidationError(
+                {'comment': 'Please keep your review under 2000 characters.'})
+        attrs['comment'] = comment
+        attrs['title'] = (attrs.get('title') or '').strip()
+        return attrs

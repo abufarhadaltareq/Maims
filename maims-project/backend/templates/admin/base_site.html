@@ -1,10 +1,10 @@
 {% extends "admin/base.html" %}
 {% load static %}
 
-{# Maims base template: jazzmin provides the AdminLTE/Bootstrap shell, and we
+{# Maims base template: Unfold provides the Tailwind shell, and we
    re-inject the Maims stylesheet on top of it.
 
-   jazzmin's admin/base.html does NOT render {{ media }}, so anything declared in
+   Unfold's admin/base.html does NOT render {{ media }}, so anything declared in
    a ModelAdmin's Media class (here: static/admin/maims.css) is silently dropped.
    Loading it here — in the project template dir, which is searched before any app
    — means it applies to every admin page regardless of which app owns the view. #}

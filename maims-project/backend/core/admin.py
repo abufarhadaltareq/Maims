@@ -4,22 +4,99 @@ The default auth User page is replaced with one built around the question the sh
 actually asks about a customer: what have they ordered, what have they spent, and
 how do I reach them.
 """
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin
 from django.contrib.auth.models import Group, User
 from django.db.models import Count, Prefetch
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from urllib.parse import quote
 
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
+from unfold.admin import StackedInline as UnfoldStackedInline
+from unfold.admin import TabularInline as UnfoldTabularInline
+
 from products.admin import CURRENCY_SYMBOLS
-from products.models import Order, UserProfile
+from products.models import Order, OrderNotification, Review, UserProfile
 
 from .admin_site import maims_admin
 
 
-class UserProfileInline(admin.StackedInline):
+# --- Unfold dashboard / navigation callbacks ---------------------------------------
+# Wired up via UNFOLD in core/settings.py. Kept here (rather than in admin_site.py)
+# because they read the shop models and are part of the admin's presentation.
+
+# The order queues, in the order they must be worked through. 'new' comes first
+# because it is the only queue that blocks on a decision: staff must accept or
+# decline before anything else happens to the order.
+QUEUES = (
+    ('new', 'Awaiting our decision', 'status__exact=new'),
+    ('accepted', 'Accepted, to pack', 'status__exact=accepted'),
+    ('packed', 'Packed, waiting for the courier', 'status__exact=packed'),
+    ('shipped', 'Out for delivery', 'status__exact=shipped'),
+    ('delivered', 'Delivered', 'status__exact=delivered'),
+    ('rejected', 'Declined', 'status__exact=rejected'),
+    ('cancelled', 'Cancelled or returned', 'status__exact=cancelled'),
+)
+
+
+def dashboard_callback(request, context):
+    """Numbers on the admin home page (UNFOLD["DASHBOARD_CALLBACK"]).
+
+    Unfold renders templates/admin/index.html with this context, so the dashboard
+    template reads ``orders_today``, ``open_orders``, ``queues``, ``pending_notifications``
+    and ``unanswered_reviews``.
+    """
+    today = timezone.localdate()
+    open_statuses = ('new', 'accepted', 'packed', 'shipped')
+    orders_url = reverse('admin:products_order_changelist')
+    context.update({
+        'orders_today': Order.objects.filter(created_at__date=today).count(),
+        'open_orders': Order.objects.filter(status__in=open_statuses).count(),
+        # The number that actually needs a human decision right now.
+        'awaiting_decision': Order.objects.filter(status='new').count(),
+        # Sends that did not get through. Surfaced because a silently failed
+        # WhatsApp means a customer never hears about their delivery.
+        'pending_notifications': OrderNotification.objects.filter(status='failed').count(),
+        # Reviews waiting to be looked at, if any are hidden.
+        'unanswered_reviews': Review.objects.filter(is_approved=False).count(),
+        'queues': [
+            {
+                'label': label,
+                'count': Order.objects.filter(status=status).count(),
+                'url': f'{orders_url}?{query}',
+            }
+            for status, label, query in QUEUES
+        ],
+    })
+    return context
+
+
+def environment_callback(request):
+    """Header label so it is obvious which environment the admin is running in."""
+    if settings.DEBUG:
+        return ['Development', 'warning']
+    return ['Live', 'success']
+
+
+def new_orders_badge(request):
+    """Sidebar badge: orders still waiting for the shop to accept or decline."""
+    return Order.objects.filter(status='new').count()
+
+
+def failed_notifications_badge(request):
+    """Sidebar badge: messages that did not get through.
+
+    A silently failed email or WhatsApp means a customer never hears about their
+    delivery, so this is shown next to the orders rather than buried.
+    """
+    return OrderNotification.objects.filter(status='failed').count()
+
+
+class UserProfileInline(UnfoldStackedInline):
     """Delivery details the customer filled in on the storefront."""
     model = UserProfile
     can_delete = False
@@ -27,7 +104,7 @@ class UserProfileInline(admin.StackedInline):
     fields = ('phone', 'address', 'zipcode', 'place')
 
 
-class OrderInline(admin.TabularInline):
+class OrderInline(UnfoldTabularInline):
     """Recent orders placed by this customer, newest first."""
     model = Order
     extra = 0
@@ -50,7 +127,7 @@ class OrderInline(admin.TabularInline):
         return 'Paid' if obj.is_paid else 'Unpaid'
 
 
-class MaimsUserAdmin(admin.ModelAdmin):
+class MaimsUserAdmin(UnfoldModelAdmin):
     change_form_template = 'admin/maims_user_change_form.html'
     list_display = ('username', 'email', 'full_name', 'order_count', 'spent', 'place', 'is_staff')
     list_filter = ('is_staff', 'is_superuser', 'is_active')
@@ -132,5 +209,9 @@ class MaimsUserAdmin(admin.ModelAdmin):
 # `core` is listed after `django.contrib.auth` in INSTALLED_APPS, so the default
 # User admin is registered on the default site; we register our own version on the
 # Maims site, which is the one core.urls exposes.
+class MaimsGroupAdmin(GroupAdmin, UnfoldModelAdmin):
+    """Django's Group admin (filter_horizontal for permissions) with Unfold styling."""
+
+
 maims_admin.register(User, MaimsUserAdmin)
-maims_admin.register(Group, GroupAdmin)
+maims_admin.register(Group, MaimsGroupAdmin)

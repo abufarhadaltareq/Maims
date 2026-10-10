@@ -10,6 +10,33 @@
     &middot; <a href="{% url 'admin:products_order_changelist' %}">All orders</a>
   </p>
 
+  {# Anything that needs a human right now, called out before the routine queues. #}
+  {% if awaiting_decision or pending_notifications or unanswered_reviews %}
+    <section class="maims-block maims-alerts">
+      <h2>Needs your attention</h2>
+      <ul class="maims-storelist">
+        {% if awaiting_decision %}
+          <li>
+            <a href="{% url 'admin:products_order_changelist' %}?status__exact=new">{{ awaiting_decision }} order{{ awaiting_decision|pluralize }}</a>
+            <span>Waiting for you to accept or decline.</span>
+          </li>
+        {% endif %}
+        {% if pending_notifications %}
+          <li>
+            <a href="{% url 'admin:products_ordernotification_changelist' %}?status__exact=failed">{{ pending_notifications }} notification{{ pending_notifications|pluralize }}</a>
+            <span>A customer or the shop was not reached (email, WhatsApp or Facebook). Select the orders and use "Resend failed notifications".</span>
+          </li>
+        {% endif %}
+        {% if unanswered_reviews %}
+          <li>
+            <a href="{% url 'admin:products_review_changelist' %}?is_approved__exact=0">{{ unanswered_reviews }} hidden review{{ unanswered_reviews|pluralize }}</a>
+            <span>Reviews that are not shown on the storefront.</span>
+          </li>
+        {% endif %}
+      </ul>
+    </section>
+  {% endif %}
+
   {# The queues the shop works through, in the order they must be handled. #}
   <section class="maims-block">
     <h2>Orders to handle</h2>
@@ -22,7 +49,7 @@
           </tr>
         {% endfor %}
         <tr>
-          <td><a href="{% url 'admin:products_order_changelist' %}?status__exact=new&amp;status__exact=packed&amp;status__exact=shipped">Everything not yet delivered</a></td>
+          <td><a href="{% url 'admin:products_order_changelist' %}?status__exact=new&amp;status__exact=accepted&amp;status__exact=packed&amp;status__exact=shipped">Everything not yet delivered</a></td>
           <td class="maims-queue-table__count">{{ open_orders }}</td>
         </tr>
       </tbody>
@@ -51,7 +78,11 @@
       </li>
       <li>
         <a href="{% url 'admin:products_sitesettings_changelist' %}">Store settings</a>
-        <span>WhatsApp number, which payment methods are offered, and the Facebook and social links in the header and footer.</span>
+        <span>WhatsApp number, which payment methods are offered, the Facebook and social links in the header and footer, and where order notifications go (email, WhatsApp, Facebook page).</span>
+      </li>
+      <li>
+        <a href="{% url 'admin:products_review_changelist' %}">Product reviews</a>
+        <span>Star ratings and comments customers leave. Publish or hide them here.</span>
       </li>
       <li>
         <a href="{% url 'admin:auth_user_changelist' %}">Customers</a>

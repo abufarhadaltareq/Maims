@@ -12,11 +12,11 @@
         :key="slide.id || index"
         class="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ease-in-out transform-gpu"
         :class="index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'"
-        :style="{ backgroundImage: `linear-gradient(120deg, rgba(79,70,229,0.55), rgba(147,51,234,0.35) 50%, rgba(236,72,153,0.55)), url(${slide.image_url})`, transform: index === currentSlide ? 'translateZ(0)' : 'translateZ(-10px)' }"
+        :style="{ backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.30)), url(${slide.image_url})`, transform: index === currentSlide ? 'translateZ(0)' : 'translateZ(-10px)' }"
       ></div>
 
       <div class="max-w-2xl text-white relative z-20 backdrop-blur-sm bg-black/20 p-8 rounded-2xl border border-white/10">
-        <h1 class="text-5xl md:text-6xl font-extrabold mb-4 tracking-tight drop-shadow-lg text-gradient-light">
+        <h1 class="text-5xl md:text-6xl font-extrabold mb-4 tracking-tight text-white drop-shadow-lg">
           {{ heroSlides[currentSlide]?.title }}
         </h1>
         <p v-if="heroSlides[currentSlide]?.subtitle" class="text-xl md:text-2xl mb-8 opacity-90 drop-shadow-sm font-light">
@@ -27,7 +27,7 @@
           v-if="heroSlides[currentSlide]?.button_text"
           :to="isInternalLink(heroSlides[currentSlide]?.button_link) ? heroSlides[currentSlide].button_link : undefined"
           :href="!isInternalLink(heroSlides[currentSlide]?.button_link) ? heroSlides[currentSlide].button_link : undefined"
-          class="inline-block bg-gradient-brand text-white font-bold px-8 py-4 rounded-full shadow-[0_0_25px_rgba(147,51,234,0.55)] hover:shadow-[0_0_35px_rgba(236,72,153,0.65)] hover:scale-105 transition-all duration-300 active:scale-95 uppercase tracking-widest text-sm"
+          class="inline-block bg-white text-brand-primary font-bold px-8 py-4 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 active:scale-95 uppercase tracking-widest text-sm"
         >
           {{ heroSlides[currentSlide]?.button_text }}
         </component>
@@ -38,7 +38,7 @@
             :key="item.id || index"
             @click="goToSlide(index)"
             class="w-2.5 h-2.5 rounded-full transition-all duration-300"
-            :class="index === currentSlide ? 'bg-gradient-brand scale-125' : 'bg-white/40'"
+            :class="index === currentSlide ? 'bg-white scale-125' : 'bg-white/40'"
           ></button>
         </div>
       </div>

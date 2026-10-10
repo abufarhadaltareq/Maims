@@ -10,9 +10,9 @@
     >
       <defs>
         <linearGradient id="maimsLogoGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#4f46e5" />
-          <stop offset="0.5" stop-color="#9333ea" />
-          <stop offset="1" stop-color="#ec4899" />
+          <stop offset="0" stop-color="#6366f1" />
+          <stop offset="0.5" stop-color="#a855f7" />
+          <stop offset="1" stop-color="#f472b6" />
         </linearGradient>
       </defs>
       <rect width="40" height="40" rx="12" fill="url(#maimsLogoGrad)" />
