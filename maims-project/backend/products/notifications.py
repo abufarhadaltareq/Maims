@@ -478,8 +478,12 @@ def handle_order_status_change(order, previous_status=None):
 
     try:
         if order.status == 'new':
-            # The alert about the order existing at all.
+            # The alert about the order existing at all...
             notify_admin_new_order(order)
+            # ...and the customer's order confirmation. 'new' is the
+            # first status a customer hears about, so both audiences
+            # are told — the elif below would skip the customer.
+            notify_customer(order)
         elif order.should_notify_customer:
             notify_customer(order)
         elif order.status == 'delivered':

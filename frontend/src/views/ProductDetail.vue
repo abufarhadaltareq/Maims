@@ -8,10 +8,10 @@
       <div class="space-y-8">
         <div class="relative rounded-[2rem] overflow-hidden shadow-2xl shadow-slate-300/40 transform-gpu hover:-translate-y-1 transition-all duration-500 bg-white">
           
-          <div class="h-[520px] bg-slate-900/5 flex items-center justify-center overflow-hidden cursor-zoom-in" @click="openLightbox">
+          <div class="h-[560px] sm:h-[640px] lg:h-[720px] bg-slate-900/5 flex items-center justify-center overflow-hidden cursor-zoom-in group" @click="openLightbox">
             <template v-if="activeMedia">
-              <video v-if="activeMedia.media_type === 'video'" :src="activeMedia.url" controls class="w-full h-full object-cover" @click.stop></video>
-              <img v-else :src="activeMedia.url" :alt="product.name" class="w-full h-full object-cover" />
+              <video v-if="activeMedia.media_type === 'video'" :key="'v-' + activeMediaIndex" :src="activeMedia.url" controls class="w-full h-full object-cover animate-media-switch" @click.stop></video>
+              <img v-else :key="'i-' + activeMediaIndex" :src="activeMedia.url" :alt="product.name" class="w-full h-full object-cover animate-media-switch transition-transform duration-700 group-hover:scale-105" />
             </template>
             <template v-else>
               <img :src="product.get_image || 'https://placehold.co/600x800'" :alt="product.name" class="w-full h-full object-cover" />
@@ -122,6 +122,18 @@
               Order via WhatsApp
             </a>
             <p v-if="site.whatsappEnabled" class="text-xs text-gray-400 text-center">Questions or pay-on-chat orders — we reply fast on WhatsApp.</p>
+
+            <a
+              v-if="site.messengerUrl"
+              :href="site.messengerUrl"
+              target="_blank"
+              rel="noopener"
+              class="flex items-center justify-center gap-2 w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-[#0084FF] hover:brightness-95"
+            >
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+              Message us on Messenger
+            </a>
+            <p v-if="site.messengerUrl" class="text-xs text-gray-400 text-center">Prefer chat? We reply fast on Facebook Messenger too.</p>
           </div>
 
           <p v-if="showSuccessMessage" class="mt-4 text-emerald-600 font-semibold flex items-center gap-2">

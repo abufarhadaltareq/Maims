@@ -120,6 +120,19 @@ class Product(models.Model):
     size_options = models.CharField(max_length=250, blank=True, null=True, help_text='Comma-separated options like S,M,L or One Size')
     image = models.ImageField(upload_to='uploads/', blank=True, null=True)
     thumbnail = models.ImageField(upload_to='uploads/', blank=True, null=True)
+    # --- Facebook Page sync ------------------------------------------------
+    # Graph API post id ("{page_id}_{post_id}") — the idempotent key
+    # that ties this record to the Facebook post it came from. NULL
+    # for products entered by hand, so the unique index never collides
+    # (PostgreSQL treats NULLs as distinct).
+    facebook_post_id = models.CharField(max_length=64, blank=True, null=True,
+                                        unique=True,
+                                        help_text="Graph API post id this product was synced from")
+    # Re-hosted photo (Cloudinary) when the sync pipeline uploads the
+    # Facebook image to cloud storage. Preferred over the local file
+    # because Meta's lookaside image URLs expire.
+    facebook_image_url = models.URLField(blank=True, null=True,
+                                         help_text="Cloud-hosted image URL from Facebook sync")
     date_added = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -129,11 +142,17 @@ class Product(models.Model):
         return self.name
 
     def get_image(self):
+        # A cloud-hosted copy (Facebook sync) outlives Meta's
+        # expiring lookaside URLs, so it wins when present.
+        if self.facebook_image_url:
+            return self.facebook_image_url
         if self.image:
             return self.image.url
         return ''
 
     def get_thumbnail(self):
+        if self.facebook_image_url:
+            return self.facebook_image_url
         if self.thumbnail:
             return self.thumbnail.url
         else:
@@ -269,6 +288,13 @@ class CurrencyPrice(models.Model):
 
 class SiteSettings(models.Model):
     """Single row controlling storefront links + payment toggles. Admin edits this; frontend reads it."""
+    # --- Brand identity -------------------------------------------------------
+    # Uploaded logo (PNG/JPG) shown in the header/footer instead of the default
+    # 'M' monogram. Blank = keep the monogram. Validated below (type + 2MB cap)
+    # so a wrong upload fails with a message, not a broken header.
+    store_name = models.CharField(max_length=120, default='Maims')
+    logo = models.ImageField(upload_to='uploads/brand/', blank=True, null=True,
+                             help_text="PNG or JPG, max 2MB. Shown in the header and footer.")
     facebook_page_url = models.URLField(blank=True, null=True,
         help_text="e.g. https://www.facebook.com/yourshop")
     facebook_shop_url = models.URLField(blank=True, null=True,
@@ -290,9 +316,33 @@ class SiteSettings(models.Model):
     whatsapp_enabled = models.BooleanField(default=True)
     whatsapp_greeting = models.CharField(max_length=255, blank=True, null=True, default="Hello Maims! I want to order:",
         help_text="Prefill text before the cart details in the WhatsApp message")
-    cod_enabled = models.BooleanField(default=True, verbose_name="Cash on Delivery enabled")
+    # Cash on Delivery was retired: the three methods below are all a storefront
+    # can offer now (card via Stripe, PayPal, or a WhatsApp-confirmed order).
     stripe_enabled = models.BooleanField(default=True)
+    paypal_enabled = models.BooleanField(default=True, verbose_name="PayPal enabled")
     updated_at = models.DateTimeField(auto_now=True)
+
+    # --- Only PNG/JPG brand logos, max 2MB. The check lives here (not only in the
+    # form) so API/admin/shell uploads are all guarded the same way.
+    LOGO_MAX_BYTES = 2 * 1024 * 1024
+    LOGO_ALLOWED_TYPES = ('image/png', 'image/jpeg')
+    LOGO_ALLOWED_EXTS = ('.png', '.jpg', '.jpeg')
+
+    def clean(self):
+        super().clean()
+        logo = self.logo
+        if not logo:
+            return
+        from django.core.exceptions import ValidationError
+        import os
+        content_type = getattr(logo.file, 'content_type', '') if hasattr(logo, 'file') else ''
+        ext = os.path.splitext(logo.name or '')[1].lower()
+        if (content_type and content_type not in self.LOGO_ALLOWED_TYPES) or \
+                (ext and ext not in self.LOGO_ALLOWED_EXTS):
+            raise ValidationError({'logo': 'Please upload a PNG or JPG image.'})
+        size = getattr(logo.file, 'size', None) if hasattr(logo, 'file') else None
+        if size and size > self.LOGO_MAX_BYTES:
+            raise ValidationError({'logo': 'Logo must be 2MB or smaller.'})
 
     # --- Outbound notifications -------------------------------------------------
     # Everything below is configured here (not in env vars) so the shop can be set
@@ -349,34 +399,124 @@ class SiteSettings(models.Model):
             return ''
         return f"https://wa.me/{num}?text={urllib.parse.quote(message or self.whatsapp_greeting or '')}"
 
+    def clean(self):
+        super().clean()
+        logo = self.logo
+        if not logo:
+            return
+        from django.core.exceptions import ValidationError
+        import os
+        content_type = getattr(logo.file, 'content_type', '') if hasattr(logo, 'file') else ''
+        ext = os.path.splitext(logo.name or '')[1].lower()
+        if (content_type and content_type not in self.LOGO_ALLOWED_TYPES) or \
+                (ext and ext not in self.LOGO_ALLOWED_EXTS):
+            raise ValidationError({'logo': 'Please upload a PNG or JPG image.'})
+        size = getattr(logo.file, 'size', None) if hasattr(logo, 'file') else None
+        if size and size > self.LOGO_MAX_BYTES:
+            raise ValidationError({'logo': 'Logo must be 2MB or smaller.'})
+
+
+# --- EMAIL MARKETING OPT-IN (singleton, editable in Admin) ---
+
+class CustomerNotificationSettings(models.Model):
+    """One row controlling how shoppers may be added to the mailing list.
+
+    Nothing here sends email by itself — it gates the two places a shopper can
+    join the list (footer sign-up form and the checkout opt-in checkbox), and
+    records which consent strategy the shop follows so the wording on those
+    forms can match. GDPR/PECR: consent must be freely given, so the checkout
+    box starts unticked unless the shop deliberately chooses an opt-out
+    strategy for a region where that is lawful.
+    """
+    OPT_IN_STRATEGIES = [
+        # The checkbox ships unticked; no means no.
+        ('explicit', 'Explicit opt-in (box starts unticked)'),
+        # Pre-ticked boxes are not valid consent in the EU/UK, so this exists
+        # only for regions where opt-out is lawful and is NOT the default.
+        ('opt_out', 'Opt-out (box starts ticked)'),
+    ]
+
+    # Storefront footer sign-up form: hide it entirely when the shop is not
+    # ready to receive subscribers (e.g. no sender configured yet).
+    signup_enabled = models.BooleanField(default=True,
+        help_text="Show the email sign-up form in the storefront footer")
+    # Checkout checkbox: capture the address with the order too.
+    checkout_opt_in_enabled = models.BooleanField(default=True,
+        help_text="Show the marketing opt-in checkbox during checkout")
+    # Consent strategy described above — drives the default state of both forms.
+    opt_in_strategy = models.CharField(max_length=16, choices=OPT_IN_STRATEGIES, default='explicit',
+        help_text="'Explicit' keeps the checkout box unticked until the shopper ticks it")
+    # Consent text shown next to the checkout checkbox; kept editable so legal
+    # wording can be tightened without a deploy.
+    consent_text = models.CharField(max_length=255, default=(
+        "Email me about new drops, restocks and offers. Unsubscribe any time."
+    ))
+    # Where captured addresses are delivered when a send is triggered.
+    recipient_email = models.EmailField(blank=True, null=True,
+        help_text="Mailbox that receives captured sign-ups; leave empty to stop collecting")
+    # Quick status an operator can see on the changelist without opening the row.
+    status = models.CharField(max_length=12, default='active',
+        choices=[('active', 'Collecting'), ('paused', 'Paused')],
+        help_text="'Paused' stops both forms from accepting new addresses")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Customer notification settings'
+        verbose_name_plural = 'Customer notification settings'
+
+    def __str__(self):
+        return 'Customer notification settings'
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def accepts_signups(self):
+        """True when at least one storefront form may capture an address."""
+        return self.status == 'active' and bool(self.recipient_email)
+
+    @property
+    def checkout_box_starts_ticked(self):
+        """The checkout checkbox default; only 'opt-out' regions pre-tick it."""
+        return self.opt_in_strategy == 'opt_out'
+
 
 # --- CHECKOUT & ORDER HANDLING ---
 
 class Order(models.Model):
     PAYMENT_METHODS = [
-        ('stripe', 'Stripe (card)'),
-        ('cod', 'Cash on Delivery'),
+        ('stripe', 'Card (Stripe)'),
+        ('paypal', 'PayPal'),
         ('whatsapp', 'WhatsApp order'),
     ]
-    PAYMENT_STATUSES = [
+    CURRENCY_CHOICES = [
         ('EUR', 'Euro (€)'),
         ('USD', 'US Dollar ($)'),
         ('SEK', 'Swedish Krona (kr)'),
         ('BDT', 'Bangladeshi Taka (৳)'),
         ('PKR', 'Pakistani Rupee (Rs)'),
     ]
-    CURRENCY_CHOICES = PAYMENT_STATUSES
     user = models.ForeignKey(User, related_name='orders', on_delete=models.SET_NULL, blank=True, null=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField()
-    phone = models.CharField(max_length=20, blank=True, null=True)
+    # Required: the confirmation email, WhatsApp updates and the courier all
+    # need a phone number, so checkout rejects an order without one.
+    phone = models.CharField(max_length=20, default='')
     address = models.CharField(max_length=255)
     zipcode = models.CharField(max_length=20)
     place = models.CharField(max_length=100)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='EUR')
+    # How the customer is paying: card via Stripe, PayPal, or a WhatsApp order
+    # (confirmed by the shop on chat). Cash on Delivery was removed — the
+    # storefront never offers it, and orders that predate the change still carry
+    # their stored value for historical display.
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='stripe')
+    # Stripe PaymentIntent id — the handle for webhooks, refunds and receipts.
+    # Blank for WhatsApp orders, which never touch Stripe.
     stripe_payment_intent_id = models.CharField(max_length=255, blank=True, null=True)
     is_paid = models.BooleanField(default=False)
     # Client-supplied dedupe key (the `Idempotency-Key` request header). A retried
@@ -412,6 +552,10 @@ class Order(models.Model):
     # only permits business-initiated messages to people who opted in, so this flag
     # is collected at checkout and enforced again at send time.
     whatsapp_opt_in = models.BooleanField(default=False)
+    # Email-marketing consent captured at checkout, only stored when the
+    # CustomerNotificationSettings-gated checkbox was shown and ticked. This is
+    # the shop's proof of consent for that address.
+    marketing_opt_in = models.BooleanField(default=False)
     # The status the customer has already been told about. Guarantees exactly one
     # notification per transition even if an order is saved several times (the admin
     # changelist saves the whole form, actions save again, and a retry may re-save).
@@ -443,6 +587,30 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order {self.id} - {self.first_name} {self.last_name}"
+
+    @property
+    def payment_method_label(self):
+        """Readable label shown to customers in emails and the admin."""
+
+        return dict(self.PAYMENT_METHODS).get(self.payment_method, self.payment_method)
+
+    @property
+    def payment_badge(self):
+        """A coloured pill (foreground, background) keyed by payment method."""
+
+        return {
+            'stripe': ('#1d4ed8', '#dbeafe'),
+            'paypal': ('#003087', '#e0f2fe'),
+            'whatsapp': ('#15803d', '#dcfce7'),
+        }.get(self.payment_method, ('#111827', '#e5e7eb'))
+
+    @property
+    def payment_status_message(self):
+        """One-line text for the customer describing how the order was paid."""
+
+        if self.payment_method == 'whatsapp':
+            return 'Your order will be confirmed on WhatsApp before it is prepared.'
+        return f'Your order was placed with {self.payment_method_label}.'
 
     @property
     def status_message_label(self):

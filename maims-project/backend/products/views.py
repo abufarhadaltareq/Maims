@@ -1,10 +1,17 @@
 import logging
 
+import binascii
 import stripe
 import os
 from decimal import Decimal, ROUND_HALF_UP
 from django.conf import settings
-from django.http import Http404
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
+from django.http import Http404, HttpResponse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -15,9 +22,11 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Avg, Count, F, Prefetch, Q
 from rest_framework.authtoken.models import Token
-from .models import Category, CurrencyPrice, HeroSlide, Order, OrderItem, Product, Review, SiteSettings, UserProfile
+from .models import Category, CurrencyPrice, CustomerNotificationSettings, HeroSlide, Order, OrderItem, Product, Review, SiteSettings, UserProfile
+from . import facebook
 from .serializers import (
-    CategorySerializer, HeroSlideSerializer, OrderSerializer, ProductSerializer, ReviewCreateSerializer,
+    CategorySerializer, CustomerNotificationSettingsSerializer, HeroSlideSerializer, OrderSerializer,
+    ProductSerializer, ReviewCreateSerializer,
     ReviewSerializer, SiteSettingsSerializer, UserProfileSerializer,
     RegisterSerializer, UserSerializer,
 )
@@ -50,6 +59,11 @@ class AuthThrottle(_ScopedThrottle):
 class CheckoutThrottle(_ScopedThrottle):
     """Slows order-spam and Stripe PaymentIntent abuse."""
     scope = 'checkout'
+
+
+class NewsletterThrottle(_ScopedThrottle):
+    """Caps address-harvesting / mail-bombing via the footer sign-up form."""
+    scope = 'newsletter'
 
 
 # --- 🌟 RESTORED: PRODUCT VIEWS ---
@@ -102,6 +116,29 @@ class LatestProductsList(APIView):
         else:
             products = product_queryset().all()
 
+        serializer = ProductSerializer(products, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
+class SocialFeedList(APIView):
+    """Social Live Feed: products synced from the Facebook Page.
+
+    GET /api/v1/social-feed/?limit=12 — newest Facebook-synced products
+    first. Empty list (not 404) when the Page has never synced, so the
+    homepage shelf renders its graceful empty state.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, format=None):
+        try:
+            limit = int(request.query_params.get('limit', '12'))
+        except (TypeError, ValueError):
+            limit = 12
+        limit = max(1, min(limit, 50))
+        products = (product_queryset()
+                    .filter(facebook_post_id__isnull=False)
+                    .exclude(facebook_post_id='')
+                    .order_by('-date_added')[:limit])
         serializer = ProductSerializer(products, many=True, context={'request': request})
         return Response(serializer.data)
     
@@ -380,10 +417,107 @@ def _mark_paid_and_reserve(order):
         return True
 
 
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def facebook_webhook(request):
+    """
+    Meta Page webhook that drives the Facebook product sync.
+
+    GET — the one-time URL verification Meta performs when the
+          endpoint is registered (hub.mode=subscribe,
+          hub.verify_token, hub.challenge). The challenge is echoed
+          back as plain text, which proves we control the URL.
+
+    POST — `feed` changes: a post was added, edited or removed on
+          the Page. Each change is applied through products.facebook,
+          matched idempotently on the Graph API post id, so Meta's
+          automatic retries are harmless.
+
+    The handler never raises: Meta retries non-2xx answers for
+    days, so a malformed payload is answered 200 and logged.
+    """
+    if request.method == 'GET':
+        challenge = facebook.verify_webhook_request(request.query_params)
+        if challenge is None:
+            return Response({'error': 'Webhook verification failed.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        # Meta expects the raw challenge value, not a JSON body.
+        return HttpResponse(challenge, content_type='text/plain')
+
+    if not facebook.verify_signature(request.body,
+                                     request.META.get('HTTP_X_HUB_SIGNATURE_256', '')):
+        return Response({'error': 'Invalid webhook signature.'},
+                        status=status.HTTP_403_FORBIDDEN)
+
+    payload = request.data if isinstance(request.data, dict) else {}
+    results = []
+    try:
+        for entry in payload.get('entry') or []:
+            if not isinstance(entry, dict):
+                continue
+            for change in entry.get('changes') or []:
+                if not isinstance(change, dict) or change.get('field') != 'feed':
+                    continue
+                results.append(facebook.handle_feed_change(change.get('value') or {}))
+    except Exception:
+        logger.exception('Facebook webhook processing failed')
+    return Response({'received': True, 'results': results})
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def site_settings(request):
-    return Response(SiteSettingsSerializer(SiteSettings.get()).data)
+    payload = SiteSettingsSerializer(SiteSettings.get(), context={'request': request}).data
+    # One round-trip for the storefront: payment/social links above, plus the
+    # email-marketing consent row that decides whether the footer form and the
+    # checkout opt-in checkbox render at all.
+    payload['newsletter'] = CustomerNotificationSettingsSerializer(CustomerNotificationSettings.get()).data
+    return Response(payload)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([NewsletterThrottle])
+def newsletter_subscribe(request):
+    """Storefront footer sign-up: forward the address to the shop mailbox.
+
+    The admin-controlled consent row gates this endpoint too — pausing sign-ups
+    in the admin stops capture immediately, with no deploy.
+    """
+    prefs = CustomerNotificationSettings.get()
+    if not prefs.signup_enabled or prefs.status != 'active':
+        return Response({'error': 'Email sign-ups are paused right now.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    if not prefs.recipient_email:
+        return Response({'error': 'Email sign-ups are not configured yet.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from django.core.validators import validate_email
+    email = str(request.data.get('email') or '').strip().lower()
+    try:
+        validate_email(email)
+    except DjangoValidationError:
+        return Response({'error': 'Please provide a valid email address.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    from django.core.mail import send_mail
+    try:
+        send_mail(
+            subject='New newsletter sign-up — Maims',
+            message=f'A new address joined the mailing list from the storefront footer:\n\n'
+                    f'{email}\n',
+            from_email=None,
+            recipient_list=[prefs.recipient_email],
+            fail_silently=False,
+        )
+    except Exception:
+        # Never leak transport details (SMTP credentials, hostnames) to the client.
+        logger.exception('Newsletter sign-up email failed')
+        return Response({'error': 'Could not save your address. Please try again later.'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response({'ok': True}, status=status.HTTP_201_CREATED)
 
 def _as_bool(value):
     """Coerce the checkbox/JSON value the client sent into a real boolean."""
@@ -451,12 +585,15 @@ def _checkout_replay_response(order):
 @throttle_classes([CheckoutThrottle])
 def checkout(request):
     """
-    Unified checkout: payment_method = stripe | cod | whatsapp.
+    Unified checkout: payment_method = stripe | paypal | whatsapp.
 
     SECURITY: the order total and every unit price are derived from the database
     only — the client's `total_amount` / `price` are never trusted.
     - stripe: PaymentIntent, order unpaid until confirm/webhook.
-    - cod/whatsapp: order created immediately, stock reserved at once.
+    - paypal: order created unpaid; the customer completes payment on PayPal and
+      the order is marked paid once PayPal confirms it.
+    - whatsapp: order created immediately, stock reserved at once; payment is
+      arranged in the WhatsApp thread.
 
     IDEMPOTENCY: send an `Idempotency-Key` header (the frontend generates one per
     checkout attempt). A repeated POST carrying a key that already produced an
@@ -473,12 +610,12 @@ def checkout(request):
 
     data = request.data
     payment_method = str(data.get('payment_method') or 'stripe').lower()
-    if payment_method not in ('stripe', 'cod', 'whatsapp'):
+    if payment_method not in ('stripe', 'paypal', 'whatsapp'):
         return Response({'error': 'Invalid payment method.'}, status=status.HTTP_400_BAD_REQUEST)
 
     store = SiteSettings.get()
-    if payment_method == 'cod' and not store.cod_enabled:
-        return Response({'error': 'Cash on Delivery is currently disabled.'}, status=status.HTTP_400_BAD_REQUEST)
+    if payment_method == 'paypal' and not store.paypal_enabled:
+        return Response({'error': 'PayPal is currently disabled.'}, status=status.HTTP_400_BAD_REQUEST)
     if payment_method == 'whatsapp' and not (store.whatsapp_enabled and store.whatsapp_number):
         return Response({'error': 'WhatsApp ordering is not configured yet.'}, status=status.HTTP_400_BAD_REQUEST)
     if payment_method == 'stripe' and not store.stripe_enabled:
@@ -487,9 +624,12 @@ def checkout(request):
         return Response({'error': 'Card payments are not configured.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     # Validate required fields (pricing is never taken from the client).
+    # Phone is collected by default: every channel the shop uses to reach a
+    # customer (confirmation email, WhatsApp updates, courier delivery)
+    # needs it, so an order without one is rejected here.
     if not data.get('items'):
         return Response({'error': 'Your cart is empty.'}, status=status.HTTP_400_BAD_REQUEST)
-    for field in ('first_name', 'last_name', 'email', 'address', 'zipcode', 'place'):
+    for field in ('first_name', 'last_name', 'email', 'phone', 'address', 'zipcode', 'place'):
         if not data.get(field):
             return Response({'error': f'Please provide {field.replace("_", " ")}.'},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -536,6 +676,16 @@ def checkout(request):
         with transaction.atomic():
             # 1. Persist the order with a placeholder total; the authoritative
             #    total is computed server-side from the database below.
+            # Marketing consent is only stored when the shop would still be
+            # showing the checkbox at submit time — if settings changed between
+            # page load and POST, the admin's choice wins and no consent that
+            # the UI wouldn't have offered is recorded.
+            prefs = CustomerNotificationSettings.get()
+            marketing_consent = (
+                _as_bool(data.get('marketing_opt_in'))
+                and prefs.checkout_opt_in_enabled
+                and prefs.accepts_signups
+            )
             order = Order.objects.create(
                 user=order_user,
                 first_name=data['first_name'],
@@ -554,6 +704,7 @@ def checkout(request):
                 # asked for them, so the customer's choice is stored with the
                 # order and re-checked by the notifier before every send.
                 whatsapp_opt_in=_as_bool(data.get('whatsapp_opt_in')),
+                marketing_opt_in=marketing_consent,
             )
 
             subtotal = _build_order_items(order, data.get('items', []), raw_currency)
@@ -561,8 +712,10 @@ def checkout(request):
                 raise _CheckoutError('Cart total must be greater than zero.')
             order.total_amount = subtotal
 
-            # COD / WhatsApp: no Stripe — reserve stock atomically right now.
-            if payment_method in ('cod', 'whatsapp'):
+            # PayPal / WhatsApp: no Stripe intent — the order is created unpaid
+            # and stock is reserved atomically right now. PayPal is captured
+            # later (manually by the shop until a PayPal client ID exists).
+            if payment_method in ('paypal', 'whatsapp'):
                 _reserve_stock(order)
                 order.save(update_fields=['total_amount'])
                 payload = _checkout_response_payload(order)
@@ -676,6 +829,101 @@ def register_user(request):
         # Log only the error class — never the message (can contain secrets/PII).
         logger.exception('Registration failed')
         return Response({'error': 'Failed to create user.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# --- PASSWORD RESET ---------------------------------------------------------------------
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([AuthThrottle])
+def password_reset_request(request):
+    """
+    Email a one-time password-reset link to the account's address.
+
+    The response is identical whether or not the address is registered,
+    so the endpoint cannot be used to enumerate customer emails.
+    """
+    email = str(request.data.get('email') or '').strip().lower()
+    if not email:
+        return Response({'error': 'Please provide your email address.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.filter(email__iexact=email).first()
+    if user:
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        reset_url = (
+            f"{settings.FRONTEND_BASE_URL}/reset-password"
+            f"?uid={uid}&token={token}"
+        )
+        subject = '[Maims] Reset your password'
+        message = (
+            f"Hello {user.first_name or user.username},\n\n"
+            "Someone (hopefully you) asked to reset the password for your "
+            "Maims account.\n"
+            "Open this link to choose a new one — it stays valid for the "
+            f"next 24 hours:\n\n"
+            f"{reset_url}\n\n"
+            "If you did not ask for this, simply ignore this email; your "
+            "password is unchanged.\n\n"
+            "— Maims"
+        )
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL or None,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+        except Exception:
+            # Never leak delivery problems to the caller; the generic
+            # reply below is correct either way, and the traceback is in
+            # the server logs for the shop to investigate.
+            logger.exception('Password reset email failed for user %s', user.pk)
+
+    return Response({
+        'detail': 'If an account with that email exists, a reset link is on its way.'
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([AuthThrottle])
+def password_reset_confirm(request):
+    """Validate the emailed token and set a new password."""
+    uid = str(request.data.get('uid') or '')
+    token = str(request.data.get('token') or '')
+    new_password = request.data.get('new_password')
+
+    if not uid or not token or not new_password:
+        return Response({'error': 'Missing reset details.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user_id = urlsafe_base64_decode(uid).decode()
+        user = User.objects.get(pk=user_id)
+    except (TypeError, ValueError, OverflowError, binascii.Error, User.DoesNotExist):
+        return Response({'error': 'This reset link is invalid.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    if not default_token_generator.check_token(user, token):
+        return Response({'error': 'This reset link has expired or is invalid.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # The same rules as sign-up: length, similarity to the user's data,
+    # common-password checks, ...
+    try:
+        validate_password(new_password, user)
+    except ValidationError as exc:
+        return Response({'error': ' '.join(exc.messages)},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(new_password)
+    user.save()
+    return Response({
+        'detail': 'Password updated. You can log in with your new password.'
+    })
 
 
 @api_view(['POST'])

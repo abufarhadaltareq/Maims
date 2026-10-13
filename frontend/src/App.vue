@@ -106,56 +106,60 @@
       </main>
     </div>
 
-    <!-- Footer with admin-driven Facebook / WhatsApp links -->
-    <footer class="footer-gradient-top bg-gray-50/70 px-6 py-8 font-brand text-sm text-gray-500">
-      <div class="max-w-[1600px] mx-auto flex flex-col md:flex-row items-center justify-between gap-5">
-        <div class="flex items-center gap-3">
-          <BrandLogo size="sm" :show-tagline="false" />
-          <span class="font-semibold text-gray-700">© {{ new Date().getFullYear() }} {{ site.settings?.store_name || 'Maims' }}</span>
+    <!-- Footer: compact multi-column + newsletter -->
+    <footer class="footer-gradient-top bg-slate-950 text-slate-300 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
+      <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 pb-8 border-b border-white/10">
+        <div class="col-span-2 lg:col-span-2">
+          <BrandLogo size="sm" />
+          <p class="text-slate-400 text-[13px] leading-relaxed mt-3 max-w-xs">Curated premium fashion, delivered worldwide. New drops sync live from our Facebook Page.</p>
+          <!-- Newsletter (shown only when Admin → Customer notification settings allow it) -->
+          <form v-if="site.newsletterSignupEnabled" @submit.prevent="subscribeNewsletter" class="mt-4 max-w-xs">
+            <label class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-400">Get 10% off your first order</label>
+            <div class="flex gap-2 mt-2">
+              <input
+                v-model="newsletterEmail"
+                type="email" required placeholder="Email address"
+                class="flex-1 min-w-0 bg-white/10 border border-white/15 rounded-full px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-brand-accent focus:bg-white/15 transition"
+              />
+              <button class="shrink-0 bg-white text-slate-900 text-xs font-extrabold uppercase tracking-wider px-4 py-2.5 rounded-full hover:bg-sky-100 transition active:scale-95">
+                {{ newsletterDone ? '✓ Joined' : 'Join' }}
+              </button>
+            </div>
+            <p v-if="newsletterDone" class="text-emerald-300 text-xs font-semibold mt-2">You're on the list — welcome!</p>
+            <p v-else-if="newsletterError" class="text-rose-300 text-xs font-semibold mt-2">{{ newsletterError }}</p>
+          </form>
         </div>
-
-        <nav class="flex flex-wrap items-center gap-x-5 gap-y-2 font-semibold">
-          <router-link
-            v-for="legal in LEGAL_LINKS"
-            :key="legal.hash"
-            :to="`/legal#${legal.hash}`"
-            class="hover:text-brand-accent hover:underline"
-          >
-            {{ legal.label }}
-          </router-link>
-          <a
-            v-if="site.facebookShopUrl"
-            :href="site.facebookShopUrl"
-            target="_blank" rel="noopener"
-            class="flex items-center gap-1.5 text-[#1877F2] hover:underline"
-          >
-            <SocialIcon name="facebook" class="w-4 h-4" />
-            Facebook Shop
-          </a>
-          <a
-            v-for="link in site.socialLinks"
-            :key="link.key"
-            :href="link.url"
-            target="_blank" rel="noopener"
-            class="flex items-center gap-1.5 hover:underline"
-            :class="FOOTER_COLORS[link.key] || 'text-gray-600'"
-          >
-            <SocialIcon :name="link.key" class="w-4 h-4" />
-            {{ link.label }}
-          </a>
-          <a
-            v-if="site.whatsappEnabled"
-            :href="site.whatsappBaseLink"
-            target="_blank" rel="noopener"
-            class="flex items-center gap-1.5 text-[#25D366] hover:underline"
-          >
-            <SocialIcon name="whatsapp" class="w-4 h-4" />
-            WhatsApp Chat
-          </a>
-          <a v-if="brand.supportEmail" :href="`mailto:${brand.supportEmail}`" class="hover:text-black hover:underline">
-            {{ brand.supportEmail }}
-          </a>
+        <nav aria-label="Shop">
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-500 mb-3">Shop</p>
+          <ul class="space-y-2 font-medium">
+            <li><router-link to="/" class="hover:text-white transition">All products</router-link></li>
+            <li><router-link to="/new-arrivals" class="hover:text-white transition">New arrivals</router-link></li>
+            <li><router-link to="/cart" class="hover:text-white transition">Shopping bag</router-link></li>
+            <li><router-link to="/order-history" class="hover:text-white transition">Track order</router-link></li>
+          </ul>
         </nav>
+        <nav aria-label="Support">
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-500 mb-3">Support</p>
+          <ul class="space-y-2 font-medium">
+            <li v-for="legal in LEGAL_LINKS" :key="legal.hash">
+              <router-link :to="`/legal#${legal.hash}`" class="hover:text-white transition">{{ legal.label }}</router-link>
+            </li>
+            <li v-if="brand.supportEmail"><a :href="`mailto:${brand.supportEmail}`" class="hover:text-white transition">{{ brand.supportEmail }}</a></li>
+          </ul>
+        </nav>
+        <div>
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-500 mb-3">Follow</p>
+          <div class="flex flex-wrap gap-2">
+            <a v-if="site.facebookShopUrl" :href="site.facebookShopUrl" target="_blank" rel="noopener" title="Facebook Shop" class="w-9 h-9 rounded-full bg-white/10 hover:bg-[#1877F2] flex items-center justify-center transition"><SocialIcon name="facebook" class="w-4 h-4" /></a>
+            <a v-for="link in site.socialLinks" :key="link.key" :href="link.url" target="_blank" rel="noopener" :title="link.label" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"><SocialIcon :name="link.key" class="w-4 h-4" /></a>
+            <a v-if="site.whatsappEnabled" :href="site.whatsappBaseLink" target="_blank" rel="noopener" title="WhatsApp Chat" class="w-9 h-9 rounded-full bg-white/10 hover:bg-[#25D366] flex items-center justify-center transition"><SocialIcon name="whatsapp" class="w-4 h-4" /></a>
+          </div>
+          <p class="text-slate-500 text-xs mt-4">Secure checkout<br/>Stripe · PayPal · WhatsApp</p>
+        </div>
+      </div>
+      <div class="max-w-7xl mx-auto pt-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+        <span class="font-semibold">© {{ new Date().getFullYear() }} {{ site.settings?.store_name || 'Maims' }} · All rights reserved</span>
+        <span>Premium fashion, delivered worldwide</span>
       </div>
     </footer>
 
@@ -166,6 +170,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import axios from 'axios'
 import { useRouter, useRoute } from 'vue-router'
 import { useCartStore, CURRENCIES } from './stores/cart'
 import { useAuthStore } from './stores/auth'
@@ -185,16 +190,6 @@ const site = useSiteStore()
 const brand = BRAND_CONFIG
 const currencies = CURRENCIES
 
-// Text colours for the footer social links.
-const FOOTER_COLORS = {
-  facebook: 'text-[#1877F2]',
-  instagram: 'text-[#E1306C]',
-  tiktok: 'text-black',
-  twitter: 'text-black',
-  youtube: 'text-[#FF0000]',
-  linkedin: 'text-[#0A66C2]',
-}
-
 // Footer links into the dedicated /legal page (opens the matching tab).
 const LEGAL_LINKS = [
   { label: 'Terms & Conditions', hash: 'legal-terms' },
@@ -210,6 +205,25 @@ const countryFlag = computed(() => FLAGS[activeRegion.value.country] || '🌍')
 const searchQuery = ref('')
 const isCurrencyOpen = ref(false)
 const isAccountOpen = ref(false)
+const newsletterEmail = ref('')
+const newsletterDone = ref(false)
+const newsletterError = ref('')
+
+// Hand the address to the backend (POST /api/v1/newsletter/subscribe/), which
+// re-checks the admin consent row and forwards it to the shop mailbox. The old
+// localStorage-only version never reached the shop — it only claimed it did.
+const subscribeNewsletter = async () => {
+  if (!newsletterEmail.value || !newsletterEmail.value.includes('@')) return
+  newsletterError.value = ''
+  try {
+    await axios.post('/api/v1/newsletter/subscribe/', { email: newsletterEmail.value })
+    newsletterDone.value = true
+    newsletterEmail.value = ''
+  } catch (err) {
+    newsletterError.value = err.response?.data?.error ||
+      'Could not sign you up right now. Please try again later.'
+  }
+}
 
 // Close mobile layout menus automatically when navigating paths
 watch(() => route.path, () => {

@@ -78,7 +78,7 @@
       </li>
       <li>
         <a href="{% url 'admin:products_sitesettings_changelist' %}">Store settings</a>
-        <span>WhatsApp number, which payment methods are offered, the Facebook and social links in the header and footer, and where order notifications go (email, WhatsApp, Facebook page).</span>
+        <span>Store name and logo, WhatsApp number, which payment methods are offered, the Facebook and social links in the header and footer, and where order notifications go (email, WhatsApp, Facebook page).</span>
       </li>
       <li>
         <a href="{% url 'admin:products_review_changelist' %}">Product reviews</a>
@@ -90,6 +90,31 @@
       </li>
     </ul>
   </section>
+
+  {# Full model index: the sidebar only shows Daily work + Shop, so every
+     CRUD model gets an explicit link here. This is the fallback that makes
+     sure nothing registered in the admin is unreachable. #}
+  {% if app_list %}
+  <section class="maims-block">
+    <h2>All models</h2>
+    <ul class="maims-storelist">
+      {% for app in app_list %}
+        {% for model in app.models %}
+          <li>
+            {% if model.admin_url %}
+              <a href="{{ model.admin_url }}">{{ model.name }}</a>
+            {% else %}
+              {{ model.name }}
+            {% endif %}
+            {% if model.add_url %}
+              &middot; <a href="{{ model.add_url }}">Add</a>
+            {% endif %}
+          </li>
+        {% endfor %}
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
 
 </div>
 {% endblock %}

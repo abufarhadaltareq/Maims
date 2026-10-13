@@ -103,6 +103,29 @@ export const useCartStore = defineStore('cart', {
       this.persist()
     },
 
+    // Move a line to another size (admin manages the size list per product).
+    // Merges into an existing line of the same size instead of duplicating it.
+    changeSize(productId, oldSize = '', newSize = '') {
+      const itemIndex = this.items.findIndex(
+        item => item.product.id === productId && (item.size || '') === (oldSize || '')
+      )
+      if (itemIndex === -1) return false
+      const item = this.items[itemIndex]
+      if ((item.size || '') === (newSize || '')) return true
+
+      const target = this.items.find(
+        i => i.product.id === productId && (i.size || '') === (newSize || '')
+      )
+      if (target) {
+        target.quantity = Math.min(99, (target.quantity || 0) + (item.quantity || 1))
+        this.items.splice(itemIndex, 1)
+      } else {
+        item.size = newSize || ''
+      }
+      this.persist()
+      return true
+    },
+
     clearCart() {
       this.items = []
       localStorage.removeItem('cart_items')

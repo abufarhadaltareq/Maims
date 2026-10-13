@@ -193,6 +193,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Password-reset links expire after 24 hours (the emailed link says so).
+PASSWORD_RESET_TIMEOUT = 24 * 3600
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
@@ -269,13 +272,18 @@ UNFOLD = {
 
     'BORDER_RADIUS': '10px',
 
-    # Brand palette: the storefront's violet (#7C3AED) becomes Unfold's primary
-    # colour so the admin and the shop read as one product.
+    # Brand palette: the storefront's royal-purple gradient (violet-700 → fuchsia-700)
+    # becomes Unfold's primary colour so the admin and the shop read as one product.
     'COLORS': {
         'primary': {
-            '50': '#f5f3ff', '100': '#ede9fe', '200': '#ddd6fe', '300': '#c4b5fd',
-            '400': '#a78bfa', '500': '#8b5cf6', '600': '#7c3aed', '700': '#6d28d9',
-            '800': '#5b21b6', '900': '#4c1d95', '950': '#2e1065',
+            '50': '#faf5ff', '100': '#f3e8ff', '200': '#e9d5ff', '300': '#d8b4fe',
+            '400': '#c084fc', '500': '#a855f7', '600': '#9333ea', '700': '#7e22ce',
+            '800': '#6b21a8', '900': '#581c87', '950': '#3b0764',
+        },
+        'secondary': {
+            '50': '#fdf4ff', '100': '#fae8ff', '200': '#f5d0fe', '300': '#f0abfc',
+            '400': '#e879f9', '500': '#d946ef', '600': '#c026d3', '700': '#a21caf',
+            '800': '#86198f', '900': '#701a75', '950': '#4a044e',
         },
     },
 
@@ -284,6 +292,8 @@ UNFOLD = {
     'SIDEBAR': {
         'show_search': True,
         'show_all_applications': False,
+        # Every registered model is listed explicitly: Unfold only shows what
+        # is named here, so a missing entry silently hides that model's CRUD.
         'navigation': [
             {
                 'title': _('Daily work'),
@@ -293,53 +303,44 @@ UNFOLD = {
                      'link': reverse_lazy('admin:index')},
                     {'title': _('Awaiting our decision'), 'icon': 'inventory_2',
                      'link': '/admin/products/order/?status__exact=new',
-                     'badge': 'core.admin.new_orders_badge',
-                     'badge_variant': 'warning',
-                     'permission': lambda request: request.user.has_perm('products.view_order')},
-                    {'title': _('Failed notifications'), 'icon': 'notification_important',
-                     'link': '/admin/products/ordernotification/?status__exact=failed',
-                     'badge': 'core.admin.failed_notifications_badge',
-                     'badge_variant': 'danger',
-                     'permission': lambda request: request.user.has_perm('products.view_ordernotification')},
-                    {'title': _('Awaiting courier'), 'icon': 'local_shipping',
-                     'link': '/admin/products/order/?status__exact=packed',
-                     'permission': lambda request: request.user.has_perm('products.view_order')},
-                    {'title': _('Sold out'), 'icon': 'production_quantity_limits',
-                     'link': '/admin/products/product/?stock_level=out',
-                     'permission': lambda request: request.user.has_perm('products.view_product')},
+                     'badge': 'core.admin.new_orders_badge'},
+                    {'title': _('Accepted, to pack'), 'icon': 'package_2',
+                     'link': '/admin/products/order/?status__exact=accepted'},
+                    {'title': _('Packed, waiting for courier'), 'icon': 'local_shipping',
+                     'link': '/admin/products/order/?status__exact=packed'},
+                    {'title': _('Out for delivery'), 'icon': 'local_shipping',
+                     'link': '/admin/products/order/?status__exact=shipped'},
+                    {'title': _('Delivered'), 'icon': 'check_circle',
+                     'link': '/admin/products/order/?status__exact=delivered'},
+                    {'title': _('Declined'), 'icon': 'cancel',
+                     'link': '/admin/products/order/?status__exact=rejected'},
+                    {'title': _('Cancelled'), 'icon': 'cancel',
+                     'link': '/admin/products/order/?status__exact=cancelled'},
+                    {'title': _('Notifications'), 'icon': 'notifications',
+                     'link': reverse_lazy('admin:products_ordernotification_changelist'),
+                     'badge': 'core.admin.failed_notifications_badge'},
                 ],
             },
             {
-                'title': _('Catalogue'),
+                'title': _('Shop'),
                 'separator': True,
                 'items': [
-                    {'title': _('Products'), 'icon': 'sell',
+                    {'title': _('Orders'), 'icon': 'shopping_cart',
+                     'link': reverse_lazy('admin:products_order_changelist')},
+                    {'title': _('Products'), 'icon': 'inventory_2',
                      'link': reverse_lazy('admin:products_product_changelist')},
                     {'title': _('Categories'), 'icon': 'category',
                      'link': reverse_lazy('admin:products_category_changelist')},
-                    {'title': _('Collections'), 'icon': 'layers',
+                    {'title': _('Collections'), 'icon': 'collections',
                      'link': reverse_lazy('admin:products_collection_changelist')},
-                    {'title': _('Homepage hero slides'), 'icon': 'imagesmode',
+                    {'title': _('Hero slides'), 'icon': 'photo_library',
                      'link': reverse_lazy('admin:products_heroslide_changelist')},
-                ],
-            },
-            {
-                'title': _('Customers'),
-                'separator': True,
-                'items': [
+                    {'title': _('Reviews'), 'icon': 'star',
+                     'link': reverse_lazy('admin:products_review_changelist')},
                     {'title': _('Customers'), 'icon': 'group',
                      'link': reverse_lazy('admin:auth_user_changelist')},
-                    {'title': _('Groups'), 'icon': 'workspaces',
+                    {'title': _('Groups'), 'icon': 'group',
                      'link': reverse_lazy('admin:auth_group_changelist')},
-                    {'title': _('Product reviews'), 'icon': 'rate_review',
-                     'link': reverse_lazy('admin:products_review_changelist'),
-                     'permission': lambda request: request.user.has_perm('products.view_review')},
-                ],
-            },
-            {
-                'title': _('Settings'),
-                'separator': True,
-                'items': [
                     {'title': _('Store settings'), 'icon': 'settings',
                      'link': reverse_lazy('admin:products_sitesettings_changelist')},
                     {'title': _('Update prices & stock (CSV)'), 'icon': 'upload_file',
@@ -464,6 +465,30 @@ if STRIPE_SECRET_KEY and not STRIPE_WEBHOOK_SECRET:
         'https://dashboard.stripe.com/webhooks for reliable order confirmation.'
     )
 
+# --- Facebook Page product sync -------------------------------------------
+# Products are posted on the Facebook Page; the webhook endpoint
+# (/api/v1/facebook/webhook/) and `manage.py sync_facebook_catalog`
+# turn those posts into Product rows. Credentials can also be filled
+# in Admin → Store settings (facebook_page_id / facebook_page_access_token);
+# these env vars override them when set.
+FACEBOOK_PAGE_ID = os.environ.get('FACEBOOK_PAGE_ID', '')
+FACEBOOK_PAGE_ACCESS_TOKEN = os.environ.get('FACEBOOK_PAGE_ACCESS_TOKEN', '')
+# App secret from developers.facebook.com → Settings → Basic. Enables
+# HMAC signature checks on webhook deliveries (recommended, optional).
+FACEBOOK_APP_SECRET = os.environ.get('FACEBOOK_APP_SECRET', '')
+# The token Meta checks when the webhook URL is registered.
+FACEBOOK_WEBHOOK_VERIFY_TOKEN = os.environ.get('FACEBOOK_WEBHOOK_VERIFY_TOKEN', '')
+# cloudinary://API_KEY:API_SECRET@CLOUD_NAME — when set, post photos
+# are re-hosted on Cloudinary so they never expire; otherwise they are
+# stored through the default Django storage (local disk / S3).
+CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '')
+# Facebook-synced products land in this category (auto-created).
+FACEBOOK_SYNC_CATEGORY_SLUG = os.environ.get('FACEBOOK_SYNC_CATEGORY_SLUG', 'facebook-sync')
+# Opening stock for a newly synced product (0 when the post says sold).
+FACEBOOK_SYNC_DEFAULT_STOCK = int(os.environ.get('FACEBOOK_SYNC_DEFAULT_STOCK', '10'))
+# Currency for "price: 2500" lines that carry no currency symbol.
+FACEBOOK_SYNC_DEFAULT_CURRENCY = os.environ.get('FACEBOOK_SYNC_DEFAULT_CURRENCY', 'EUR')
+
 # Real Live Email Settings Configuration
 # Gmail's SMTP endpoint is hardcoded above, so when no credentials are supplied
 # the real backend would raise on every send. Fall back to the console backend
@@ -519,6 +544,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'auth': os.environ.get('THROTTLE_AUTH', '10/min'),
         'checkout': os.environ.get('THROTTLE_CHECKOUT', '30/hour'),
+        'newsletter': os.environ.get('THROTTLE_NEWSLETTER', '5/hour'),
     },
 }
 

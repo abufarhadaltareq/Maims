@@ -12,6 +12,13 @@ export const useSiteStore = defineStore('site', {
   }),
   getters: {
     facebookPageUrl: (s) => s.settings?.facebook_page_url || '',
+    /** Messenger deep link (https://m.me/<username>) derived from the
+        configured Facebook page URL. Empty when no page is set. */
+    messengerUrl: (s) => {
+      const match = (s.settings?.facebook_page_url || '')
+        .match(/facebook\.com\/([^/?#]+)/i)
+      return match ? `https://m.me/${match[1]}` : ''
+    },
     facebookShopUrl: (s) => s.settings?.facebook_shop_url || '',
     instagramUrl: (s) => s.settings?.instagram_url || '',
     tiktokUrl: (s) => s.settings?.tiktok_url || '',
@@ -34,9 +41,24 @@ export const useSiteStore = defineStore('site', {
     },
     whatsappNumber: (s) => s.settings?.whatsapp_number || '',
     whatsappEnabled: (s) => !!(s.settings?.whatsapp_enabled && s.settings?.whatsapp_number),
-    codEnabled: (s) => s.settings?.cod_enabled !== false,
     stripeEnabled: (s) => s.settings?.stripe_enabled !== false,
+    paypalEnabled: (s) => s.settings?.paypal_enabled !== false,
+    // --- Email-marketing consent row (Admin → Customer notification settings) ---
+    /** Footer sign-up form: its toggle on AND the shop can actually receive sign-ups. */
+    newsletterSignupEnabled: (s) =>
+      !!s.settings?.newsletter?.signup_enabled && !!s.settings?.newsletter?.accepts_signups,
+    /** Checkout opt-in checkbox: its own toggle, same delivery gate. */
+    newsletterCheckoutEnabled: (s) =>
+      !!s.settings?.newsletter?.checkout_opt_in_enabled && !!s.settings?.newsletter?.accepts_signups,
+    /** Admin-editable consent wording shown next to the checkout box. */
+    newsletterConsentText: (s) =>
+      s.settings?.newsletter?.consent_text ||
+      'Email me about new drops, restocks and offers. Unsubscribe any time.',
+    /** Box default: ticked only when the shop chose the (non-EU) opt-out strategy. */
+    newsletterBoxTicked: (s) => !!s.settings?.newsletter?.box_starts_ticked,
     whatsappBaseLink: (s) => s.settings?.whatsapp_link || '',
+    storeName: (s) => s.settings?.store_name || 'Maims',
+    logoUrl: (s) => s.settings?.logo_url || '',
   },
   actions: {
     async fetchSettings() {

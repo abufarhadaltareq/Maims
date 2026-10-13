@@ -19,7 +19,7 @@ const orderId = ref(null)
 const stripe = ref(null)
 const cardElement = ref(null)
 const stripeReady = ref(false)
-const paymentMethod = ref('stripe') // stripe | cod | whatsapp
+const paymentMethod = ref('stripe') // stripe | paypal | whatsapp
 
 // --- Idempotency ---
 // One key per checkout attempt. It stays the same for every retry of the SAME
@@ -54,7 +54,11 @@ const form = ref({
   zipcode: '',
   // WhatsApp Business may only open a conversation with someone who asked for
   // it, so this stays opt-in and is re-checked on the server before every send.
-  whatsapp_opt_in: false
+  whatsapp_opt_in: false,
+  // Email-marketing consent for the address above. Only sent when the admin
+  // shows the checkbox; its default state follows the consent strategy
+  // (unticked unless the shop deliberately chose opt-out).
+  marketing_opt_in: false
 })
 
 // --- Computed ---
@@ -84,6 +88,7 @@ const basePayload = computed(() => ({
   currency: cartStore.currentCurrency,
   items: formattedItems.value,
   whatsapp_opt_in: form.value.whatsapp_opt_in,
+  marketing_opt_in: form.value.marketing_opt_in,
 }))
 
 const initializeStripe = async () => {
@@ -122,9 +127,14 @@ const initializeStripe = async () => {
 onMounted(async () => {
   idempotencyKey.value = newIdempotencyKey()
   await site.fetchSettings()
+  // Checkout consent box default: ticked only for the opt-out strategy, and
+  // only if the admin is showing the box at all.
+  if (site.newsletterCheckoutEnabled && site.newsletterBoxTicked) {
+    form.value.marketing_opt_in = true
+  }
   // Default to first available method if admin disabled Stripe.
-  if (!site.stripeEnabled && site.codEnabled) paymentMethod.value = 'cod'
-  else if (!site.stripeEnabled && !site.codEnabled && site.whatsappEnabled) paymentMethod.value = 'whatsapp'
+  if (!site.stripeEnabled && site.paypalEnabled) paymentMethod.value = 'paypal'
+  else if (!site.stripeEnabled && !site.paypalEnabled && site.whatsappEnabled) paymentMethod.value = 'whatsapp'
   try {
     const response = await axios.get('/api/v1/profile/')
     if (response.data) {
@@ -147,8 +157,9 @@ const submitCheckoutForm = async () => {
     return
   }
 
-  // COD / WhatsApp: no card needed.
-  if (paymentMethod.value === 'cod' || paymentMethod.value === 'whatsapp') {
+  // PayPal / WhatsApp: no card details collected here — the order is created
+  // unpaid (stock reserved) and payment is completed outside this page.
+  if (paymentMethod.value === 'paypal' || paymentMethod.value === 'whatsapp') {
     try {
       const res = await postCheckout(paymentMethod.value)
       successMethod.value = res.data.payment_method || paymentMethod.value
@@ -235,7 +246,7 @@ const submitCheckoutForm = async () => {
       <p v-if="successOrderId" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Order #{{ successOrderId }}</p>
       <p class="text-gray-500 text-sm max-w-sm mx-auto">
         <span v-if="successMethod === 'stripe'">Your payment has been successfully completed. We are preparing your packages for shipment.</span>
-        <span v-else-if="successMethod === 'cod'">Your order is placed — pay in cash when it arrives. We'll contact you to confirm.</span>
+        <span v-else-if="successMethod === 'paypal'">Your order is reserved — we'll email you a secure PayPal link to complete the payment, then we start packing.</span>
         <span v-else>Your order is saved. Tap below to send it to us on WhatsApp and confirm.</span>
       </p>
       <a
@@ -286,6 +297,20 @@ const submitCheckoutForm = async () => {
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Email Address</label>
                 <input type="email" v-model="form.email" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600" />
+                <label v-if="site.newsletterCheckoutEnabled" class="mt-2 flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    v-model="form.marketing_opt_in"
+                    class="mt-0.5 rounded border-gray-300 text-brand-accent focus:ring-brand-accent"
+                  />
+                  <span>
+                    {{ site.newsletterConsentText }}
+                    <span class="block text-gray-500">
+                      We'll only use this address for the emails you asked for.
+                      Opt out any time from any message.
+                    </span>
+                  </span>
+                </label>
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Phone Number</label>
@@ -332,14 +357,14 @@ const submitCheckoutForm = async () => {
                 <p class="text-[11px] text-gray-500">Visa / Mastercard via Stripe</p>
               </button>
               <button
-                v-if="site.codEnabled"
+                v-if="site.paypalEnabled"
                 type="button"
-                @click="paymentMethod = 'cod'"
-                :class="paymentMethod === 'cod' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'"
+                @click="paymentMethod = 'paypal'"
+                :class="paymentMethod === 'paypal' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'"
                 class="border-2 rounded-xl p-3 text-left transition"
               >
-                <p class="font-bold text-sm">💵 Cash on Delivery</p>
-                <p class="text-[11px] text-gray-500">Pay when it arrives</p>
+                <p class="font-bold text-sm">🅿️ PayPal</p>
+                <p class="text-[11px] text-gray-500">Pay with your PayPal account</p>
               </button>
               <button
                 v-if="site.whatsappEnabled"
@@ -352,7 +377,7 @@ const submitCheckoutForm = async () => {
                 <p class="text-[11px] text-gray-500">Confirm on chat</p>
               </button>
             </div>
-            <p v-if="!site.stripeEnabled && !site.codEnabled && !site.whatsappEnabled" class="text-sm text-red-500">
+            <p v-if="!site.stripeEnabled && !site.paypalEnabled && !site.whatsappEnabled" class="text-sm text-red-500">
               No payment methods are enabled. Please contact the store.
             </p>
           </div>
@@ -364,7 +389,7 @@ const submitCheckoutForm = async () => {
             <p v-if="serverError" class="text-sm text-red-500">{{ serverError }}</p>
           </div>
           <div v-else class="bg-blue-50 border border-blue-100 rounded-xl p-5 text-sm text-blue-900">
-            <p v-if="paymentMethod === 'cod'" class="font-semibold">No card needed — pay cash on delivery. We'll confirm by phone/WhatsApp.</p>
+            <p v-if="paymentMethod === 'paypal'" class="font-semibold">No card details needed here — once the order is placed we'll email you a secure PayPal payment link.</p>
             <p v-else class="font-semibold">No card needed — your order is saved, then sent to our WhatsApp Business number with one tap.</p>
             <p v-if="serverError" class="text-sm text-red-500 mt-2">{{ serverError }}</p>
           </div>
@@ -372,7 +397,7 @@ const submitCheckoutForm = async () => {
           <button type="submit" :disabled="isProcessing" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition disabled:opacity-70">
             <span v-if="isProcessing">Processing...</span>
             <span v-else-if="paymentMethod === 'stripe'">Pay {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
-            <span v-else-if="paymentMethod === 'cod'">Place COD Order · {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
+            <span v-else-if="paymentMethod === 'paypal'">Place PayPal Order · {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
             <span v-else>Place WhatsApp Order · {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
           </button>
         </form>

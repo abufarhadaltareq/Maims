@@ -9,6 +9,7 @@ urlpatterns = [
     
     # Keeps your existing legacy endpoints intact
     path('latest-products/', views.LatestProductsList.as_view()),
+    path('social-feed/', views.SocialFeedList.as_view()),
     path('categories/', views.CategoryList.as_view()),
     path('hero-slides/', views.HeroSlideList.as_view()),
     path('category-showcase/', views.CategoryShowcase.as_view()),
@@ -20,6 +21,10 @@ urlpatterns = [
     path('stripe-key/', views.stripe_key, name='stripe_key'),
     path('stripe-webhook/', views.stripe_webhook, name='stripe_webhook'),
     path('site-settings/', views.site_settings, name='site_settings'),
+    path('newsletter/subscribe/', views.newsletter_subscribe, name='newsletter_subscribe'),
+    # Meta Page webhook: verifies the URL (GET) and receives feed
+    # changes (POST) for the Facebook product sync.
+    path('facebook/webhook/', views.facebook_webhook, name='facebook_webhook'),
     path('orders/', views.get_orders, name='get_orders'),
 
     # Authentication Endpoints
@@ -28,6 +33,8 @@ urlpatterns = [
     path('logout/', views.logout_user, name='logout_user'),
     path('me/', views.me, name='me'),
     path('change-password/', views.change_password, name='change_password'),
+    path('password-reset/', views.password_reset_request, name='password_reset_request'),
+    path('password-reset/confirm/', views.password_reset_confirm, name='password_reset_confirm'),
     # Legacy DRF token endpoint kept for back-compat:
     path('token-login/', obtain_auth_token, name='token_login'),
     path('profile/', views.my_profile, name='my_profile'),

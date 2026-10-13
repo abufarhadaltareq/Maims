@@ -77,9 +77,9 @@ export const LEGAL_DOCS = [
       {
         heading: '6. Payment',
         body: [
-          'We accept the payment methods shown at checkout: card payment, PayPal or bank transfer where available, and cash on delivery in supported regions.',
+          'We accept the payment methods shown at checkout: card payment (Stripe), PayPal, or a WhatsApp order where available.',
           'Card payments are handled by our payment provider. We never see or store your full card number; payment details are collected on a secure, provider-hosted page.',
-          'Cash on delivery orders are payable in the delivery currency to the courier. If the courier cannot reach you or the order cannot be handed over, it is returned to us and the original delivery fee may not be refundable.',
+          'PayPal orders are reserved when you place them; we email you a secure PayPal link to complete the payment. The order is confirmed once the payment is received.',
           'Orders placed through WhatsApp are confirmed by us before they are treated as accepted.',
         ],
       },

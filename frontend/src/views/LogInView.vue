@@ -28,6 +28,10 @@
         >
       </div>
 
+      <div class="text-right -mt-1">
+        <router-link to="/forgot-password" class="text-xs text-blue-600 hover:underline font-semibold">Forgot password?</router-link>
+      </div>
+
       <div v-if="error" class="p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded">
         {{ error }}
       </div>

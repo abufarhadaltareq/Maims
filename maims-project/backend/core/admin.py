@@ -6,11 +6,12 @@ how do I reach them.
 """
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.auth.admin import GroupAdmin
+from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group, User
 from django.db.models import Count, Prefetch
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from urllib.parse import quote
@@ -127,7 +128,9 @@ class OrderInline(UnfoldTabularInline):
         return 'Paid' if obj.is_paid else 'Unpaid'
 
 
-class MaimsUserAdmin(UnfoldModelAdmin):
+# UserAdmin supplies the creation form (password1/password2) and add_fieldsets
+# handling; UnfoldModelAdmin supplies the Tailwind shell and the Add link.
+class MaimsUserAdmin(UserAdmin, UnfoldModelAdmin):
     change_form_template = 'admin/maims_user_change_form.html'
     list_display = ('username', 'email', 'full_name', 'order_count', 'spent', 'place', 'is_staff')
     list_filter = ('is_staff', 'is_superuser', 'is_active')

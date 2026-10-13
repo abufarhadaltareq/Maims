@@ -37,9 +37,11 @@ from django.utils.safestring import mark_safe
 from urllib.parse import quote
 
 from core.admin_site import maims_admin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
 from .models import (
-    RESTOCK_LEVEL, Category, Collection, CurrencyPrice, HeroSlide, Order, OrderItem,
+    RESTOCK_LEVEL, Category, Collection, CurrencyPrice, CustomerNotificationSettings,
+    HeroSlide, Order, OrderItem,
     OrderNotification, Product, ProductMedia, Review, SiteSettings,
 )
 
@@ -48,10 +50,10 @@ CURRENCY_CODES = tuple(CURRENCY_SYMBOLS)
 
 PAYMENT_COLORS = {
     'stripe': ('#1d4ed8', '#dbeafe'),
-    'cod': ('#047857', '#d1fae5'),
+    'paypal': ('#003087', '#e0f2fe'),
     'whatsapp': ('#15803d', '#dcfce7'),
 }
-PAYMENT_LABELS = {'stripe': 'Card', 'cod': 'Cash on delivery', 'whatsapp': 'WhatsApp'}
+PAYMENT_LABELS = {'stripe': 'Card', 'paypal': 'PayPal', 'whatsapp': 'WhatsApp'}
 
 STITCHING_LABELS = dict(Product.STITCHING_CHOICES)
 
@@ -140,8 +142,14 @@ def whatsapp_link(phone, message):
     return f"https://wa.me/{digits}?text={quote(message or '')}"
 
 
-class MaimsModelAdmin(admin.ModelAdmin):
-    """Defaults every shop admin inherits: roomier lists, action bar on top, nicer empties."""
+class MaimsModelAdmin(UnfoldModelAdmin):
+    """Defaults every shop admin inherits: roomier lists, action bar on top, nicer empties.
+
+    Inherits Unfold's ModelAdmin (not plain admin.ModelAdmin) so the
+    changelist renders Unfold's object tools — including the "Add" button,
+    which Unfold only shows when `show_add_link` is set (it defaults to
+    True here). Without this, every list page silently loses Create.
+    """
     save_on_top = True
     actions_on_top = True
     actions_on_bottom = False
@@ -288,9 +296,10 @@ class OrderAdmin(MaimsModelAdmin):
             'description': 'Totals and prices are calculated at checkout and cannot be edited here.'}),
         ('Customer', {
             'fields': ('user', 'first_name', 'last_name', 'email', 'phone',
-                       'address', 'zipcode', 'place', 'whatsapp_opt_in'),
+                       'address', 'zipcode', 'place', 'whatsapp_opt_in', 'marketing_opt_in'),
             'description': 'WhatsApp updates are only sent to customers who ticked the '
-                           'opt-in box at checkout.'}),
+                           'opt-in box at checkout. marketing_opt_in is the proof of '
+                           'email-marketing consent for this address.'}),
         ('Payment', {
             'fields': ('total_amount', 'currency', 'payment_method', 'is_paid', 'stripe_payment_intent_id'),
             'description': 'Card payments are confirmed by Stripe automatically. If a status looks wrong, '
@@ -786,7 +795,7 @@ class ProductAdmin(MaimsModelAdmin):
     # Stock is the number that changes daily — edit it straight from the list.
     list_editable = ('stock',)
     list_filter = ('category', 'collection', 'fabric_type', 'stitching_type', StockFilter, PricingFilter)
-    search_fields = ('name', 'slug', 'brand_name', 'description')
+    search_fields = ('name', 'slug', 'brand_name', 'description', 'facebook_post_id')
     prepopulated_fields = {'slug': ('name',)}
     autocomplete_fields = ('category', 'collection')
     list_select_related = ('category', 'collection')
@@ -795,7 +804,7 @@ class ProductAdmin(MaimsModelAdmin):
     inlines = (CurrencyPriceInline, ProductMediaInline)
     change_list_template = 'admin/maims_changelist.html'
     actions = ('add_stock', 'mark_sold_out', 'restock_selected', 'duplicate_products',
-               'export_products_csv')
+               'export_products_csv', 'sync_facebook_feed')
     change_form_template = 'admin/maims_change_form.html'
     fieldsets = (
         ('Basics', {
@@ -811,6 +820,41 @@ class ProductAdmin(MaimsModelAdmin):
             'description': 'Only needed for clothing. Use <b>material type</b> for bags and jewellery, and '
                            '<b>size options</b> for anything that is not S/M/L (for example "One Size").'}),
     )
+
+    @admin.action(description='Import latest Facebook page posts now')
+    def sync_facebook_feed(self, request, queryset):
+        """Manual fallback for the Meta webhook.
+
+        Webhooks only fire when Facebook can reach this host, which never
+        happens on a laptop or a firewalled server. This pulls the recent page
+        feed and runs the exact same upsert the webhook would, so the storefront
+        stays in sync without waiting for a callback.
+        """
+        from . import facebook
+        posts = facebook.fetch_page_feed(limit=50)
+        if not posts:
+            self.message_user(
+                request,
+                'No Facebook posts imported. Check the Page ID / access token in '
+                'Store settings, or the page may simply be empty.',
+                level='WARNING')
+            return
+        imported = skipped = 0
+        for post in posts:
+            post_id = (post.get('id') or '').strip()
+            if not post_id:
+                continue
+            # Upsert is idempotent on facebook_post_id — re-running never duplicates.
+            product = facebook.upsert_product_from_post(
+                post_id, post.get('message') or '', post.get('full_picture') or '')
+            if product is None:
+                skipped += 1
+            else:
+                imported += 1
+        self.message_user(
+            request,
+            f'Facebook sync finished: {imported} product(s) imported or refreshed, '
+            f'{skipped} post(s) skipped (no parseable product info).')
 
     def get_urls(self):
         return [
@@ -1236,14 +1280,18 @@ class HeroSlideAdmin(MaimsModelAdmin):
 
 class SiteSettingsAdmin(MaimsModelAdmin):
     """One row controls every link and payment toggle — there is never more than one."""
-    list_display = ('singleton_label', 'whatsapp_number', 'stripe_enabled', 'cod_enabled',
+    list_display = ('singleton_label', 'logo_preview', 'store_name', 'whatsapp_number', 'stripe_enabled', 'paypal_enabled',
                     'whatsapp_enabled', 'updated_at')
-    list_editable = ('stripe_enabled', 'cod_enabled', 'whatsapp_enabled')
+    list_editable = ('stripe_enabled', 'paypal_enabled', 'whatsapp_enabled')
     fieldsets = (
+        ('Brand', {
+            'fields': ('store_name', 'logo'),
+            'description': 'Upload a PNG or JPG logo (max 2MB). It appears in the header and footer. Leave it empty to keep the M monogram.'}),
         ('Payments', {
-            'fields': ('stripe_enabled', 'cod_enabled'),
+            'fields': ('stripe_enabled', 'paypal_enabled'),
             'description': 'Untick a method to hide it at checkout. Card payments also need a valid '
-                           'STRIPE_SECRET_KEY in the environment.'}),
+                           'STRIPE_SECRET_KEY in the environment; PayPal orders are confirmed '
+                           'manually until a PayPal client ID is configured.'}),
         ('WhatsApp Business', {
             'fields': ('whatsapp_enabled', 'whatsapp_number', 'whatsapp_greeting'),
             'description': 'Digits only with the country code, e.g. 351912345678. This powers the '
@@ -1259,6 +1307,12 @@ class SiteSettingsAdmin(MaimsModelAdmin):
     @admin.display(description='Settings')
     def singleton_label(self, obj):
         return 'Storefront links & payment methods'
+
+    @admin.display(description='Logo')
+    def logo_preview(self, obj):
+        if obj.logo:
+            return format_html('<img src="{}" style="height:40px;border-radius:8px;" />', obj.logo.url)
+        return '— (monogram shown)'
 
     def has_add_permission(self, request):
         # Exactly one settings row may ever exist.
@@ -1276,6 +1330,55 @@ class SiteSettingsAdmin(MaimsModelAdmin):
         return super().changelist_view(request, extra_context)
 
 
+class CustomerNotificationSettingsAdmin(MaimsModelAdmin):
+    """Single row controlling the footer sign-up form and checkout opt-in box."""
+    list_display = ('singleton_label', 'status_badge', 'signup_enabled', 'checkout_opt_in_enabled',
+                    'opt_in_strategy', 'recipient_email', 'updated_at')
+    list_editable = ('signup_enabled', 'checkout_opt_in_enabled')
+    fieldsets = (
+        ('Email capture', {
+            'fields': ('signup_enabled', 'checkout_opt_in_enabled', 'opt_in_strategy', 'status'),
+            'description': 'Both storefront forms (footer sign-up and checkout checkbox) read this row. '
+                           "'Explicit opt-in' keeps the checkout box unticked — required in the EU/UK. "
+                           "Set status to Paused to stop collecting everywhere at once."}),
+        ('Consent wording & delivery', {
+            'fields': ('consent_text', 'recipient_email'),
+            'description': 'The consent text appears next to the checkout checkbox. Each new sign-up '
+                           'is emailed to the mailbox above; leave it empty to stop collecting.'}),
+    )
+
+    @admin.display(description='Settings')
+    def singleton_label(self, obj):
+        return 'Email marketing consent'
+
+    @admin.display(description='Status')
+    def status_badge(self, obj):
+        if obj.status == 'active':
+            colour, label = ('#15803d', '#dcfce7', ) if obj.accepts_signups else ('#b45309', '#fef3c7')
+            text = 'Collecting' if obj.accepts_signups else 'Active — no mailbox set'
+        else:
+            colour, label, text = '#b91c1c', '#fee2e2', 'Paused'
+        return format_html(
+            '<span style="background:{};color:{};padding:3px 10px;border-radius:99px;'
+            'font-size:11px;font-weight:700;">{}</span>', label, colour, text)
+
+    def has_add_permission(self, request):
+        # Exactly one consent row may ever exist.
+        return not CustomerNotificationSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        """Skip the list page: send the operator straight to the single settings form."""
+        if request.method == 'GET' and not request.GET.get('q'):
+            row = CustomerNotificationSettings.objects.first()
+            if row:
+                return HttpResponseRedirect(
+                    reverse('admin:products_customernotificationsettings_change', args=[row.pk]))
+        return super().changelist_view(request, extra_context)
+
+
 # --- registration -------------------------------------------------------------------
 # Registered as plain calls, not @decorators: Django 6's AdminSite.register()
 # returns None, so it cannot be used as a class decorator.
@@ -1286,6 +1389,7 @@ maims_admin.register(Category, CategoryAdmin)
 maims_admin.register(Collection, CollectionAdmin)
 maims_admin.register(HeroSlide, HeroSlideAdmin)
 maims_admin.register(SiteSettings, SiteSettingsAdmin)
+maims_admin.register(CustomerNotificationSettings, CustomerNotificationSettingsAdmin)
 
 
 class ReviewAdmin(MaimsModelAdmin):

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    Product, Category, CurrencyPrice, HeroSlide, Order, OrderItem, ProductMedia,
+    Product, Category, CurrencyPrice, CustomerNotificationSettings, HeroSlide, Order, OrderItem, ProductMedia,
     Review, SiteSettings, UserProfile,
 )
 
@@ -101,6 +101,8 @@ class ProductSerializer(serializers.ModelSerializer):
             "media",          # Resolves empty gallery tray tray issue
             "average_rating",  # Star average shown under the product title
             "review_count",    # Number of published reviews
+            "facebook_post_id",    # Present = synced from Facebook Page (drives "Live" badge)
+            "facebook_image_url",  # Cloud-hosted FB image (preferred by get_image)
         )
 
     def get_average_rating(self, obj):
@@ -170,18 +172,49 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class SiteSettingsSerializer(serializers.ModelSerializer):
     whatsapp_link = serializers.SerializerMethodField()
+    logo_url = serializers.SerializerMethodField()
 
     class Meta:
         model = SiteSettings
         fields = (
+            "store_name", "logo_url",
             "facebook_page_url", "facebook_shop_url",
             "instagram_url", "tiktok_url", "twitter_url", "youtube_url", "linkedin_url",
             "whatsapp_number", "whatsapp_enabled", "whatsapp_greeting",
-            "cod_enabled", "stripe_enabled", "whatsapp_link",
+            "stripe_enabled", "paypal_enabled", "whatsapp_link",
         )
 
     def get_whatsapp_link(self, obj):
         return obj.whatsapp_link()
+
+    def get_logo_url(self, obj):
+        logo = getattr(obj, 'logo', None)
+        if not logo:
+            return ''
+        try:
+            return logo.url
+        except Exception:
+            return ''
+
+
+# 6b. Customer notification (email marketing) settings
+class CustomerNotificationSettingsSerializer(serializers.ModelSerializer):
+    """Read-only view of the consent row for the storefront.
+
+    `accepts_signups` and `box_starts_ticked` are derived, not stored — the
+    frontend must never decide to collect an address from the raw toggles
+    alone (a paused shop with forms still flagged 'on' still collects nothing).
+    """
+    accepts_signups = serializers.BooleanField(read_only=True)
+    box_starts_ticked = serializers.BooleanField(read_only=True, source='checkout_box_starts_ticked')
+
+    class Meta:
+        model = CustomerNotificationSettings
+        fields = (
+            "signup_enabled", "checkout_opt_in_enabled", "opt_in_strategy",
+            "consent_text", "accepts_signups", "box_starts_ticked",
+        )
+        read_only_fields = fields
 
 
 # 7. User Profile Serializer

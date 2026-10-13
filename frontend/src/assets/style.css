@@ -1,52 +1,39 @@
 @import "tailwindcss";
 
 /* ============================================================================
-   Maims theme tokens (Tailwind v4)
-   Re-skin the whole store by editing these hex codes — every `brand-*` utility
-   and the gradients below read from them.
+   Maims — Light & Clean Theme (Tailwind v4)
+   A neutral, airy palette. Edit the tokens below to re-skin the store.
    ============================================================================ */
 @theme {
-  --color-brand-primary: #2a2350;    /* Soft deep-indigo ink — headings, dark surfaces */
-  --color-brand-secondary: #ffffff;  /* Background structures */
-  --color-brand-accent: #ec4899;     /* Accent — prices, badges, active states */
-  --color-brand-muted: #f6f4ff;      /* Light lavender shading blocks */
-  --color-brand-text: #3a3357;       /* Main readable copy — softer than near-black */
+  /* Core brand tokens — soft, professional, high-contrast for readability */
+  --color-brand-primary: #1e293b;    /* Slate 800 — headings, primary actions */
+  --color-brand-accent: #0ea5e9;     /* Sky 500 — links, buttons, accents */
+  --color-brand-muted: #f8fafc;      /* Slate 50 — subtle section backgrounds */
+  --color-brand-text: #334155;       /* Slate 700 — body copy */
 
   --font-brand: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 /* ---------------------------------------------------------------------------
-   Gradient palette, exposed as CSS variables so the utilities below (and any
-   inline styles) share one source of truth. Change the three stops to re-tint
-   the entire store.
+   Gradient — subtle, never overwhelming.
+   Used only for the hero bar and a few decorative accents.
    --------------------------------------------------------------------------- */
 :root {
-  --grad-from: #6366f1;   /* Indigo 500 — lighter, brighter */
-  --grad-via: #a855f7;    /* Purple 500 */
-  --grad-to: #f472b6;     /* Pink 400 — soft finish */
-  --grad-angle: 115deg;
-  --brand-glow: 0 16px 36px -20px rgba(168, 85, 247, 0.45);
+  --grad-from: #9c0aa1;   /* Sky 500 — clean blue */
+  --grad-via: #be30d1;    /* Sky 400 — lighter blue */
+  --grad-to: #ce5ceb;     /* Sky 300 — airy finish */
+  --grad-angle: 110deg;
+  --brand-glow: 0 8px 24px -12px rgba(14, 165, 233, 0.35);
 }
 
-/* Custom utilities (Tailwind v4) — declared with @utility so they also work
-   with variants such as hover: and group-hover:. */
+/* Custom utilities (Tailwind v4) — @utility so variants (hover:, group-hover:) work. */
 
-/* Solid brand gradient — bars, buttons, badges. */
+/* Subtle gradient bar — top hero strip, button accents. */
 @utility bg-gradient-brand {
   background-image: linear-gradient(var(--grad-angle), var(--grad-from), var(--grad-via) 50%, var(--grad-to));
 }
 
-/* Reversed stops, for alternating surfaces. */
-@utility bg-gradient-brand-rev {
-  background-image: linear-gradient(var(--grad-angle), var(--grad-to), var(--grad-via) 50%, var(--grad-from));
-}
-
-/* Faint tint for large section backgrounds. */
-@utility bg-gradient-brand-soft {
-  background-image: linear-gradient(var(--grad-angle), #f2f5ff, #faf5ff 50%, #fff0f7);
-}
-
-/* Gradient text on light backgrounds. */
+/* Gradient text for the hero headline only. */
 @utility text-gradient-brand {
   background-image: linear-gradient(var(--grad-angle), var(--grad-from), var(--grad-via) 45%, var(--grad-to));
   -webkit-background-clip: text;
@@ -54,33 +41,145 @@
   color: transparent;
 }
 
-/* Brighter gradient text for the dark hero. */
-@utility text-gradient-light {
-  background-image: linear-gradient(120deg, #ffffff, #e9d5ff 45%, #fbcfe8);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Soft brand glow for elevated / interactive elements. */
+/* Soft glow for elevated elements (cards on hover, modals). */
 @utility shadow-brand {
   box-shadow: var(--brand-glow);
 }
 
-/* Thin gradient rule across the top of the footer. */
+/* Thin gradient rule — footer top border. */
 @utility footer-gradient-top {
-  border-top: 2px solid transparent;
+  border-top: 1px solid transparent;
   border-image: linear-gradient(var(--grad-angle), var(--grad-from), var(--grad-via), var(--grad-to)) 1;
 }
 
-/* Gentle lift on product cards so the grid feels alive on hover. */
+/* Product card hover — subtle lift, no heavy shadows. */
 .product-card {
-  transition: transform 0.3s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .product-card:hover {
   transform: translateY(-4px);
+  box-shadow: 0 12px 28px -10px rgba(14, 165, 233, 0.25);
 }
 
-body {
-  margin: 0;
+/* Global base styles — keep the page light and readable.
+   MUST live in @layer base: unlayered CSS outranks Tailwind's
+   layered utilities, so an unlayered `img { height: auto }` would
+   silently defeat .h-8 / .max-w-* on every <img> (e.g. the brand
+   logo rendering at its natural 500px instead of the header size). */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply font-brand text-brand-text antialiased bg-white;
+    line-height: 1.6;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold text-brand-primary tracking-tight;
+  }
+  a {
+    @apply text-brand-accent underline-offset-2 hover:underline;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Focus visible for keyboard users. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-sky-500;
+  }
+}
+
+/* Scrollbar — subtle. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Utility: hide scrollbar but keep scroll. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* --- Homepage hero animations ---------------------------------------------- */
+@keyframes kenburns {
+  from { transform: scale(1.02); }
+  to   { transform: scale(1.14); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(26px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes hero-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+@keyframes hero-glow {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+@keyframes media-switch {
+  from { opacity: 0; transform: scale(1.06); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@utility animate-kenburns {
+  animation: kenburns 7.5s ease-out forwards;
+}
+@utility animate-fade-up {
+  animation: fade-up 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@utility animate-hero-progress {
+  animation: hero-progress 4s linear forwards;
+}
+@utility animate-hero-glow {
+  background-size: 200% 200%;
+  animation: hero-glow 12s ease infinite;
+}
+@utility animate-media-switch {
+  animation: media-switch 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Scroll-reveal: applied by the v-reveal directive — elements lift in
+   when they enter the viewport, with an optional stagger delay. */
+.reveal-init {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.65s ease, transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-init { opacity: 1; transform: none; transition: none; }
+  .animate-kenburns, .animate-fade-up, .animate-hero-progress,
+  .animate-hero-glow, .animate-media-switch, .animate-bounce { animation: none !important; }
+}
+
+/* Print styles — clean. */
+@media print {
+  .no-print { display: none !important; }
+  a { text-decoration: none; color: inherit; }
 }

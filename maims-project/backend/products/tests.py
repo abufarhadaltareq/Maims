@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import threading
 from datetime import timedelta
 from decimal import Decimal
@@ -5,10 +7,12 @@ from types import SimpleNamespace
 from unittest import mock, skipIf
 
 from django.contrib.auth.models import User
+from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.contrib import admin
+from django.conf import settings
 from django.urls import Resolver404
 from django.utils import timezone
 
@@ -16,8 +20,11 @@ from core.admin_site import maims_admin
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
+from . import facebook
+
 from .models import (
-    Category, CurrencyPrice, Order, OrderItem, Product, Review, SiteSettings, UserProfile,
+    Category, CurrencyPrice, CustomerNotificationSettings, Order, OrderItem, Product,
+    Review, SiteSettings, UserProfile,
 )
 from .views import _build_order_items, _CheckoutError, _mark_paid_and_reserve, _reserve_stock
 
@@ -40,7 +47,7 @@ class AdminPageTests(TestCase):
         cls.order = Order.objects.create(
             first_name='Ada', last_name='Lovelace', email='ada@example.com',
             address='1 Main St', zipcode='1000', place='Lisbon',
-            total_amount=Decimal('25.00'), currency='EUR', payment_method='cod', is_paid=False)
+            total_amount=Decimal('25.00'), currency='EUR', payment_method='paypal', is_paid=False)
         OrderItem.objects.create(order=cls.order, product=cls.product, size='M',
                                  price=Decimal('25.00'), quantity=1)
 
@@ -65,6 +72,23 @@ class AdminPageTests(TestCase):
         # 'new' is the decision queue: staff accept or decline before packing.
         self.assertContains(res, 'Awaiting our decision')
         self.assertContains(res, 'Accepted, to pack')
+
+    def test_product_admin_can_sync_facebook_feed_manually(self):
+        """Webhooks can't reach a laptop/firewalled host — the admin action is
+        the fallback, running the same idempotent upsert as the webhook."""
+        posts = [{'id': '111_222',
+                  'message': 'Jamdani Saree — Lotus\n€ 120.00\nHandwoven in Dhaka',
+                  'full_picture': ''}]
+        with mock.patch('products.facebook.fetch_page_feed', return_value=posts) as fetch:
+            res = self.client.post('/admin/products/product/', {
+                'action': 'sync_facebook_feed',
+                '_selected_action': [str(self.product.pk)],
+            })
+        self.assertEqual(res.status_code, 302)
+        fetch.assert_called_once()
+        linked = Product.objects.filter(facebook_post_id='111_222')
+        self.assertTrue(linked.exists())
+        self.assertEqual(linked.first().name, 'Jamdani Saree — Lotus')
 
     def test_every_registered_changelist_renders(self):
         from core.admin_site import maims_admin
@@ -97,6 +121,18 @@ class AdminPageTests(TestCase):
         self.assertEqual(self.client.get('/admin/products/sitesettings/add/').status_code, 403)
         res = self.client.get('/admin/products/sitesettings/')
         self.assertEqual(res.status_code, 302)
+
+    def test_notification_settings_is_a_singleton_and_form_renders(self):
+        from .models import CustomerNotificationSettings
+        row = CustomerNotificationSettings.get()
+        # Second row can never be added, and the list page jumps to the form.
+        self.assertEqual(
+            self.client.get('/admin/products/customernotificationsettings/add/').status_code, 403)
+        res = self.client.get('/admin/products/customernotificationsettings/')
+        self.assertEqual(res.status_code, 302)
+        res = self.client.get(f'/admin/products/customernotificationsettings/{row.pk}/change/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Email capture')
 
 
 class AdminDailyWorkflowTests(AdminPageTests):
@@ -248,7 +284,7 @@ class CheckoutPricingSecurityTests(TestCase):
         payload = {
             'first_name': 'Ada', 'last_name': 'Lovelace', 'email': 'ada@example.com',
             'phone': '+351 900000000', 'address': '1 Main St', 'zipcode': '1000',
-            'place': 'Lisbon', 'payment_method': 'cod', 'currency': 'EUR',
+            'place': 'Lisbon', 'payment_method': 'paypal', 'currency': 'EUR',
             'items': [{'product_id': self.product.id, 'quantity': 2, 'price': '0.01'}],
         }
         payload.update(overrides)
@@ -269,10 +305,46 @@ class CheckoutPricingSecurityTests(TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertFalse(Order.objects.exists())
 
+    def test_missing_phone_rejected(self):
+        """Phone is collected by default: no number, no order."""
+        res = self.client.post('/api/v1/checkout/',
+                               self._payload(phone=''), format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('phone', res.data['error'])
+        self.assertFalse(Order.objects.exists())
+
     def test_empty_cart_rejected(self):
         res = self.client.post('/api/v1/checkout/',
                                self._payload(items=[]), format='json')
         self.assertEqual(res.status_code, 400)
+
+    def test_marketing_opt_in_is_stored_when_the_checkbox_would_show(self):
+        from django.core.cache import cache
+        cache.clear()  # checkout is throttled; keep order irrelevant
+        prefs = CustomerNotificationSettings.get()
+        prefs.checkout_opt_in_enabled = True
+        prefs.status = 'active'
+        prefs.recipient_email = 'list@example.com'
+        prefs.save()
+        res = self.client.post('/api/v1/checkout/',
+                               self._payload(marketing_opt_in=True), format='json')
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertTrue(Order.objects.get(id=res.data['order_id']).marketing_opt_in)
+
+    def test_marketing_opt_in_dropped_when_consent_row_no_longer_asks(self):
+        """A settings flip between page load and POST wins: the server never
+        records consent the shop wouldn't be showing anymore."""
+        from django.core.cache import cache
+        cache.clear()
+        prefs = CustomerNotificationSettings.get()
+        prefs.checkout_opt_in_enabled = True
+        prefs.status = 'paused'   # admin hit pause while the cart was open
+        prefs.recipient_email = 'list@example.com'
+        prefs.save()
+        res = self.client.post('/api/v1/checkout/',
+                               self._payload(marketing_opt_in=True), format='json')
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertFalse(Order.objects.get(id=res.data['order_id']).marketing_opt_in)
 
 
 class WebhookSecurityTests(TestCase):
@@ -317,8 +389,8 @@ class CurrencyPricingTests(TestCase):
     def _payload(self, currency):
         return {
             'first_name': 'Ada', 'last_name': 'Lovelace', 'email': 'ada@example.com',
-            'phone': '', 'address': '1 Main St', 'zipcode': '1000', 'place': 'Lisbon',
-            'payment_method': 'cod', 'currency': currency,
+            'phone': '+351 900000000', 'address': '1 Main St', 'zipcode': '1000', 'place': 'Lisbon',
+            'payment_method': 'paypal', 'currency': currency,
             'items': [{'product_id': self.product.id, 'quantity': 1, 'price': '0.01'}],
         }
 
@@ -348,8 +420,8 @@ class DuplicateCartLineTests(TestCase):
     def _payload(self, *quantities):
         return {
             'first_name': 'Ada', 'last_name': 'Lovelace', 'email': 'ada@example.com',
-            'phone': '', 'address': '1 Main St', 'zipcode': '1000', 'place': 'Lisbon',
-            'payment_method': 'cod', 'currency': 'EUR',
+            'phone': '+351 900000000', 'address': '1 Main St', 'zipcode': '1000', 'place': 'Lisbon',
+            'payment_method': 'paypal', 'currency': 'EUR',
             'items': [{'product_id': self.product.id, 'quantity': q, 'price': '0.01'} for q in quantities],
         }
 
@@ -385,7 +457,7 @@ class StockRaceConditionTests(TransactionTestCase):
         order = Order.objects.create(
             first_name='A', last_name='B', email='a@b.com', address='x',
             zipcode='1', place='y', total_amount=Decimal('0.00'),
-            currency='EUR', payment_method='cod', is_paid=False,
+            currency='EUR', payment_method='paypal', is_paid=False,
         )
         _build_order_items(order, [{'product_id': self.product.id, 'quantity': 1}], 'EUR')
         return order
@@ -417,8 +489,8 @@ class StockRaceConditionTests(TransactionTestCase):
                 barrier.wait(timeout=10)
                 res = client.post('/api/v1/checkout/', {
                     'first_name': 'A', 'last_name': 'B', 'email': 'a@b.com',
-                    'phone': '', 'address': 'x', 'zipcode': '1', 'place': 'y',
-                    'payment_method': 'cod', 'currency': 'EUR',
+                    'phone': '+351 900000000', 'address': 'x', 'zipcode': '1', 'place': 'y',
+                    'payment_method': 'paypal', 'currency': 'EUR',
                     'items': [{'product_id': self.product.id, 'quantity': 1, 'price': '0.01'}],
                 }, format='json')
                 results.append(res.status_code)
@@ -606,8 +678,9 @@ class CheckoutIdempotencyTests(TestCase):
     def _payload(self):
         return {
             'first_name': 'Ada', 'last_name': 'Lovelace', 'email': 'ada@example.com',
+            'phone': '+351 900000000',
             'address': '1 Main St', 'zipcode': '1000', 'place': 'Lisbon',
-            'payment_method': 'cod', 'currency': 'EUR',
+            'payment_method': 'paypal', 'currency': 'EUR',
             'items': [{'product_id': self.product.id, 'quantity': 2}],
         }
 
@@ -680,7 +753,7 @@ class StockReleaseTests(TestCase):
         self.order = Order.objects.create(
             first_name='Ada', last_name='Lovelace', email='ada@example.com',
             address='1 Main St', zipcode='1000', place='Lisbon',
-            total_amount=Decimal('20.00'), currency='EUR', payment_method='cod', is_paid=False)
+            total_amount=Decimal('20.00'), currency='EUR', payment_method='paypal', is_paid=False)
         OrderItem.objects.create(order=self.order, product=self.product, size='M',
                                  price=Decimal('10.00'), quantity=2)
 
@@ -889,7 +962,7 @@ class OrderHistoryQueryCountTests(TestCase):
             order = Order.objects.create(
                 user=self.user, first_name='Ada', last_name='L', email='a@example.com',
                 address='1 Main St', zipcode='1000', place='Lisbon',
-                total_amount=Decimal('20.00'), currency='EUR', payment_method='cod')
+                total_amount=Decimal('20.00'), currency='EUR', payment_method='paypal')
             for product in self.products[:2]:
                 OrderItem.objects.create(order=order, product=product, size='M',
                                          price=Decimal('10.00'), quantity=1)
@@ -1068,7 +1141,7 @@ def _make_order(**overrides):
     defaults = dict(
         first_name='Ada', last_name='Lovelace', email='ada@example.com',
         phone='+351 912345678', address='1 Main St', zipcode='1000', place='Lisbon',
-        total_amount=Decimal('25.00'), currency='EUR', payment_method='cod', is_paid=True,
+        total_amount=Decimal('25.00'), currency='EUR', payment_method='paypal', is_paid=True,
     )
     defaults.update(overrides)
     order = Order.objects.create(**defaults)
@@ -1300,6 +1373,23 @@ class OrderNotificationTests(TestCase):
         self.assertEqual(alert.status, 'sent')
         self.assertIn('#%d' % self.order.pk, alert.subject)
         self.assertIn('912345678', alert.body)
+
+    def test_placing_an_order_emails_the_customer_a_confirmation(self):
+        """
+        The customer must receive a confirmation the moment the order is
+        placed — not only when the shop later accepts it.
+        """
+        with mock.patch('products.notifications._send_email') as send:
+            send.return_value = (True, '')
+            with self.captureOnCommitCallbacks(execute=True):
+                fresh, _ = _make_order(email='grace@example.com')
+
+        confirmation = fresh.notifications.filter(
+            channel='email', audience='customer', event='new').first()
+        self.assertIsNotNone(confirmation)
+        self.assertEqual(confirmation.status, 'sent')
+        self.assertEqual(confirmation.recipient, 'grace@example.com')
+        self.assertIn('received your order', confirmation.body)
 
     def test_new_order_alerts_the_shop_once_only(self):
         alert_count = self.order.notifications.filter(
@@ -1619,3 +1709,269 @@ class NotificationAdminDisplayTests(TestCase):
         self.assertFalse(inline.has_delete_permission(request))
         # max_num must stay unset: it would cap the formset and hide every row.
         self.assertNotEqual(inline.max_num, 0)
+
+
+class FacebookSyncTests(TestCase):
+    """Facebook Page → Product sync: parsing, webhook, upsert."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.category = Category.objects.create(name='Kurta', slug='kurta')
+
+    def setUp(self):
+        # APIClient (not the plain Django client): `format='json'`
+        # only sends application/json here, so DRF parses the
+        # payload into a dict instead of a url-encoded string.
+        self.client = APIClient()
+
+    # --- parsing -----------------------------------------------------------
+
+    def test_parse_product_post_extracts_title_price_and_description(self):
+        parsed = facebook.parse_product_post(
+            'Jamdani Saree — Lotus\n'
+            '€ 120.00\n'
+            'Handwoven in Dhaka, 6 yards, includes blouse piece')
+        self.assertEqual(parsed['title'], 'Jamdani Saree — Lotus')
+        self.assertEqual(parsed['price'], Decimal('120.00'))
+        self.assertEqual(parsed['currency'], 'EUR')
+        self.assertIn('Handwoven', parsed['description'])
+        self.assertFalse(parsed['sold_out'])
+
+    def test_parse_product_post_sold_out(self):
+        parsed = facebook.parse_product_post('Silk Scarf\n€ 45\nSold out until Friday')
+        self.assertTrue(parsed['sold_out'])
+
+    def test_parse_product_post_bengali_currency_and_sold(self):
+        parsed = facebook.parse_product_post('শাড়ি\n৳1,200\nবিক্রিত')
+        self.assertEqual(parsed['currency'], 'BDT')
+        self.assertEqual(parsed['price'], Decimal('1200'))
+        self.assertTrue(parsed['sold_out'])
+
+    def test_parse_product_post_number_formats(self):
+        self.assertEqual(
+            facebook.parse_product_post('A\nPrice: 1,200.50')['price'],
+            Decimal('1200.50'))
+        self.assertEqual(
+            facebook.parse_product_post('A\nPrice: 1.200,50')['price'],
+            Decimal('1200.50'))
+        self.assertEqual(
+            facebook.parse_product_post('A\nPrice: 1,200')['price'],
+            Decimal('1200'))
+        self.assertEqual(
+            facebook.parse_product_post('A\n€ 1.200,50')['price'],
+            Decimal('1200.50'))
+
+    def test_parse_product_post_price_on_title_line(self):
+        parsed = facebook.parse_product_post('Linen Kurti € 89\nSoft washed linen')
+        self.assertEqual(parsed['title'], 'Linen Kurti')
+        self.assertEqual(parsed['price'], Decimal('89.00'))
+        self.assertEqual(parsed['currency'], 'EUR')
+
+    def test_parse_product_post_bullet_title(self):
+        parsed = facebook.parse_product_post('•  • New Kurti\n€ 10')
+        self.assertEqual(parsed['title'], 'New Kurti')
+
+    def test_unique_slug_dedupes(self):
+        Product.objects.create(category=self.category, name='A', slug='jamdani', stock=1)
+        self.assertEqual(facebook.unique_slug('Jamdani'), 'jamdani-2')
+        Product.objects.create(category=self.category, name='B', slug='jamdani-2', stock=1)
+        self.assertEqual(facebook.unique_slug('Jamdani'), 'jamdani-3')
+        # Excluding the existing product frees the plain slug.
+        product = Product.objects.get(slug='jamdani')
+        self.assertEqual(facebook.unique_slug('Jamdani', exclude_id=product.id), 'jamdani')
+
+    # --- webhook verification --------------------------------------------------
+
+    def test_webhook_get_verification(self):
+        with override_settings(FACEBOOK_WEBHOOK_VERIFY_TOKEN='secret-token'):
+            response = self.client.get('/api/v1/facebook/webhook/', {
+                'hub.mode': 'subscribe',
+                'hub.verify_token': 'secret-token',
+                'hub.challenge': 'challenge-123',
+            })
+        self.assertEqual(response.status_code, 200)
+        # Meta expects the raw challenge value, not a JSON body.
+        self.assertEqual(response.content.decode(), 'challenge-123')
+
+    def test_webhook_get_rejects_wrong_token(self):
+        with override_settings(FACEBOOK_WEBHOOK_VERIFY_TOKEN='secret-token'):
+            response = self.client.get('/api/v1/facebook/webhook/', {
+                'hub.mode': 'subscribe',
+                'hub.verify_token': 'wrong',
+                'hub.challenge': 'challenge-123',
+            })
+        self.assertEqual(response.status_code, 403)
+
+    def test_webhook_get_requires_challenge(self):
+        with override_settings(FACEBOOK_WEBHOOK_VERIFY_TOKEN='secret-token'):
+            response = self.client.get('/api/v1/facebook/webhook/', {
+                'hub.mode': 'subscribe',
+                'hub.verify_token': 'secret-token',
+            })
+        self.assertEqual(response.status_code, 403)
+
+    # --- webhook processing ------------------------------------------------------
+
+    @mock.patch('products.facebook.attach_product_image')
+    def test_webhook_post_creates_product(self, _attach):
+        payload = {
+            'object': 'page',
+            'entry': [{
+                'id': '123',
+                'changes': [{
+                    'field': 'feed',
+                    'value': {
+                        'post_id': '123_456',
+                        'verb': 'added',
+                        'message': 'Linen Kurta\n€ 89.00\nCotton linen, hand embroidered',
+                        'full_picture': 'https://example.com/pic.jpg',
+                    },
+                }],
+            }],
+        }
+        response = self.client.post('/api/v1/facebook/webhook/',
+                                    data=payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        product = Product.objects.get(facebook_post_id='123_456')
+        self.assertEqual(product.name, 'Linen Kurta')
+        self.assertEqual(product.stock, settings.FACEBOOK_SYNC_DEFAULT_STOCK)
+        price = CurrencyPrice.objects.get(product=product, currency='EUR')
+        self.assertEqual(price.price, Decimal('89.00'))
+        self.assertEqual(product.get_image(), '')  # image attach was mocked out
+        # The sync category is auto-created on first use.
+        self.assertEqual(product.category.slug, settings.FACEBOOK_SYNC_CATEGORY_SLUG)
+
+    @mock.patch('products.facebook.attach_product_image')
+    def test_webhook_post_is_idempotent(self, _attach):
+        payload = {
+            'entry': [{'changes': [{'field': 'feed', 'value': {
+                'post_id': '123_456', 'verb': 'added',
+                'message': 'Linen Kurta\n€ 89.00',
+                'full_picture': 'https://example.com/pic.jpg'}}]}],
+        }
+        for _ in range(2):
+            self.client.post('/api/v1/facebook/webhook/', data=payload, format='json')
+        self.assertEqual(Product.objects.filter(facebook_post_id='123_456').count(), 1)
+
+    @mock.patch('products.facebook.attach_product_image')
+    def test_webhook_post_removed_marks_sold(self, _attach):
+        product = Product.objects.create(
+            category=self.category, name='Old Kurta', slug='old-kurta',
+            stock=5, facebook_post_id='123_789')
+        payload = {
+            'entry': [{'changes': [{'field': 'feed',
+                                     'value': {'post_id': '123_789', 'verb': 'removed'}}]}],
+        }
+        response = self.client.post('/api/v1/facebook/webhook/',
+                                    data=payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        product.refresh_from_db()
+        self.assertEqual(product.stock, 0)
+
+    def test_webhook_ignores_non_feed_changes(self):
+        payload = {'entry': [{'changes': [{'field': 'story', 'value': {}}]}]}
+        response = self.client.post('/api/v1/facebook/webhook/',
+                                    data=payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['results'], [])
+
+    def test_webhook_signature_verification(self):
+        body = b'{"entry": []}'
+        with override_settings(FACEBOOK_APP_SECRET='app-secret'):
+            sig = 'sha256=' + hmac.new(
+                b'app-secret', body, hashlib.sha256).hexdigest()
+            self.assertTrue(facebook.verify_signature(body, sig))
+            self.assertFalse(facebook.verify_signature(body, 'sha256=deadbeef'))
+            self.assertFalse(facebook.verify_signature(body, None))
+
+    # --- social feed endpoint ------------------------------------------------
+
+    def test_social_feed_returns_only_synced_products(self):
+        synced = Product.objects.create(
+            category=self.category, name='FB Kurta', slug='fb-kurta',
+            stock=5, facebook_post_id='123_456')
+        Product.objects.create(
+            category=self.category, name='Manual Kurta', slug='manual-kurta', stock=5)
+        response = self.client.get('/api/v1/social-feed/')
+        self.assertEqual(response.status_code, 200)
+        ids = [p['id'] for p in response.data]
+        self.assertIn(synced.id, ids)
+        self.assertEqual(len(ids), 1)
+        # The card's "Live" badge reads these fields.
+        row = response.data[0]
+        self.assertEqual(row['facebook_post_id'], '123_456')
+
+    def test_social_feed_empty_when_never_synced(self):
+        Product.objects.create(
+            category=self.category, name='Manual Kurta', slug='manual-kurta', stock=5)
+        response = self.client.get('/api/v1/social-feed/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [])
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class NewsletterSubscribeTests(TestCase):
+    """Footer sign-up: forwards to the shop mailbox only while the admin consent
+    row allows it, and the derived flags must reach the storefront payload."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        # The endpoint is throttled (newsletter scope); keep test order irrelevant.
+        cache.clear()
+        self.prefs = CustomerNotificationSettings.get()
+        self.prefs.signup_enabled = True
+        self.prefs.checkout_opt_in_enabled = True
+        self.prefs.opt_in_strategy = 'explicit'
+        self.prefs.status = 'active'
+        self.prefs.recipient_email = 'list@example.com'
+        self.prefs.save()
+        self.url = '/api/v1/newsletter/subscribe/'
+
+    def test_valid_signup_is_forwarded_to_the_shop_mailbox(self):
+        response = self.client.post(self.url, {'email': 'Shopper@Example.COM'})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['list@example.com'])
+        self.assertIn('shopper@example.com', mail.outbox[0].body)
+
+    def test_invalid_email_is_rejected_without_sending(self):
+        response = self.client.post(self.url, {'email': 'not-an-email'})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_missing_email_is_rejected(self):
+        response = self.client.post(self.url, {})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_paused_status_stops_capture_immediately(self):
+        self.prefs.status = 'paused'
+        self.prefs.save()
+        response = self.client.post(self.url, {'email': 'someone@example.com'})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_signup_toggle_off_stops_capture(self):
+        self.prefs.signup_enabled = False
+        self.prefs.save()
+        response = self.client.post(self.url, {'email': 'someone@example.com'})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_no_mailbox_configured_means_nothing_is_collected(self):
+        self.prefs.recipient_email = ''
+        self.prefs.save()
+        response = self.client.post(self.url, {'email': 'someone@example.com'})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_site_settings_payload_exposes_derived_consent_flags(self):
+        response = self.client.get('/api/v1/site-settings/')
+        self.assertEqual(response.status_code, 200)
+        block = response.json()['newsletter']
+        # Raw toggles alone must never gate the frontend — the derived flags do.
+        self.assertTrue(block['signup_enabled'])
+        self.assertTrue(block['accepts_signups'])
+        self.assertTrue(block['checkout_opt_in_enabled'])
+        self.assertFalse(block['box_starts_ticked'])  # explicit strategy = unticked
+        self.assertIn('consent_text', block)
