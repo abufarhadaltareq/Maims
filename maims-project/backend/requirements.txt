@@ -11,3 +11,4 @@ python-dotenv==1.0.1
 django-unfold==0.104.0
 django-cloudinary-storage==0.3.0
 requests==2.34.2
+django-anymail==15.2

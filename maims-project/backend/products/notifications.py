@@ -354,6 +354,10 @@ def _email_connection(store=None):
     logged, never raised, so a misconfigured SMTP setup only ever nulls the
     channel to 'skipped'.
     """
+    if 'anymail' in (getattr(settings, 'EMAIL_BACKEND', '') or ''):
+        # Production always uses Django's configured backend (Brevo over HTTP);
+        # custom SMTP from the admin would be blocked on Render's free tier.
+        return None
     store = store or _store()
     host = (store.smtp_host or '').strip()
     if not host:
@@ -391,29 +395,21 @@ def _send_email(recipient, subject, body, from_email=None, html='', store=None):
     if not sender:
         sender = None
 
-    connection = _email_connection(store) if html else None
-    has_part = bool(html)
+    connection = _email_connection(store)
+    reply_to = [settings.SUPPORT_EMAIL] if getattr(settings, 'SUPPORT_EMAIL', '') else None
 
     try:
-        if has_part:
-            msg = EmailMultiAlternatives(
-                subject=subject,
-                body=body,
-                from_email=sender,
-                to=[recipient],
-                connection=connection,
-            )
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=body,
+            from_email=sender,
+            to=[recipient],
+            reply_to=reply_to,
+            connection=connection,
+        )
+        if html:
             msg.attach_alternative(html, 'text/html')
-            msg.send()
-        else:
-            send_mail(
-                subject=subject,
-                message=body,
-                from_email=sender,
-                to=[recipient],
-                fail_silently=False,
-                connection=connection,
-            )
+        msg.send(fail_silently=False)
         return True, ''
     except Exception as exc:
         logger.warning('Email to %s failed: %s', recipient, exc)

@@ -1711,6 +1711,30 @@ class NotificationAdminDisplayTests(TestCase):
         self.assertNotEqual(inline.max_num, 0)
 
 
+import hashlib
+import hmac
+import json
+from django.test import override_settings
+
+FB_TEST_SECRET = 'test-facebook-app-secret'
+
+
+class SignedFacebookClient(APIClient):
+    """APIClient that signs webhook POST bodies the way Meta does (X-Hub-Signature-256)."""
+
+    def post(self, path, data=None, format=None, content_type=None, follow=False, **extra):
+        if (data is not None and path.startswith('/api/v1/facebook/webhook/')
+                and 'HTTP_X_HUB_SIGNATURE_256' not in extra):
+            body = json.dumps(data).encode('utf-8')
+            digest = hmac.new(FB_TEST_SECRET.encode(), body, hashlib.sha256).hexdigest()
+            extra['HTTP_X_HUB_SIGNATURE_256'] = 'sha256=' + digest
+            return super().post(path, data=body, content_type='application/json',
+                                follow=follow, **extra)
+        return super().post(path, data=data, format=format, content_type=content_type,
+                            follow=follow, **extra)
+
+
+@override_settings(FACEBOOK_APP_SECRET=FB_TEST_SECRET)
 class FacebookSyncTests(TestCase):
     """Facebook Page → Product sync: parsing, webhook, upsert."""
 
@@ -1722,7 +1746,7 @@ class FacebookSyncTests(TestCase):
         # APIClient (not the plain Django client): `format='json'`
         # only sends application/json here, so DRF parses the
         # payload into a dict instead of a url-encoded string.
-        self.client = APIClient()
+        self.client = SignedFacebookClient()
 
     # --- parsing -----------------------------------------------------------
 
@@ -1975,3 +1999,40 @@ class NewsletterSubscribeTests(TestCase):
         self.assertTrue(block['checkout_opt_in_enabled'])
         self.assertFalse(block['box_starts_ticked'])  # explicit strategy = unticked
         self.assertIn('consent_text', block)
+
+
+class FacebookWebhookSecurityTests(TestCase):
+    """The webhook must fail closed: only correctly signed requests get through."""
+    URL = '/api/v1/facebook/webhook/'
+    BODY = json.dumps({'entry': []}).encode('utf-8')
+
+    def _sig(self, secret):
+        return 'sha256=' + hmac.new(secret.encode(), self.BODY, hashlib.sha256).hexdigest()
+
+    def _post(self, **extra):
+        return APIClient().post(self.URL, data=self.BODY,
+                                content_type='application/json', **extra)
+
+    @override_settings(FACEBOOK_APP_SECRET='')
+    def test_unsigned_request_rejected_when_secret_missing(self):
+        self.assertEqual(self._post().status_code, 403)
+
+    @override_settings(FACEBOOK_APP_SECRET=FB_TEST_SECRET)
+    def test_missing_signature_rejected(self):
+        self.assertEqual(self._post().status_code, 403)
+
+    @override_settings(FACEBOOK_APP_SECRET=FB_TEST_SECRET)
+    def test_wrong_signature_rejected(self):
+        response = self._post(HTTP_X_HUB_SIGNATURE_256=self._sig('some-other-secret'))
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(FACEBOOK_APP_SECRET=FB_TEST_SECRET)
+    def test_valid_signature_accepted(self):
+        response = self._post(HTTP_X_HUB_SIGNATURE_256=self._sig(FB_TEST_SECRET))
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(FACEBOOK_WEBHOOK_VERIFY_TOKEN='')
+    def test_verification_rejected_when_verify_token_unset(self):
+        response = APIClient().get(self.URL, {
+            'hub.mode': 'subscribe', 'hub.verify_token': '', 'hub.challenge': 'abc'})
+        self.assertEqual(response.status_code, 403)

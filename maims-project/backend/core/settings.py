@@ -549,26 +549,30 @@ FACEBOOK_SYNC_DEFAULT_STOCK = int(os.environ.get('FACEBOOK_SYNC_DEFAULT_STOCK', 
 # Currency for "price: 2500" lines that carry no currency symbol.
 FACEBOOK_SYNC_DEFAULT_CURRENCY = os.environ.get('FACEBOOK_SYNC_DEFAULT_CURRENCY', 'EUR')
 
-# EMAIL: Render free tier blocks SMTP ports (25, 465, 587). Use console backend for local dev
-# or integrate a third‑party service (SendGrid, Mailgun, etc.) in production.
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-# SMTP settings are kept for compatibility but will not be used when EMAIL_BACKEND is console.
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-
-if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-else:
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-
-# The sender address customers will see
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@maims.app')
-
-# The Admin email address that receives store notifications
+# EMAIL
+# Production sends through Brevo's HTTP API (Render's free tier blocks SMTP ports 25/465/587).
+# Local development prints emails to the console unless SMTP credentials are set in .env.
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Maims <noreply@maims.eu>')
 ADMIN_RECEIVER_EMAIL = os.environ.get('ADMIN_RECEIVER_EMAIL', '')
+SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', '')  # used as Reply-To on customer emails
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
+
+if DEBUG:
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+        EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    else:
+        EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    if not BREVO_API_KEY:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured('BREVO_API_KEY environment variable is required in production.')
+    EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
+    ANYMAIL = {'BREVO_API_KEY': BREVO_API_KEY}
 
 # --- Transport & cookie hardening ---
 SECURE_CONTENT_TYPE_NOSNIFF = True          # X-Content-Type-Options: nosniff
