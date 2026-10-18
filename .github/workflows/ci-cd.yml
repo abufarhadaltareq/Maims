@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
@@ -6,14 +6,18 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+permissions:
+  contents: read
+
 jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
 
-    # The Django steps below run against the PostgreSQL service defined here.
-    # Keep these in sync with services.postgres.env.
+    # Tests run against the PostgreSQL service below. DEBUG=True selects the
+    # development-mode settings (console email, no production-only requirements).
     env:
+      DEBUG: "True"
       POSTGRES_DB: test_maims
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test
@@ -36,101 +40,56 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-        cache: 'pip'
-        cache-dependency-path: maims-project/backend/requirements.txt
-    
-    - name: Install dependencies
-      run: |
-        cd maims-project/backend
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run Django checks
-      run: |
-        cd maims-project/backend
-        python manage.py check
-    
-    - name: Run migrations
-      run: |
-        cd maims-project/backend
-        python manage.py migrate
-    
-    - name: Run tests
-      run: |
-        cd maims-project/backend
-        python manage.py test products
+      - uses: actions/checkout@v4
 
-  frontend-tests:
-    name: Frontend Tests
-    runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-    
-    - name: Install dependencies
-      run: |
-        cd frontend
-        npm install
-    
-    - name: Build
-      run: |
-        cd frontend
-        npm run build
-    
-    - name: Lint check (if available)
-      run: |
-        cd frontend
-        npm run lint || echo "Linter not configured"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: maims-project/backend/requirements.txt
 
-  deploy-frontend:
-    name: Deploy Frontend to Vercel
-    needs: frontend-tests
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Deploy to Vercel
-      uses: vercel/action@master
-      with:
-        vercel-token: ${{ secrets.VERCEL_TOKEN }}
-        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-        working-directory: frontend
-      env:
-        VERCEL_ENV: production
+      - name: Install dependencies
+        run: |
+          cd maims-project/backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-  deploy-backend:
-    name: Deploy Backend to Railway
-    needs: backend-tests
+      - name: Run Django checks
+        run: |
+          cd maims-project/backend
+          python manage.py check
+
+      - name: Check for missing migrations
+        run: |
+          cd maims-project/backend
+          python manage.py makemigrations --check --dry-run
+
+      - name: Run tests
+        run: |
+          cd maims-project/backend
+          python manage.py test --noinput
+
+  frontend-build:
+    name: Frontend Build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Deploy to Railway
-      uses: railwayapp/railway-action@v1
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      with:
-        service: backend
-        environment: production
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Build
+        run: |
+          cd frontend
+          npm run build
