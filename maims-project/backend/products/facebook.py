@@ -459,12 +459,19 @@ def verify_signature(body, signature_header):
     already gates who can register the endpoint, and rejecting
     everything would break the sync for operators who skip the
     optional secret). A warning is logged so the gap is visible.
+
+    In production (DEBUG=False) we enforce signature verification:
+    if FACEBOOK_APP_SECRET is not set, reject all requests. In debug,
+    we log a warning and accept any payload for development convenience.
     """
     secret = settings.FACEBOOK_APP_SECRET
     if not secret:
-        logger.warning('FACEBOOK_APP_SECRET is not set; Facebook webhook '
-                       'payloads are accepted without signature verification.')
-        return True
+        if not settings.DEBUG:
+            logger.warning('FACEBOOK_APP_SECRET is not set in production; rejecting all webhook requests.')
+            return False
+        else:
+            logger.warning('FACEBOOK_APP_SECRET is not set; Facebook webhook payloads are accepted without signature verification (DEBUG=True).')
+            return True
     if not signature_header:
         return False
     expected = 'sha256=' + hmac.new(

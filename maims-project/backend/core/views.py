@@ -41,3 +41,9 @@ def health(request):
         return JsonResponse({'status': 'unhealthy', 'database': 'down'}, status=503)
 
     return JsonResponse({'status': 'ok', 'database': 'ok'})
+
+
+@never_cache
+def ping(request):
+    """Ultra-lightweight ping probe."""
+    return JsonResponse({'ping': 'pong'})

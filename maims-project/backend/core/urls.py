@@ -5,7 +5,7 @@ from django.conf.urls.static import static
 from django.urls import include, path, re_path
 
 from core.admin_site import maims_admin
-from core.views import health, redirect_root
+from core.views import health, ping, redirect_root
 
 urlpatterns = [
     path('', redirect_root),
@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/v1/', include('products.urls')),
     # Container/orchestrator probe: unauthenticated, cheap, DB-aware.
     path('health/', health, name='health'),
+    path('ping/', ping, name='ping'),
 ]
 
 if settings.DEBUG:
