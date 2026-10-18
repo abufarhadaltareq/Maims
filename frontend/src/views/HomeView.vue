@@ -21,57 +21,24 @@
       <!-- Animated readability gradient -->
       <div class="absolute inset-0 z-[5] pointer-events-none animate-hero-glow bg-gradient-to-b from-black/55 via-black/10 to-black/70"></div>
 
-      <!-- Copy — re-keyed per slide so the entrance animation replays -->
-      <div :key="currentSlide" class="max-w-4xl w-full text-white relative z-20 px-4 py-10"
-           :class="{ 'drop-shadow-lg': siteStore.heroTextShadow, 'backdrop-blur-md bg-white/10 border border-white/20 rounded-[2rem] p-10': siteStore.heroGlassCards }">
-        <p class="animate-slide-left inline-flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.28em] px-4 py-1.5 mb-5 rounded-full" style="animation-delay: 0s; background: color-mix(in srgb, var(--hero-accent) 22%, transparent); color: #fff; border: 1px solid color-mix(in srgb, var(--hero-accent) 55%, transparent)">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
-          {{ heroSlides[currentSlide]?.badge_text || 'New season drop' }}
-        </p>
-        <h1 class="animate-slide-right text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-4 tracking-tight text-balance" style="animation-delay: .08s">
-          {{ heroSlides[currentSlide]?.title }}
-        </h1>
-        <p v-if="heroSlides[currentSlide]?.subtitle" class="animate-slide-right text-base sm:text-lg md:text-xl mb-7 opacity-90 font-light max-w-2xl mx-auto text-balance" style="animation-delay: .18s">
-          {{ heroSlides[currentSlide]?.subtitle }}
-        </p>
-        <div class="animate-slide-right flex flex-wrap items-center justify-center gap-3" style="animation-delay: .3s">
-        <component
-          :is="isInternalLink(heroSlides[currentSlide]?.button_link) ? 'router-link' : 'a'"
-          v-if="heroSlides[currentSlide]?.button_text"
-          :to="isInternalLink(heroSlides[currentSlide]?.button_link) ? heroSlides[currentSlide].button_link : undefined"
-          :href="!isInternalLink(heroSlides[currentSlide]?.button_link) ? heroSlides[currentSlide].button_link : undefined"
-          class="inline-block font-extrabold px-8 py-4 rounded-full shadow-brand hover:shadow-xl hover:scale-105 transition-all duration-300 active:scale-95 uppercase tracking-widest text-[13px] text-white"
-          :style="{ background: 'var(--hero-accent)' }"
+      <!-- Slide navigation dots (bottom center) -->
+      <div v-if="heroSlides.length > 1" class="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex justify-center gap-2">
+        <button
+          v-for="(item, index) in heroSlides"
+          :key="item.id || index"
+          @click="goToSlide(index)"
+          class="h-1.5 rounded-full transition-all duration-300 overflow-hidden"
+          :class="index === currentSlide ? 'w-10' : 'w-3 hover:bg-white/60'"
+          :style="index === currentSlide ? { background: 'var(--hero-accent)', opacity: 0.3 } : { background: 'rgba(255,255,255,0.4)' }"
+          :aria-label="`Go to slide ${index + 1}`"
         >
-          {{ heroSlides[currentSlide]?.button_text }}
-        </component>
-        <router-link
-          to="/new-arrivals"
-          class="inline-block font-extrabold px-8 py-4 rounded-full uppercase tracking-widest text-[13px] border border-white/40 text-white backdrop-blur-md bg-white/10 hover:bg-white/20 transition-all duration-300 active:scale-95"
-        >
-          New arrivals
-        </router-link>
-        </div>
-
-        <!-- Progress indicators (one bar fills per rotation) -->
-        <div v-if="heroSlides.length > 1" class="animate-slide-right flex justify-center gap-2 mt-12" style="animation-delay: .5s">
-          <button
-            v-for="(item, index) in heroSlides"
-            :key="item.id || index"
-            @click="goToSlide(index)"
-            class="h-1 rounded-full transition-all duration-300 overflow-hidden"
-            :class="index === currentSlide ? 'w-10' : 'w-4 hover:bg-white/60'"
-            :style="index === currentSlide ? { background: 'var(--hero-accent)', opacity: 0.25 } : { background: 'rgba(255,255,255,0.3)' }"
-            :aria-label="`Go to slide ${index + 1}`"
-          >
-            <span
-              v-if="index === currentSlide"
-              :key="`fill-${currentSlide}`"
-              class="block h-full animate-hero-progress"
-              :style="{ background: 'var(--hero-accent)' }"
-            ></span>
-          </button>
-        </div>
+          <span
+            v-if="index === currentSlide"
+            :key="`fill-${currentSlide}`"
+            class="block h-full animate-hero-progress"
+            :style="{ background: 'var(--hero-accent)' }"
+          ></span>
+        </button>
       </div>
 
       <!-- Scroll cue -->
