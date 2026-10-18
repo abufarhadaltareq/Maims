@@ -25,14 +25,14 @@
             </button>
             <div v-if="isCatMenuOpen" class="absolute left-0 mt-2 bg-white border border-gray-100 shadow-xl rounded-2xl w-56 z-50 py-1.5 overflow-hidden max-h-[70vh] overflow-y-auto">
               <p class="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50">Categories</p>
-              <router-link to="/" class="block px-4 py-2 hover:bg-gray-50 text-sm font-semibold">All Products</router-link>
-              <router-link to="/new-arrivals" class="block px-4 py-2 hover:bg-gray-50 text-sm font-semibold">New Arrivals</router-link>
+              <router-link to="/" class="block px-4 py-2 hover:bg-purple-50 text-[#7C3AED] font-semibold transition-colors">All Products</router-link>
+              <router-link to="/new-arrivals" class="block px-4 py-2 hover:bg-purple-50 text-[#7C3AED] font-semibold transition-colors">New Arrivals</router-link>
               <template v-if="navCats.length">
                 <router-link
                   v-for="c in navCats"
                   :key="c.slug || c.name"
                   :to="c.slug ? `/category/${c.slug}` : '/'"
-                  class="block px-4 py-2 hover:bg-gray-50 text-sm uppercase tracking-wide"
+                  class="block px-4 py-2 hover:bg-purple-50 hover:text-white text-[#7C3AED] font-semibold transition-colors"
                 >{{ c.name }}</router-link>
               </template>
               <span v-else class="block px-4 py-2 text-sm text-gray-400">Loading…</span>
@@ -47,9 +47,9 @@
               v-if="site.logoUrl"
               :src="site.logoUrl"
               alt="Maims logo"
-              class="h-11 md:h-14 max-w-[10rem] md:max-w-[12rem] shrink-0 object-contain"
+              class="h-16 md:h-20 max-w-[14rem] md:max-w-[18rem] shrink-0 object-contain"
             />
-            <svg v-else class="h-11 w-11 md:h-14 md:w-14 shrink-0 drop-shadow-md" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <svg v-else class="h-16 w-16 md:h-20 md:w-20 shrink-0 drop-shadow-md" viewBox="0 0 40 40" fill="none" aria-hidden="true">
               <defs>
                 <linearGradient id="maimsLogoGradMobile" x1="0" y1="0" x2="1" y2="1">
                   <stop offset="0" stop-color="#1e293b" />

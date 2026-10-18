@@ -170,18 +170,7 @@
       </template>
     </section>
 
-    <!-- ===== Value props — compact trust strip (deshi-besh style) ===== -->
-    <section v-if="isHomePage" v-reveal class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div v-for="prop in valueProps" :key="prop.title" class="flex flex-col items-center text-center gap-2 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-6 hover:shadow-brand transition">
-          <span class="w-10 h-10 flex items-center justify-center text-[var(--color-content)]" v-html="prop.icon"></span>
-          <span>
-            <span class="block text-[14px] font-bold text-[var(--color-content)] leading-tight">{{ prop.title }}</span>
-            <span class="block text-[12px] text-gray-500 leading-tight mt-1">{{ prop.sub }}</span>
-          </span>
-        </div>
-      </div>
-    </section>
+
 
     <!-- ===== Category-wise shopping sections (homepage only) ===== -->
     <div v-if="isHomePage && showcase.length" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 space-y-12">
@@ -262,13 +251,6 @@ const searchBrand = (name) => {
   window.location.href = `/search?q=${encodeURIComponent(name)}`
 }
 
-// Trust strip under the hero (deshi-besh style: shipping, rewards, global, genuine).
-const valueProps = [
-  { title: 'EU Free Shipping', sub: 'On orders over €40', icon: '<svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7h11v10H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>' },
-  { title: 'Loyalty & Rewards', sub: 'Earn 1 point per €1 spent', icon: '<svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 6H4a1 1 0 00-1 1c0 2.5 2 4 4 4M17 6h3a1 1 0 011 1c0 2.5-2 4-4 4"/></svg>' },
-  { title: 'Global Shipping', sub: 'On selected items', icon: '<svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg>' },
-  { title: '100% Genuine Products', sub: 'From the original brand', icon: '<svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 14L7 22l5-3 5 3-1.5-8"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9l1.5 1.5L14 8"/></svg>' },
-]
 
 const facebookUrl = computed(() => siteStore.facebookPageUrl || '')
 
