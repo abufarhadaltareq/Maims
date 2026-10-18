@@ -1,11 +1,11 @@
 <template>
   <div class="home-page font-brand text-brand-text">
 
-    <!-- ===== Hero — tall, elegant, animated slides ===== -->
+    <!-- ===== Hero — pure image + 3D gallery, no text or overlays ===== -->
     <div
       v-if="isHomePage && siteStore.heroEnabled && heroSlides.length"
-      class="hero-section relative w-full overflow-hidden bg-slate-950 flex items-center justify-center text-center"
-      :style="{ minHeight: heroHeightStyle, '--hero-accent': siteStore.heroAccent, '--hero-overlay': siteStore.heroOverlay + '%' }"
+      class="hero-section relative w-full overflow-hidden bg-slate-950"
+      :style="{ minHeight: heroHeightStyle }"
     >
       <!-- Animated 3D Background component (admin-controlled transparency) -->
       <Hero3D v-if="siteStore.hero3DEnabled" />
@@ -15,90 +15,8 @@
         :key="slide.id || index"
         class="absolute inset-0 bg-cover bg-center transition-opacity ease-in-out"
         :class="index === currentSlide ? 'opacity-100 z-10 animate-kenburns' : 'opacity-0 z-0'"
-        :style="{ backgroundImage: `linear-gradient(rgba(2,6,23,${(siteStore.heroOverlay / 100) * 0.55}), rgba(15,23,42,${(siteStore.heroOverlay / 100) * 0.35})), url(${slide.image_url})`, transform: index === currentSlide ? 'translateZ(0)' : 'translateZ(-10px)', animationDuration: (siteStore.heroKenburns / 12) + 's' }"
+        :style="{ backgroundImage: `url(${slide.image_url})`, animationDuration: (siteStore.heroKenburns / 12) + 's' }"
       ></div>
-
-      <!-- Animated readability gradient -->
-      <div class="absolute inset-0 z-[5] pointer-events-none animate-hero-glow bg-gradient-to-b from-black/55 via-black/10 to-black/70"></div>
-
-      <!-- Copy — flat text directly on the image, NO glass card / NO backdrop-blur -->
-      <div :key="currentSlide" class="max-w-4xl w-full text-white relative z-20 px-4 py-10 drop-shadow-lg">
-        <p class="animate-slide-left inline-flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.28em] px-4 py-1.5 mb-5 rounded-full" style="animation-delay: 0s; background: color-mix(in srgb, var(--hero-accent) 22%, transparent); color: #fff; border: 1px solid color-mix(in srgb, var(--hero-accent) 55%, transparent)">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
-          {{ heroSlides[currentSlide]?.badge_text || 'New season drop' }}
-        </p>
-        <h1 class="animate-slide-right text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-4 tracking-tight text-balance" style="animation-delay: .08s">
-          {{ heroSlides[currentSlide]?.title }}
-        </h1>
-        <p v-if="heroSlides[currentSlide]?.subtitle" class="animate-slide-right text-base sm:text-lg md:text-xl mb-7 opacity-90 font-light max-w-2xl mx-auto text-balance" style="animation-delay: .18s">
-          {{ heroSlides[currentSlide]?.subtitle }}
-        </p>
-        <div class="animate-slide-right flex flex-wrap items-center justify-center gap-3" style="animation-delay: .3s">
-        <component
-          :is="isInternalLink(heroSlides[currentSlide]?.button_link) ? 'router-link' : 'a'"
-          v-if="heroSlides[currentSlide]?.button_text"
-          :to="isInternalLink(heroSlides[currentSlide]?.button_link) ? heroSlides[currentSlide].button_link : undefined"
-          :href="!isInternalLink(heroSlides[currentSlide]?.button_link) ? heroSlides[currentSlide].button_link : undefined"
-          class="inline-block font-extrabold px-8 py-4 rounded-full shadow-brand hover:shadow-xl hover:scale-105 transition-all duration-300 active:scale-95 uppercase tracking-widest text-[13px] text-white"
-          :style="{ background: 'var(--hero-accent)' }"
-        >
-          {{ heroSlides[currentSlide]?.button_text }}
-        </component>
-        <router-link
-          to="/new-arrivals"
-          class="inline-block font-extrabold px-8 py-4 rounded-full uppercase tracking-widest text-[13px] border border-white/40 text-white hover:bg-white/20 transition-all duration-300 active:scale-95"
-        >
-          New arrivals
-        </router-link>
-        </div>
-
-        <!-- Progress indicators (one bar fills per rotation) -->
-        <div v-if="heroSlides.length > 1" class="animate-slide-right flex justify-center gap-2 mt-12" style="animation-delay: .5s">
-          <button
-            v-for="(item, index) in heroSlides"
-            :key="item.id || index"
-            @click="goToSlide(index)"
-            class="h-1 rounded-full transition-all duration-300 overflow-hidden"
-            :class="index === currentSlide ? 'w-10' : 'w-4 hover:bg-white/60'"
-            :style="index === currentSlide ? { background: 'var(--hero-accent)', opacity: 0.25 } : { background: 'rgba(255,255,255,0.3)' }"
-            :aria-label="`Go to slide ${index + 1}`"
-          >
-            <span
-              v-if="index === currentSlide"
-              :key="`fill-${currentSlide}`"
-              class="block h-full animate-hero-progress"
-              :style="{ background: 'var(--hero-accent)' }"
-            ></span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Slide navigation dots (bottom center) -->
-      <div v-if="heroSlides.length > 1" class="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex justify-center gap-2">
-        <button
-          v-for="(item, index) in heroSlides"
-          :key="item.id || index"
-          @click="goToSlide(index)"
-          class="h-1.5 rounded-full transition-all duration-300 overflow-hidden"
-          :class="index === currentSlide ? 'w-10' : 'w-3 hover:bg-white/60'"
-          :style="index === currentSlide ? { background: 'var(--hero-accent)', opacity: 0.3 } : { background: 'rgba(255,255,255,0.4)' }"
-          :aria-label="`Go to slide ${index + 1}`"
-        >
-          <span
-            v-if="index === currentSlide"
-            :key="`fill-${currentSlide}`"
-            class="block h-full animate-hero-progress"
-            :style="{ background: 'var(--hero-accent)' }"
-          ></span>
-        </button>
-      </div>
-
-      <!-- Scroll cue -->
-      <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 animate-floaty text-white/70 hover:text-white transition-colors">
-        <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7-7-7M19 5l-7 7-7-7"></path>
-        </svg>
-      </div>
     </div>
 
     <!-- ===== Shop by Category — round balls, directly under the hero ===== -->
@@ -344,11 +262,6 @@ const isHomePage = computed(() => route.path === '/')
 const currentSlide = ref(0)
 let sliderInterval = null
 
-const isInternalLink = (link) => {
-  if (!link) return false
-  return link.startsWith('/') || link.startsWith('#')
-}
-
 // Scroll-reveal directive: elements start hidden and lift in
 // when they enter the viewport. Optional value = stagger delay (ms).
 const vReveal = {
@@ -439,11 +352,6 @@ const startImageRotation = () => {
       currentSlide.value = (currentSlide.value + 1) % heroSlides.value.length
     }
   }, interval)
-}
-
-const goToSlide = (index) => {
-  currentSlide.value = index
-  startImageRotation() // reset timer on manual click
 }
 
 // Admin-controlled hero height: medium/tall/full map to viewport units.
