@@ -40,26 +40,33 @@
           </div>
         </div>
 
-        <!-- Center: logo mark only (bigger), centered on ALL screens — no brand name, no slogan -->
+        <!-- Center: bigger logo + brand name alongside, centered on ALL screens -->
         <div class="flex-1 flex items-center justify-center min-w-0">
-          <router-link to="/" aria-label="Maims — go to homepage" class="inline-flex items-center justify-center select-none">
-            <img
-              v-if="site.logoUrl"
-              :src="site.logoUrl"
-              alt="Maims logo"
-              class="h-16 md:h-20 max-w-[14rem] md:max-w-[18rem] shrink-0 object-contain"
-            />
-            <svg v-else class="h-16 w-16 md:h-20 md:w-20 shrink-0 drop-shadow-md" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-              <defs>
-                <linearGradient id="maimsLogoGradMobile" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stop-color="#1e293b" />
-                  <stop offset="0.55" stop-color="#0ea5e9" />
-                  <stop offset="1" stop-color="#38bdf8" />
-                </linearGradient>
-              </defs>
-              <rect width="40" height="40" rx="12" fill="url(#maimsLogoGradMobile)" />
-              <path d="M13 27.5V12.5L20 22.5L27 12.5V27.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
+          <router-link to="/" aria-label="Maims — go to homepage" class="inline-flex items-center justify-center select-none group">
+            <div class="brand-pack">
+              <div class="brand-wrap">
+                <img
+                  v-if="site.logoUrl"
+                  :src="site.logoUrl"
+                  :alt="site.storeName + ' logo'"
+                  class="h-16 md:h-20 max-w-[14rem] md:max-w-[18rem] shrink-0 object-contain brand-logo"
+                />
+                <svg v-else class="h-16 w-16 md:h-20 md:w-20 shrink-0 drop-shadow-md brand-logo" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="maimsLogoGradMobile" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0" stop-color="#1e293b" />
+                      <stop offset="0.55" stop-color="#0ea5e9" />
+                      <stop offset="1" stop-color="#38bdf8" />
+                    </linearGradient>
+                  </defs>
+                  <rect width="40" height="40" rx="12" fill="url(#maimsLogoGradMobile)" />
+                  <path d="M13 27.5V12.5L20 22.5L27 12.5V27.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+
+                <!-- Brand name beside the logo -->
+                <span class="brand-wordmark">{{ site.storeName }}</span>
+              </div>
+            </div>
           </router-link>
         </div>
         
@@ -344,3 +351,71 @@ watch(
   }
 )
 </script>
+<style scoped>
+/* ============================================================================
+   Header brand unit — logo + brand name, 3D animated
+   ============================================================================ */
+
+:root {
+  --color-brand-deep: #4C1D95; /* Purple 900 — 3D extrusion layers */
+  --color-brand-darker: #371266;
+}
+
+/* Outer unit — lifts and tilts in 3D on hover */
+.brand-pack {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+}
+
+/* Inner unit — the gentle floating float */
+.brand-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  animation: brand-float 3.2s ease-in-out infinite;
+}
+
+@keyframes brand-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.brand-logo { display: block; }
+
+/* Brand wordmark — serif with an extruded 3D letterpress look */
+.brand-wordmark {
+  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-brand);
+  text-shadow:
+    0 2px 0 var(--color-brand-deep),
+    0 4px 0 var(--color-brand-deep),
+    0 6px 0 var(--color-brand-deep),
+    0 8px 6px rgba(76, 29, 149, 0.28);
+  transition: text-shadow 0.2s ease;
+}
+
+/* Hover: lift the unit in 3D + deepen the wordmark */
+.brand-pack:hover {
+  transform: translateY(-4px) rotateX(3deg);
+  transform-origin: center bottom;
+  box-shadow:
+    0 28px 48px -18px rgba(124, 58, 237, 0.4),
+    0 0 0 2px rgba(124, 58, 237, 0.12);
+}
+
+.brand-wordmark:hover {
+  text-shadow:
+    0 2px 0 var(--color-brand-deep),
+    0 4px 0 var(--color-brand-deep),
+    0 6px 0 var(--color-brand-deep),
+    0 12px 10px rgba(76, 29, 149, 0.36);
+}
+</style>
