@@ -282,7 +282,11 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {
     'default': {
         # Use Cloudinary for media in production; local file storage only when DEBUG.
-        'BACKEND': 'django.core.files.storage.FileSystemStorage' if DEBUG else 'django_cloudinary_storage.storage.MediaCloudinaryStorage',
+        'BACKEND': (
+            'django.core.files.storage.FileSystemStorage'
+            if DEBUG
+            else 'cloudinary_storage.storage.MediaCloudinaryStorage'
+        ),
     },
     'staticfiles': {
         'BACKEND': (
