@@ -14,7 +14,7 @@ from django.core.management import call_command
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 
-# Initialize Django apps first, then run migrations safely on startup
+# Initialize Django and run migrations safely on startup
 try:
     django.setup()
     call_command('migrate', interactive=False)
