@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen flex flex-col font-brand text-gray-900 bg-white">
     <!-- Header Block -->
-    <header class="sticky top-0 z-50 bg-purple-500/10 backdrop-blur-md border-b border-purple-500/20 shadow-lg shadow-purple-500/5">
+    <header class="sticky top-0 z-50 bg-white border-b border-purple-100 shadow-lg shadow-purple-500/5">
       <!-- Scrolling admin ticker: Admin → Store settings → Top scrolling messages.
            One message per line, loops seamlessly; hidden when disabled or empty. -->
       <div v-if="site.tickerEnabled && site.tickerMessages.length" class="bg-gradient-brand text-white overflow-hidden" role="marquee" aria-label="Store announcements">
@@ -14,26 +14,56 @@
           </span>
         </div>
       </div>
-      <div class="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center justify-between gap-3 md:gap-8 h-16">
-        <!-- Brand: logo + store name + tagline, all from Admin → Site settings -->
-        <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
-          <BrandLogo />
+      <div class="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 sm:gap-3 md:gap-8 h-16">
+        <!-- Left: hamburger category menu (dropdown) -->
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div class="relative" @click.stop="isCatMenuOpen = !isCatMenuOpen">
+            <button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors" aria-label="Open category menu">
+              <svg class="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+              </svg>
+            </button>
+            <div v-if="isCatMenuOpen" class="absolute left-0 mt-2 bg-white border border-gray-100 shadow-xl rounded-2xl w-56 z-50 py-1.5 overflow-hidden max-h-[70vh] overflow-y-auto">
+              <p class="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50">Categories</p>
+              <router-link to="/" class="block px-4 py-2 hover:bg-gray-50 text-sm font-semibold">All Products</router-link>
+              <router-link to="/new-arrivals" class="block px-4 py-2 hover:bg-gray-50 text-sm font-semibold">New Arrivals</router-link>
+              <template v-if="navCats.length">
+                <router-link
+                  v-for="c in navCats"
+                  :key="c.slug || c.name"
+                  :to="c.slug ? `/category/${c.slug}` : '/'"
+                  class="block px-4 py-2 hover:bg-gray-50 text-sm uppercase tracking-wide"
+                >{{ c.name }}</router-link>
+              </template>
+              <span v-else class="block px-4 py-2 text-sm text-gray-400">Loading…</span>
+            </div>
+          </div>
+          <!-- Brand (desktop: left; mobile: centered via order below) -->
+          <div class="hidden md:flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <BrandLogo />
+          </div>
         </div>
 
-        <!-- Central Search Context -->
-        <div class="flex-1 max-w-xl min-w-0">
-          <div class="group relative w-full">
-            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-accent transition-colors">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path>
-              </svg>
-            </span>
-          <input 
-            v-model="searchQuery" 
-            @keyup.enter="performSearch" 
-            placeholder="Search for products..." 
-            class="w-full bg-gray-50 border border-gray-200 rounded-full py-2.5 pl-11 pr-4 text-sm outline-none focus:border-brand-accent focus:bg-white focus:ring-4 focus:ring-brand-accent/10 transition"
-          >
+        <!-- Center: logo + search stacked on mobile, side-by-side centered on desktop -->
+        <div class="flex-1 min-w-0 flex flex-col items-center gap-1 md:flex-row md:items-center md:justify-center md:gap-6">
+          <div class="md:hidden flex items-center justify-center">
+            <BrandLogo size="sm" :showTagline="false" />
+          </div>
+          <!-- Central Search Context -->
+          <div class="w-full max-w-xl min-w-0">
+            <div class="group relative w-full">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-accent transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path>
+                </svg>
+              </span>
+            <input
+              v-model="searchQuery"
+              @keyup.enter="performSearch"
+              placeholder="Search for products..."
+              class="w-full bg-gray-50 border border-gray-200 rounded-full py-2 md:py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand-accent focus:bg-white focus:ring-4 focus:ring-brand-accent/10 transition"
+            >
+            </div>
           </div>
         </div>
         
@@ -231,6 +261,8 @@ const countryFlag = computed(() => FLAGS[activeRegion.value.country] || '🌍')
 const searchQuery = ref('')
 const isCurrencyOpen = ref(false)
 const isAccountOpen = ref(false)
+const isCatMenuOpen = ref(false)
+const navCats = ref([])
 const newsletterEmail = ref('')
 const newsletterDone = ref(false)
 const newsletterError = ref('')
@@ -255,6 +287,7 @@ const subscribeNewsletter = async () => {
 watch(() => route.path, () => {
   isCurrencyOpen.value = false
   isAccountOpen.value = false
+  isCatMenuOpen.value = false
 })
 
 const performSearch = () => {
@@ -280,10 +313,16 @@ onMounted(async () => {
   site.fetchSettings()
   // Hydrate wishlist from the server when signed in
   if (localStorage.getItem('token')) await wishlistStore.hydrate()
+  // Hamburger category menu items
+  try {
+    const res = await axios.get('/api/v1/categories/')
+    navCats.value = Array.isArray(res.data) ? res.data : []
+  } catch { navCats.value = [] }
   // Closes open popups gracefully on outside view space mouse clicks
   window.addEventListener('click', () => {
     isCurrencyOpen.value = false
     isAccountOpen.value = false
+    isCatMenuOpen.value = false
   })
 })
 

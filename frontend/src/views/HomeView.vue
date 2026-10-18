@@ -1,12 +1,13 @@
 <template>
   <div class="home-page font-brand text-brand-text">
 
-    <!-- ===== Hero — pure image + 3D gallery, no text or overlays ===== -->
+    <!-- ===== Hero — compact stylish gallery with sliding dots ===== -->
     <div
       v-if="isHomePage && siteStore.heroEnabled && heroSlides.length"
-      class="hero-section relative w-full overflow-hidden bg-slate-950"
+      class="hero-section relative w-full overflow-hidden"
       :style="{ minHeight: heroHeightStyle }"
     >
+      <div class="absolute inset-x-3 sm:inset-x-6 lg:inset-x-10 top-3 sm:top-4 bottom-3 sm:bottom-4 overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-950 shadow-xl shadow-slate-900/30 ring-1 ring-black/10">
       <!-- Animated 3D Background component (admin-controlled transparency) -->
       <Hero3D v-if="siteStore.hero3DEnabled" />
 
@@ -17,6 +18,21 @@
         :class="index === currentSlide ? 'opacity-100 z-10 animate-kenburns' : 'opacity-0 z-0'"
         :style="{ backgroundImage: `url(${slide.image_url})`, animationDuration: (siteStore.heroKenburns / 12) + 's' }"
       ></div>
+
+      <!-- Sliding dots — one per image -->
+      <div v-if="heroSlides.length > 1" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2 rounded-full bg-black/35 px-3 py-2 backdrop-blur-sm">
+        <button
+          v-for="(item, index) in heroSlides"
+          :key="item.id || index"
+          @click="goToSlide(index)"
+          class="h-2 rounded-full transition-all duration-300 overflow-hidden"
+          :class="index === currentSlide ? 'w-8' : 'w-2 hover:bg-white/70'"
+          :style="index === currentSlide ? { background: 'var(--hero-accent, #0ea5e9)' } : { background: 'rgba(255,255,255,0.55)' }"
+          :aria-label="`Go to slide ${index + 1}`"
+        >
+        </button>
+      </div>
+      </div>
     </div>
 
     <!-- ===== Shop by Category — round balls, directly under the hero ===== -->
@@ -354,14 +370,19 @@ const startImageRotation = () => {
   }, interval)
 }
 
-// Admin-controlled hero height: medium/tall/full map to viewport units.
+// Admin-controlled hero height: compact by default, ~bit smaller than before.
 const heroHeightStyle = computed(() => {
   switch (siteStore.heroHeight) {
-    case 'medium': return '88svh'
-    case 'full': return '100svh'
-    default: return '100svh'
+    case 'medium': return '52svh'
+    case 'full': return '78svh'
+    default: return '62svh'
   }
 })
+
+const goToSlide = (index) => {
+  currentSlide.value = index
+  startImageRotation() // reset timer on manual click
+}
 
 const formatPrice = (product) => {
   // Unified pricing helper: exact currency -> conversion fallback -> product.price fallback.
