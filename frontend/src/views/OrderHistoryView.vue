@@ -8,7 +8,7 @@
 
     <div v-else-if="orders.length === 0" class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-200 p-8">
       <p class="text-gray-500 mb-4 font-medium">You haven't placed any orders yet.</p>
-      <router-link to="/" class="inline-block bg-blue-600 text-white px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-blue-700 transition">
+      <router-link to="/" class="inline-block bg-gradient-brand text-white px-6 py-2.5 rounded-lg font-bold text-sm hover:brightness-110 transition">
         Start Shopping
       </router-link>
     </div>
@@ -19,11 +19,19 @@
         :key="order.id" 
         class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden text-left"
       >
-        <div class="bg-gray-800 text-white px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+        <div class="bg-[var(--color-brand)] text-white px-6 py-4 flex flex-wrap justify-between items-center gap-4">
           <div class="flex items-center gap-6">
             <div>
               <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">Order ID</p>
               <p class="text-sm font-black text-white">#{{ order.id }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">Date</p>
+              <p class="text-sm font-bold text-white">{{ order.created_at ? new Date(order.created_at).toLocaleDateString() : '—' }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">Payment</p>
+              <p class="text-sm font-bold text-white">{{ (order.payment_method || '').replace(/^./, c => c.toUpperCase()) }}</p>
             </div>
             <div>
               <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">Payment Status</p>
@@ -55,6 +63,7 @@
             <div class="space-y-1 text-gray-600">
               <p><span class="font-bold text-gray-700">Email:</span> {{ order.email }}</p>
               <p><span class="font-bold text-gray-700">Phone:</span> {{ order.phone }}</p>
+              <p v-if="order.tracking_number"><span class="font-bold text-gray-700">Tracking:</span> {{ order.tracking_number }}</p>
             </div>
           </div>
         </div>
@@ -83,7 +92,7 @@
                   <router-link 
                     v-if="item.product && item.product.slug"
                     :to="`/products/${item.product.slug}`" 
-                    class="font-black text-gray-900 text-base hover:text-blue-600 hover:underline transition"
+                    class="font-black text-gray-900 text-base hover:text-brand hover:underline transition"
                   >
                     {{ item.product.name }}
                   </router-link>

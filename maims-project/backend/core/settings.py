@@ -30,6 +30,10 @@ except ImportError:  # python-dotenv not installed: rely on real environment var
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# PRODUCTION: set DEBUG=False, SECRET_KEY to a long random value, and
+# ALLOWED_HOSTS=maims.eu,www.maims.eu (plus CSRF_TRUSTED_ORIGINS below).
+# The admin header then flips from the amber "Development" badge to the
+# green "Live · maims.eu" badge via core.admin.environment_callback.
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # The fallback below is a dev convenience ONLY — it is validated against DEBUG
@@ -49,6 +53,18 @@ if not DEBUG and SECRET_KEY == _INSECURE_DEV_KEY:
     )
 
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+
+# maims.eu production hosts: CSRF_TRUSTED_ORIGINS must list the exact https
+# origins or admin POSTs (login, save, actions) return 403 once DEBUG=False.
+# Example: CSRF_TRUSTED_ORIGINS=https://maims.eu,https://www.maims.eu
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get(
+    'CSRF_TRUSTED_ORIGINS',
+    'https://maims.eu,https://www.maims.eu,http://localhost:5173,http://127.0.0.1:5173'
+).split(',') if o.strip()]
+
+# Where the built Vue storefront lives. Served at / when the file exists
+# (production), otherwise / falls through to the /health/ JSON probe.
+FRONTEND_DIST_DIR = Path(os.environ.get('FRONTEND_DIST_DIR', BASE_DIR / 'static' / 'storefront'))
 
 
 # Application definition
@@ -540,13 +556,20 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
-    # Scoped throttles attached to sensitive endpoints (login/register/checkout).
+    # Scoped throttles attached to sensitive endpoints (login/register/checkout/chatbot).
     'DEFAULT_THROTTLE_RATES': {
         'auth': os.environ.get('THROTTLE_AUTH', '10/min'),
         'checkout': os.environ.get('THROTTLE_CHECKOUT', '30/hour'),
         'newsletter': os.environ.get('THROTTLE_NEWSLETTER', '5/hour'),
+        'chatbot': os.environ.get('THROTTLE_CHATBOT', '60/min'),
     },
 }
+
+# AI Chatbot Assistant API configuration (optional OpenAI / Groq / OpenRouter)
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+LLM_API_KEY = os.environ.get('LLM_API_KEY', '')
+LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
+LLM_MODEL = os.environ.get('LLM_MODEL', 'gpt-4o-mini')
 
 # A stolen DRF token stays valid forever unless revoked, so tokens issued at
 # signup keep working even after the password changes. This caps that window:

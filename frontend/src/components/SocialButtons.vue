@@ -1,13 +1,13 @@
 <template>
-  <!-- Floating social dock: WhatsApp chat + admin-controlled social pages -->
-  <div class="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3 print:hidden">
+  <!-- Floating social dock: WhatsApp chat + admin-controlled social pages (left side, clear of the chatbot) -->
+  <div class="fixed bottom-5 left-5 z-40 flex flex-col items-start gap-3 print:hidden">
     <a
       v-if="site.whatsappEnabled"
       :href="whatsappLink"
       target="_blank"
       rel="noopener"
       title="Chat with us on WhatsApp"
-      class="group flex items-center gap-2 bg-[#25D366] hover:brightness-95 text-white text-sm font-bold pl-3 pr-4 py-2.5 rounded-full shadow-lg transition"
+      class="group flex items-center gap-2 bg-gradient-brand hover:brightness-95 text-white text-sm font-bold pl-3 pr-4 py-2.5 rounded-full shadow-lg transition"
     >
       <SocialIcon name="whatsapp" class="w-6 h-6" />
       <span class="hidden sm:inline">WhatsApp</span>
@@ -44,8 +44,9 @@ const whatsappLink = computed(() =>
 const DOCK_COLORS = {
   facebook: 'bg-[#1877F2]',
   instagram: 'bg-linear-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5]',
-  tiktok: 'bg-black',
-  twitter: 'bg-black',
+  // tiktok & twitter use brand color (customizable in Admin → Site settings)
+  tiktok: 'bg-[#7C3AED]',
+  twitter: 'bg-[#7C3AED]',
   youtube: 'bg-[#FF0000]',
   linkedin: 'bg-[#0A66C2]',
 }

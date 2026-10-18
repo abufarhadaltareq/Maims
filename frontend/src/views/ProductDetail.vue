@@ -7,8 +7,13 @@
     <div v-if="product" class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-12 items-start">
       <div class="space-y-8">
         <div class="relative rounded-[2rem] overflow-hidden shadow-2xl shadow-slate-300/40 transform-gpu hover:-translate-y-1 transition-all duration-500 bg-white">
+          <WishlistHeart
+            :product="product"
+            tip-below
+            className="absolute top-4 right-4 z-10 w-10 h-10 sm:w-12 sm:h-12 border-2 border-white !bg-white shadow-lg shadow-slate-900/25 hover:!bg-white/90 hover:!scale-110 transition-all duration-200"
+          />
           
-          <div class="h-[560px] sm:h-[640px] lg:h-[720px] bg-slate-900/5 flex items-center justify-center overflow-hidden cursor-zoom-in group" @click="openLightbox">
+          <div class="h-[640px] sm:h-[760px] lg:h-[880px] bg-[var(--color-brand)]/5 flex items-center justify-center overflow-hidden cursor-zoom-in group" @click="openLightbox">
             <template v-if="activeMedia">
               <video v-if="activeMedia.media_type === 'video'" :key="'v-' + activeMediaIndex" :src="activeMedia.url" controls class="w-full h-full object-cover animate-media-switch" @click.stop></video>
               <img v-else :key="'i-' + activeMediaIndex" :src="activeMedia.url" :alt="product.name" class="w-full h-full object-cover animate-media-switch transition-transform duration-700 group-hover:scale-105" />
@@ -36,25 +41,58 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="rounded-3xl border border-gray-100 p-4 bg-white shadow-sm">
             <h3 class="text-sm uppercase tracking-[0.3em] text-gray-400 mb-3">Availability</h3>
-            <p class="text-lg font-bold text-slate-900">{{ product.in_stock ? 'In Stock' : 'Out of Stock' }}</p>
+            <p class="text-lg font-bold text-purple-900">{{ product.in_stock ? 'In Stock' : 'Out of Stock' }}</p>
             <p class="text-sm text-gray-500 mt-1">{{ product.stock }} unit{{ product.stock === 1 ? '' : 's' }} available</p>
           </div>
 
           <div class="rounded-3xl border border-gray-100 p-4 bg-white shadow-sm">
             <h3 class="text-sm uppercase tracking-[0.3em] text-gray-400 mb-3">Select Size</h3>
-            <div class="flex flex-wrap gap-3">
+            <div class="flex flex-wrap gap-2">
               <button
                 v-for="size in (product.size_options || [])"
                 :key="size"
                 type="button"
                 @click="selectedSize = size"
-                :class="size === selectedSize ? 'bg-black text-white' : 'bg-gray-100 text-slate-700'"
-                class="rounded-full px-4 py-2 text-sm font-semibold transition"
+                :class="size === selectedSize ? 'bg-gradient-brand text-white border-transparent' : 'bg-white text-purple-700 border-purple-200 hover:border-purple-400'"
+                class="border rounded px-3.5 py-2 text-sm font-semibold transition"
               >
                 {{ size }}
               </button>
             </div>
-            <p v-if="!product.size_options || product.size_options.length === 0" class="text-sm text-gray-500 mt-3">No size options available for this item.</p>
+            <p v-if="!product.size_options || product.size_options.length === 0" class="text-sm text-gray-500 mt-3">One size / no size options for this item.</p>
+          </div>
+
+          <div v-if="product.color_options && product.color_options.length" class="rounded-3xl border border-gray-100 p-4 bg-white shadow-sm">
+            <h3 class="text-sm uppercase tracking-[0.3em] text-gray-400 mb-3">Select Color{{ selectedColor ? `: ${selectedColor}` : '' }}</h3>
+            <div class="flex flex-wrap gap-2.5">
+              <button
+                v-for="color in product.color_options"
+                :key="color"
+                type="button"
+                @click="selectedColor = color"
+                :title="color"
+                :aria-label="`Choose ${color}`"
+                :style="{ backgroundColor: colorSwatch(color) }"
+                :class="color === selectedColor ? 'ring-2 ring-offset-2 ring-black scale-110' : 'ring-1 ring-black/15 hover:scale-110'"
+                class="w-9 h-9 rounded-full transition-transform"
+              />
+            </div>
+          </div>
+
+          <div v-if="product.length_options && product.length_options.length" class="rounded-3xl border border-gray-100 p-4 bg-white shadow-sm">
+            <h3 class="text-sm uppercase tracking-[0.3em] text-gray-400 mb-3">Select Length</h3>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="len in product.length_options"
+                :key="len"
+                type="button"
+                @click="selectedLength = len"
+                :class="len === selectedLength ? 'bg-gradient-brand text-white border-transparent' : 'bg-white text-purple-700 border-purple-200 hover:border-purple-400'"
+                class="border rounded px-3.5 py-2 text-sm font-semibold transition"
+              >
+                {{ len }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -105,7 +143,7 @@
             <button
               @click="addToCart"
               :disabled="!product.in_stock || (product.size_options && product.size_options.length > 0 && !selectedSize)"
-              class="w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-black hover:bg-slate-900 disabled:cursor-not-allowed disabled:bg-gray-300"
+              class="w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-gradient-brand hover:brightness-105 disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               {{ product.in_stock ? 'Add to Cart' : 'Out of Stock' }}
             </button>
@@ -116,7 +154,7 @@
               :href="whatsappProductLink"
               target="_blank"
               rel="noopener"
-              class="flex items-center justify-center gap-2 w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-[#25D366] hover:brightness-95"
+              class="flex items-center justify-center gap-2 w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-gradient-brand hover:brightness-95"
             >
               <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.4 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.9-4.3-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5s.8 1.9.8 2c.1.1.1.3 0 .5-.3.6-.6.8-.4 1.1.6 1.1 1.4 1.8 2.4 2.4.3.2.5.1.7-.1l.8-.9c.2-.3.4-.2.7-.1l2 1c.3.1.5.2.6.4 0 .1 0 .6-.5 1.5z"/></svg>
               Order via WhatsApp
@@ -128,7 +166,7 @@
               :href="site.messengerUrl"
               target="_blank"
               rel="noopener"
-              class="flex items-center justify-center gap-2 w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-[#0084FF] hover:brightness-95"
+              class="flex items-center justify-center gap-2 w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-gradient-brand hover:brightness-95"
             >
               <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
               Message us on Messenger
@@ -162,7 +200,7 @@
 
   <!-- Lightbox Modal Layout -->
   <div v-if="isLightboxOpen" 
-       class="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4 backdrop-blur-md select-none"
+       class="fixed inset-0 z-50 bg-[var(--color-brand)]/95 flex flex-col items-center justify-center p-4 backdrop-blur-md select-none"
        @click="isLightboxOpen = false">
     
     <div class="absolute top-6 left-6 right-6 flex justify-between items-center text-white text-lg font-medium">
@@ -180,17 +218,17 @@
       </button>
       <div v-else class="w-16"></div>
 
-      <div class="flex-1 flex justify-center items-center max-h-[75vh]">
+      <div class="flex-1 flex justify-center items-center max-h-[88vh]">
         <video v-if="currentLightboxMedia?.media_type === 'video'" 
                :src="currentLightboxMedia.url" 
                controls 
                autoplay
-               class="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl"></video>
+               class="max-w-full max-h-[88vh] object-contain rounded-xl shadow-2xl"></video>
         
         <img v-else 
              :src="currentLightboxMedia?.url" 
              :alt="product?.name" 
-             class="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl" />
+             class="max-w-full max-h-[88vh] object-contain rounded-xl shadow-2xl" />
       </div>
 
       <button v-if="galleryItems.length > 1" 
@@ -221,10 +259,13 @@ import axios from 'axios'
 import { useCartStore } from '../stores/cart'
 import { useSiteStore } from '../stores/site'
 import ProductReviews from '../components/ProductReviews.vue'
+import WishlistHeart from '../components/WishlistHeart.vue'
 
 // 1. Core States defined first
 const product = ref(null)
 const selectedSize = ref('')
+const selectedColor = ref('')
+const selectedLength = ref('')
 const showSuccessMessage = ref(false)
 
 const activeMediaIndex = ref(0)
@@ -235,17 +276,36 @@ const route = useRoute()
 const cartStore = useCartStore()
 const site = useSiteStore()
 
-// WhatsApp order link prefilled with this product + selected size
+// WhatsApp order link prefilled with this product + selected variant
 const whatsappProductLink = computed(() => {
   if (!product.value) return ''
-  const size = selectedSize.value ? ` (Size: ${selectedSize.value})` : ''
+  const parts = []
+  if (selectedSize.value) parts.push(`Size: ${selectedSize.value}`)
+  if (selectedColor.value) parts.push(`Color: ${selectedColor.value}`)
+  if (selectedLength.value) parts.push(`Length: ${selectedLength.value}`)
+  const variant = parts.length ? ` (${parts.join(', ')})` : ''
   const price = formatDisplayPrice.value
   return site.whatsappOrderLink(
     null,
-    [`• 1 x ${product.value.name}${size} — ${price}`],
+    [`• 1 x ${product.value.name}${variant} — ${price}`],
     `Product: ${window.location.origin}/products/${route.params.slug}`
   )
 })
+
+const COLOR_HEX = {
+  red: '#e11d48', maroon: '#7A1F1F', pink: '#f9a8d4', black: '#111111',
+  white: '#ffffff', ivory: '#fffff0', beige: '#f5f5dc', cream: '#fffdd0',
+  green: '#16a34a', emerald: '#059669', olive: '#808000', mint: '#a7f3d0',
+  blue: '#2563eb', navy: '#1e3a8a', sky: '#87ceeb', teal: '#0d9488',
+  yellow: '#facc15', gold: '#d4af37', mustard: '#e1ad01', orange: '#f97316',
+  purple: '#9333ea', lavender: '#e6e6fa', magenta: '#ff00ff', burgundy: '#800020',
+  brown: '#92400e', grey: '#808080', gray: '#808080', silver: '#c0c0c0',
+}
+const colorSwatch = (name) => {
+  const v = String(name || '').trim()
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) return v
+  return COLOR_HEX[v.toLowerCase()] || '#d1d5db'
+}
 
 // 2. Fetch API Data
 const fetchProductData = async () => {
@@ -390,10 +450,14 @@ function addToCart() {
   const currentPriceString = formatDisplayPrice.value.split(' ')[0]
   const parsedPrice = parseFloat(currentPriceString) || 0
 
+  // Variant travels as "size | color | length" so each combination is its own bag line.
+  const variant = [selectedSize.value, selectedColor.value, selectedLength.value]
+    .filter(Boolean).join(' | ')
+
   cartStore.addToCart({
     ...product.value,
     price: parsedPrice
-  }, selectedSize.value, 1)
+  }, selectedSize.value, 1, variant)
 
   showSuccessMessage.value = true
   setTimeout(() => {

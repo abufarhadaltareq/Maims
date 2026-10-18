@@ -7,8 +7,33 @@
   <p class="maims-home__summary">
     <strong>{{ orders_today }}</strong> order{{ orders_today|pluralize }} today
     &middot; <strong>{{ open_orders }}</strong> still to fulfil
+    &middot; <strong>{{ orders_week }}</strong> in the last 7 days
     &middot; <a href="{% url 'admin:products_order_changelist' %}">All orders</a>
   </p>
+
+  {# KPI cards: one glance at sales, queue and catalogue health. #}
+  <section class="maims-cards">
+    <a class="maims-card" href="{% url 'admin:products_order_changelist' %}?status__exact=new">
+      <span class="maims-card__label">Needs decision</span>
+      <span class="maims-card__value">{{ awaiting_decision }}</span>
+      <span class="maims-card__hint">Accept or decline new orders</span>
+    </a>
+    <a class="maims-card" href="{% url 'admin:products_order_changelist' %}">
+      <span class="maims-card__label">Open orders</span>
+      <span class="maims-card__value">{{ open_orders }}</span>
+      <span class="maims-card__hint">Not yet delivered</span>
+    </a>
+    <div class="maims-card">
+      <span class="maims-card__label">Paid revenue · 7 days</span>
+      <span class="maims-card__value maims-card__value--small">{% if revenue_week %}{% for row in revenue_week %}€{{ row.total }} {{ row.currency }}{% if not forloop.last %} · {% endif %}{% endfor %}{% else %}—{% endif %}</span>
+      <span class="maims-card__hint">{{ orders_week }} order{{ orders_week|pluralize }} this week</span>
+    </div>
+    <a class="maims-card" href="{% url 'admin:products_product_changelist' %}">
+      <span class="maims-card__label">Catalogue</span>
+      <span class="maims-card__value">{{ visible_products }}/{{ product_count }}</span>
+      <span class="maims-card__hint">Visible of total · {{ category_count }} categories</span>
+    </a>
+  </section>
 
   {# Anything that needs a human right now, called out before the routine queues. #}
   {% if awaiting_decision or pending_notifications or unanswered_reviews %}
@@ -62,7 +87,7 @@
     <ul class="maims-storelist">
       <li>
         <a href="{% url 'admin:products_product_changelist' %}">Products</a>
-        <span>Name, description, price per currency, stock, photos and videos. Stock is editable from the list.</span>
+        <span>Name, price per currency, stock, bust sizes, colours, lengths, photos and videos. Stock is editable from the list.</span>
       </li>
       <li>
         <a href="{% url 'admin:products_category_changelist' %}">Categories</a>

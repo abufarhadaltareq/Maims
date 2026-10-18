@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -68,6 +69,108 @@ class HeroSlide(models.Model):
         return self.external_image_url or ''
 
 
+class HeroBannerSettings(models.Model):
+    """Singleton: global controls for the homepage hero banner.
+
+    A dedicated model (rather than env vars) so the shop can toggle the
+    banner, pick its look and tune its transparency from the admin — no
+    code change, no redeploy. There is exactly one row (pk=1); `HeroSlide`
+    rows are the *content* (the images and copy), this row is the *stage*
+    (whether the stage is open and how it looks).
+    """
+
+    # --- Show / hide ---------------------------------------------------------
+    hero_enabled = models.BooleanField(
+        default=True,
+        verbose_name="Hero banner enabled",
+        help_text="Untick to hide the entire homepage banner — the page then starts at the category strip.",
+    )
+
+    # --- Layout --------------------------------------------------------------
+    HEIGHT_CHOICES = [
+        ('medium', 'Medium (70-90vh)'),
+        ('tall', 'Tall (85-100vh)'),
+        ('full', 'Full screen'),
+    ]
+    height_preset = models.CharField(
+        max_length=10, choices=HEIGHT_CHOICES, default='tall',
+        help_text="How much of the viewport the banner fills.",
+    )
+    overlay_strength = models.PositiveIntegerField(
+        default=45, validators=[MinValueValidator(0), MaxValueValidator(95)],
+        help_text="Dark overlay over the slide image, 0-95. Higher = more readable text, less of the photo.",
+    )
+    kenburns_intensity = models.PositiveIntegerField(
+        default=12, validators=[MinValueValidator(0), MaxValueValidator(40)],
+        help_text="How much each slide zooms in during its rotation, 0-40. 0 = still, 40 = dramatic.",
+    )
+
+    # --- Transparency --------------------------------------------------------
+    # The 3D background (wireframe + drifting orbs) is decorative. It can be
+    # dimmed or switched off entirely, and its opacity is a separate slider
+    # so the shop can keep the animation without it fighting the image.
+    hero_3d_enabled = models.BooleanField(
+        default=True,
+        verbose_name="Show 3D background",
+        help_text="The animated wireframe + drifting orbs behind the slides.",
+    )
+    hero_3d_opacity = models.PositiveIntegerField(
+        default=45, validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Opacity of the 3D layer, 0-100. 0 hides it while keeping it enabled.",
+    )
+    hero_3d_blend = models.BooleanField(
+        default=True,
+        verbose_name="Screen blend mode",
+        help_text="mix-blend-screen makes the 3D layer sit on top of the photo instead of covering it.",
+    )
+
+    # --- Motion --------------------------------------------------------------
+    rotation_seconds = models.PositiveIntegerField(
+        default=5, validators=[MinValueValidator(2), MaxValueValidator(30)],
+        help_text="Seconds between slides. Lower = faster rotation.",
+    )
+    transition_ms = models.PositiveIntegerField(
+        default=1100, validators=[MinValueValidator(300), MaxValueValidator(3000)],
+        help_text="Crossfade duration between slides, in milliseconds.",
+    )
+    autoplay = models.BooleanField(
+        default=True,
+        verbose_name="Autoplay rotation",
+        help_text="Untick to stop the slides from rotating — useful when the banner holds a single announcement.",
+    )
+
+    # --- Design tokens -------------------------------------------------------
+    # These re-skin the banner without touching the stylesheet.
+    accent_color = models.CharField(
+        max_length=7, default='#0ea5e9',
+        help_text="Highlight colour used by the badge, progress bars and buttons. Hex, e.g. #0ea5e9.",
+    )
+    text_shadow = models.BooleanField(
+        default=True,
+        verbose_name="Text drop shadow",
+        help_text="A soft shadow keeps the headline readable over any photo.",
+    )
+    glass_cards = models.BooleanField(
+        default=True,
+        verbose_name="Glassmorphism card",
+        help_text="The headline sits in a semi-transparent card with a blur.",
+    )
+
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Last changed")
+
+    class Meta:
+        verbose_name = 'Hero banner settings'
+        verbose_name_plural = 'Hero banner settings'
+
+    def __str__(self):
+        return 'Hero banner settings'
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class Collection(models.Model):
     # Group items by seasonal catalogs (e.g., "Festive Eid Collection", "Summer '26 Basics")
     name = models.CharField(max_length=255)
@@ -118,6 +221,14 @@ class Product(models.Model):
     
     stock = models.IntegerField(default=0)
     size_options = models.CharField(max_length=250, blank=True, null=True, help_text='Comma-separated options like S,M,L or One Size')
+    # Deshi-besh style browsing: bust sizes (32–50), garment lengths (e.g.
+    # Anarkali 53/54/56) and colour swatches. All three are comma-separated so
+    # the shop can type "36,38,40" or "Red,#7A1F1F,Emerald" with no extra setup.
+    # The public /facets/ endpoint collects the distinct values for the sidebar.
+    color_options = models.CharField(max_length=500, blank=True, null=True,
+        help_text='Comma-separated colours: names or hex swatches, e.g. Red,Emerald,#7A1F1F')
+    length_options = models.CharField(max_length=250, blank=True, null=True,
+        help_text='Comma-separated lengths, e.g. 53,54,56 or S,M,L')
     image = models.ImageField(upload_to='uploads/', blank=True, null=True)
     thumbnail = models.ImageField(upload_to='uploads/', blank=True, null=True)
     # --- Facebook Page sync ------------------------------------------------
@@ -133,6 +244,11 @@ class Product(models.Model):
     # because Meta's lookaside image URLs expire.
     facebook_image_url = models.URLField(blank=True, null=True,
                                          help_text="Cloud-hosted image URL from Facebook sync")
+    # Approval gate for Facebook-synced posts: when the shop holds syncs for
+    # review, new products land here hidden and are invisible to the storefront
+    # until an admin approves them.
+    is_visible = models.BooleanField(default=True, db_index=True,
+        help_text="Untick to hide this product from the storefront without deleting it.")
     date_added = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -164,6 +280,24 @@ class Product(models.Model):
         if not self.size_options:
             return []
         return [size.strip() for size in self.size_options.split(',') if size.strip()]
+
+    def _split_options(self, raw):
+        if not raw:
+            return []
+        seen = set()
+        out = []
+        for part in str(raw).split(','):
+            val = part.strip()
+            if val and val.lower() not in seen:
+                seen.add(val.lower())
+                out.append(val)
+        return out
+
+    def get_color_options(self):
+        return self._split_options(self.color_options)
+
+    def get_length_options(self):
+        return self._split_options(self.length_options)
 
     @property
     def is_in_stock(self):
@@ -292,7 +426,40 @@ class SiteSettings(models.Model):
     # Uploaded logo (PNG/JPG) shown in the header/footer instead of the default
     # 'M' monogram. Blank = keep the monogram. Validated below (type + 2MB cap)
     # so a wrong upload fails with a message, not a broken header.
+    # --- Top header ticker + branding (Admin → Site settings → Brand & header) ----
+    # One-line messages that scroll across the top bar (marquee). Put each
+    # message on its own line, e.g.
+    #   Free EU shipping over €40
+    #   New drop every Friday
+    #   Easy 14-day returns
+    # Blank = the header ticker hides itself.
+    announcement_enabled = models.BooleanField(default=True,
+        help_text="Show the scrolling message bar above the header.")
+    announcement_messages = models.TextField(blank=True, null=True,
+        default="Free EU shipping on orders over €40",
+        help_text="One message per line. They scroll one after another in the top bar.")
+    announcement_speed = models.PositiveIntegerField(default=30,
+        help_text="Scroll speed in seconds per loop (10 = fast, 60 = slow).")
+    # Short line under the logo (header + footer wordmark). Blank hides it.
+    tagline = models.CharField(max_length=120, blank=True, null=True, default="Premium Fashion",
+        help_text="Short line under the logo, e.g. Premium Fashion.")
+    # Short footer paragraph + bottom legal line. Both fall back to defaults.
+    footer_about = models.CharField(max_length=255, blank=True, null=True,
+        default="Curated premium fashion, delivered worldwide.",
+        help_text="One-line shop description in the footer.")
+    footer_bottom_note = models.CharField(max_length=255, blank=True, null=True,
+        default="Premium fashion, delivered worldwide",
+        help_text="Small line at the very bottom of the footer.")
     store_name = models.CharField(max_length=120, default='Maims')
+    # --- Brand color & content color (Admin → Site settings → Brand) ---
+    brand_color = models.CharField(max_length=7, default='#7C3AED',
+        help_text="Main brand color (purple gradient uses this).")
+    content_color = models.CharField(max_length=7, default='#1F2937',
+        help_text="Main content text color (headings, body text).")
+    content_text_secondary = models.CharField(max_length=7, default='#4B5563',
+        help_text="Secondary content text color (descriptions, labels).")
+    heading_color = models.CharField(max_length=7, default='#7C3AED',
+        help_text="Heading text color (page titles, section headers).")
     logo = models.ImageField(upload_to='uploads/brand/', blank=True, null=True,
                              help_text="PNG or JPG, max 2MB. Shown in the header and footer.")
     facebook_page_url = models.URLField(blank=True, null=True,
@@ -366,6 +533,10 @@ class SiteSettings(models.Model):
         help_text="Permanent/system-user token from Meta for WhatsApp Cloud API")
     whatsapp_phone_number_id = models.CharField(max_length=64, blank=True, null=True,
         help_text="Phone Number ID from WhatsApp > API Setup (not the phone number itself)")
+    whatsapp_business_account_id = models.CharField(max_length=64, blank=True, null=True,
+        help_text="WhatsApp Business Account ID (WABA ID) from Meta Business Manager > Business Info")
+    whatsapp_webhook_secret = models.CharField(max_length=128, blank=True, null=True,
+        help_text="Secret used to verify WhatsApp webhook signatures (X-Hub-Signature-256)")
 
     # --- Facebook page posting ---------------------------------------------------
     facebook_page_id = models.CharField(max_length=64, blank=True, null=True,
@@ -377,6 +548,33 @@ class SiteSettings(models.Model):
     facebook_success_story_template = models.TextField(blank=True, null=True, default=(
         "Just shipped {product_names} to {place}! Thank you {first_name} for choosing Maims."
     ), help_text="Placeholders: {order_id}, {first_name}, {place}, {product_names}, {currency}, {total}")
+    facebook_app_id = models.CharField(max_length=64, blank=True, null=True,
+        help_text="Meta App ID from developers.facebook.com — overrides FACEBOOK_APP_ID when set")
+    facebook_app_secret = models.CharField(max_length=128, blank=True, null=True,
+        help_text="Meta App Secret, used to verify webhook signatures — overrides FACEBOOK_APP_SECRET when set")
+    facebook_webhook_verify_token = models.CharField(max_length=128, blank=True, null=True,
+        help_text="Token Meta sends when verifying the feed webhook — overrides FACEBOOK_WEBHOOK_VERIFY_TOKEN when set")
+    facebook_sync_interval_minutes = models.PositiveIntegerField(default=60,
+        help_text="How often the background catalogue sync should run (minutes). 0 disables scheduled syncs.")
+    facebook_auto_approve_sync = models.BooleanField(default=True,
+        help_text="Publish Facebook-synced products to the storefront immediately. "
+                  "Untick to hold new syncs for review: they stay hidden until an admin approves them.")
+
+    # --- Store email / SMTP (admin-controlled, overrides the .env values) -------------------
+    email_from_address = models.EmailField(blank=True, null=True,
+        help_text="Sender address on order emails. Falls back to DEFAULT_FROM_EMAIL when blank.")
+    smtp_host = models.CharField(max_length=255, blank=True, null=True,
+        help_text="SMTP server for order emails (e.g. smtp.gmail.com). Blank = use the Django email backend.")
+    smtp_port = models.PositiveIntegerField(default=587,
+        help_text="SMTP port (587 for STARTTLS, 465 for SSL-implicit).")
+    smtp_use_tls = models.BooleanField(default=True,
+        help_text="Use STARTTLS when talking to the SMTP server.")
+    smtp_username = models.CharField(max_length=255, blank=True, null=True,
+        help_text="SMTP login (usually the same address as the sender).")
+    smtp_password = models.CharField(max_length=255, blank=True, null=True,
+        help_text="SMTP password or app-specific password.")
+    receipt_footer_text = models.TextField(blank=True, null=True,
+        help_text="Optional custom text appended to every order receipt (returns policy, shop hours, …).")
 
     class Meta:
         verbose_name = 'Site settings'
@@ -728,6 +926,10 @@ class OrderNotification(models.Model):
     error = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     sent_at = models.DateTimeField(null=True, blank=True)
+    # Retry bookkeeping: how many times this (order, channel, audience, event)
+    # has already been re-attempted, so the background retry command can cap
+    # itself instead of hammering a broken provider forever.
+    attempts = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ('-created_at',)
@@ -736,6 +938,7 @@ class OrderNotification(models.Model):
         indexes = [
             # The dedupe lookup is always "for this order, channel and audience".
             models.Index(fields=['order', 'channel', 'audience']),
+            models.Index(fields=['status', 'attempts']),
         ]
 
     def __str__(self):
@@ -810,4 +1013,41 @@ class Review(models.Model):
             last = (self.user.last_name or '').strip()
             initial = f"{last[0].upper()}." if last else ''
             return f"{self.user.first_name or self.user.username} {initial}".strip()
+        return 'Verified customer'
+
+
+# --- WISHLIST ---
+
+class WishlistItem(models.Model):
+    """
+    A product saved by a user for later ("wishlist" / "saved items").
+
+    One row per (user, product) — the unique constraint below guarantees a
+    double-tap on the heart can never create a duplicate row, and the DELETE
+    endpoint is idempotent so removing an item twice is simply a no-op.
+
+    This is deliberately separate from the cart: a wishlist holds intent, not a
+    commitment to buy, and it survives checkout (the cart is cleared on order).
+    """
+
+    user = models.ForeignKey(User, related_name='wishlist_items', on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, related_name='wishlisted_by', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ('-created_at', '-id')  # -id breaks ties within the same second
+        verbose_name = 'Wishlist item'
+        verbose_name_plural = 'Wishlist items'
+        constraints = [
+            # One row per user per product: hearting the same product twice
+            # returns the existing row instead of failing.
+            models.UniqueConstraint(fields=['user', 'product'], name='unique_wishlist_item_per_user_product'),
+        ]
+        indexes = [
+            # The list endpoint is always "this user's items, newest first".
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.user.username} ♥ {self.product_id}'
         return 'Verified customer'

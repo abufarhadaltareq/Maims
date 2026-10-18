@@ -200,7 +200,7 @@ defineExpose({ loadReviews })
               v-model="form.title"
               maxlength="120"
               placeholder="Sum it up in a few words"
-              class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600"
+              class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand"
             />
           </div>
 
@@ -214,7 +214,7 @@ defineExpose({ loadReviews })
               rows="4"
               maxlength="2000"
               placeholder="What did you like or dislike? How did the size fit?"
-              class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600"
+              class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand"
             ></textarea>
           </div>
 

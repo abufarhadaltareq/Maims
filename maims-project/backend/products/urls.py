@@ -9,9 +9,12 @@ urlpatterns = [
     
     # Keeps your existing legacy endpoints intact
     path('latest-products/', views.LatestProductsList.as_view()),
+    path('facets/', views.ProductFacets.as_view()),
+    path('brands/', views.FavoriteBrandsList.as_view()),
     path('social-feed/', views.SocialFeedList.as_view()),
     path('categories/', views.CategoryList.as_view()),
     path('hero-slides/', views.HeroSlideList.as_view()),
+    path('hero-banner/', views.hero_banner_settings, name='hero_banner_settings'),
     path('category-showcase/', views.CategoryShowcase.as_view()),
     path('products/category/<slug:category_slug>/', views.CategoryProducts.as_view()),
     path('products/<slug:slug>/', views.ProductDetail.as_view()),
@@ -43,4 +46,12 @@ urlpatterns = [
     path('products/<slug:slug>/reviews/', views.ProductReviewList.as_view(),
          name='product_reviews'),
     path('reviews/<int:pk>/', views.ReviewDetail.as_view(), name='review_detail'),
+
+    # --- Wishlist ---
+    path('wishlist/', views.WishlistList.as_view(), name='wishlist'),
+    path('wishlist/<int:pk>/', views.WishlistDetail.as_view(), name='wishlist_detail'),
+
+    # --- 🤖 AI Chatbot Agent ---
+    path('chatbot/chat/', views.ChatbotView.as_view(), name='chatbot_chat'),
+    path('chatbot/suggestions/', views.ChatbotSuggestionsView.as_view(), name='chatbot_suggestions'),
 ]

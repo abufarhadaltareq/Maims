@@ -1,11 +1,13 @@
 <template>
-  <div ref="canvasContainer" class="w-full h-full absolute inset-0 z-0 pointer-events-none opacity-60 mix-blend-screen"></div>
+  <div ref="canvasContainer" class="w-full h-full absolute inset-0 z-0 pointer-events-none" :style="{ opacity: siteStore.hero3DOpacity / 100, mixBlendMode: siteStore.hero3DBlend ? 'screen' : 'normal' }"></div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { useSiteStore } from '../stores/site'
 
 const canvasContainer = ref(null)
+const siteStore = useSiteStore()
 
 // Teardown handles, collected while onMounted runs asynchronously and released
 // by a hook registered here during setup.
@@ -57,6 +59,16 @@ onMounted(async () => {
     const mesh = new THREE.Mesh(geometry, material)
     scene.add(mesh)
 
+    // Floating accent orbs that drift in front of the wireframe, giving the
+    // hero depth without competing with the slide image.
+    const orbMat = new THREE.MeshBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.55 })
+    const orb1 = new THREE.Mesh(new THREE.SphereGeometry(0.45, 24, 24), orbMat)
+    const orb2 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 24, 24), orbMat)
+    orb1.position.set(-3.2, 0.8, 1.5)
+    orb2.position.set(3.4, -1, 2)
+    scene.add(orb1)
+    scene.add(orb2)
+
     // Add some cool glowing spheres
     const sphereGeo = new THREE.SphereGeometry(0.1, 16, 16)
     const sphereMat1 = new THREE.MeshBasicMaterial({ color: 0xff0055 })
@@ -82,6 +94,11 @@ onMounted(async () => {
 
       mesh.rotation.x += 0.005
       mesh.rotation.y += 0.005
+
+      orb1.position.y = Math.sin(time * 1.6) * 1.2 + 0.8
+      orb1.position.x = Math.cos(time * 1.2) * 2.6 - 3.2
+      orb2.position.y = Math.cos(time * 1.4) * 1.4 - 1
+      orb2.position.x = Math.sin(time * 1.1) * 2.8 + 3.4
 
       sphere1.position.x = Math.sin(time * 2) * 3
       sphere1.position.y = Math.cos(time * 2) * 3
@@ -117,6 +134,11 @@ onMounted(async () => {
       sphereGeo.dispose()
       sphereMat1.dispose()
       sphereMat2.dispose()
+      geometry.dispose()
+      material.dispose()
+      orbMat.dispose()
+      orb1.geometry.dispose()
+      orb2.geometry.dispose()
       renderer.domElement?.remove()
     }
   } catch (err) {

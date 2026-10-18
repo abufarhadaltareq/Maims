@@ -11,6 +11,12 @@
   --color-brand-muted: #f8fafc;      /* Slate 50 — subtle section backgrounds */
   --color-brand-text: #334155;       /* Slate 700 — body copy */
 
+  /* Brand color (customizable from Admin → Site settings → Brand) */
+  --color-brand: #7C3AED;            /* Purple — primary brand color */
+  --color-content: #1F2937;          /* Content text color */
+  --color-content-secondary: #4B5563; /* Secondary content text */
+  --color-heading: #7C3AED;          /* Heading text color */
+
   --font-brand: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -19,9 +25,9 @@
    Used only for the hero bar and a few decorative accents.
    --------------------------------------------------------------------------- */
 :root {
-  --grad-from: #9c0aa1;   /* Sky 500 — clean blue */
-  --grad-via: #be30d1;    /* Sky 400 — lighter blue */
-  --grad-to: #ce5ceb;     /* Sky 300 — airy finish */
+  --grad-from: #9c0aa1;   /* Clean violet start */
+  --grad-via: #be30d1;    /* Bright violet mid */
+  --grad-to: #ce5ceb;     /* Airy lavender finish */
   --grad-angle: 110deg;
   --brand-glow: 0 8px 24px -12px rgba(14, 165, 233, 0.35);
 }
@@ -50,6 +56,23 @@
 @utility footer-gradient-top {
   border-top: 1px solid transparent;
   border-image: linear-gradient(var(--grad-angle), var(--grad-from), var(--grad-via), var(--grad-to)) 1;
+}
+
+/* 3D purple glass footer — transparent purple shading with depth */
+@utility bg-footer-purple-glass {
+  background:
+    linear-gradient(rgba(22, 9, 62, 0.28), rgba(70, 11, 78, 0.28)),
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--grad-from) 6%, transparent),
+      color-mix(in srgb, var(--grad-via) 3%, transparent),
+      color-mix(in srgb, var(--grad-to) 1.5%, transparent)
+    );
+  backdrop-filter: blur(32px) saturate(160%);
+  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  border-top: 1px solid color-mix(in srgb, var(--grad-from) 12%, transparent);
+  box-shadow: 
+    0 -8px 28px -12px color-mix(in srgb, var(--grad-from) 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 30%, transparent);
 }
 
 /* Product card hover — subtle lift, no heavy shadows. */
@@ -136,10 +159,47 @@
   0%, 100% { background-position: 0% 50%; }
   50%      { background-position: 100% 50%; }
 }
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+@keyframes ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.35); }
+  50%      { box-shadow: 0 0 0 12px rgba(14, 165, 233, 0); }
+}
 @keyframes media-switch {
   from { opacity: 0; transform: scale(1.06); }
   to   { opacity: 1; transform: scale(1); }
 }
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes soft-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+/* Top header ticker: seamless leftward loop. Duration is set inline from
+   Admin → Site settings → announcement_speed (seconds per loop). The content
+   is rendered twice so -50% lands exactly on the loop point. */
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.ticker-track { animation: ticker-scroll 30s linear infinite; }
+.ticker-track:hover { animation-play-state: paused; }
 
 @utility animate-kenburns {
   animation: kenburns 7.5s ease-out forwards;
@@ -156,6 +216,40 @@
 }
 @utility animate-media-switch {
   animation: media-switch 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@utility animate-slide-left {
+  animation: slide-in-left 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@utility animate-slide-right {
+  animation: slide-in-right 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@utility animate-floaty {
+  animation: floaty 5s ease-in-out infinite;
+}
+@utility animate-ring-pulse {
+  animation: ring-pulse 2.4s ease-in-out infinite;
+}
+@utility animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+@utility animate-fade-slide-up {
+  animation: fade-slide-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@utility animate-soft-fade {
+  animation: soft-fade 0.8s ease both;
+}
+
+/* Gradient animation — subtle left-right shift for gradient text. */
+@keyframes gradient-x {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@utility animate-gradient-x {
+  background-size: 200% 100%;
+  animation: gradient-x 4s ease infinite;
 }
 
 /* Scroll-reveal: applied by the v-reveal directive — elements lift in
@@ -174,8 +268,12 @@
 /* Respect users who prefer reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   .reveal-init { opacity: 1; transform: none; transition: none; }
+  .ticker-track { animation: none !important; }
   .animate-kenburns, .animate-fade-up, .animate-hero-progress,
-  .animate-hero-glow, .animate-media-switch, .animate-bounce { animation: none !important; }
+  .animate-hero-glow, .animate-media-switch, .animate-bounce,
+  .animate-slide-left, .animate-slide-right, .animate-floaty,
+  .animate-ring-pulse, .animate-shimmer, .animate-fade-slide-up,
+  .animate-soft-fade { animation: none !important; }
 }
 
 /* Print styles — clean. */

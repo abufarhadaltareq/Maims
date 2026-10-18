@@ -13,45 +13,48 @@
       />
       <!-- Badges -->
       <div class="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
-        <span v-if="isNew" class="text-[10px] font-extrabold uppercase tracking-wider bg-slate-900 text-white px-2.5 py-1 rounded-full shadow">New</span>
+        <span v-if="isNew" class="text-[10px] font-extrabold uppercase tracking-wider bg-[var(--color-brand)] text-white px-2.5 py-1 rounded-full shadow">New</span>
         <span v-if="isSocial" class="text-[10px] font-extrabold uppercase tracking-wider bg-[#1877F2] text-white px-2.5 py-1 rounded-full shadow flex items-center gap-1">
           <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> Live
         </span>
         <span v-if="!product.in_stock" class="text-[10px] font-extrabold uppercase tracking-wider bg-white/90 backdrop-blur text-gray-700 px-2.5 py-1 rounded-full shadow">Sold out</span>
       </div>
       <span v-if="discountPct" class="absolute top-2.5 right-2.5 text-[10px] font-extrabold bg-rose-600 text-white px-2.5 py-1 rounded-full shadow">-{{ discountPct }}%</span>
-      <!-- Hover quick actions -->
-      <div class="absolute inset-x-2.5 bottom-2.5 flex gap-2 translate-y-14 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+      <!-- Hover quick actions. @click.stop keeps every action inside from
+           bubbling into the card's router-link (which would navigate away
+           mid-click instead of just toggling the heart / adding to bag). -->
+      <div @click.stop class="absolute inset-x-2.5 bottom-2.5 flex gap-2 items-center translate-y-16 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
         <router-link
           :to="`/products/${product.slug}`"
-          class="flex-1 text-center text-[11px] font-bold uppercase tracking-wider bg-white/90 backdrop-blur-md text-slate-900 py-2.5 rounded-xl shadow hover:bg-white transition"
+          class="flex-1 min-h-[44px] text-center text-[11px] font-bold uppercase tracking-wider bg-gradient-brand text-white py-2.5 rounded-xl shadow hover:brightness-105 transition active:scale-95 items-center justify-center no-underline"
         >
           Quick view
         </router-link>
         <button
           @click.prevent="onAdd"
           :disabled="!product.in_stock"
-          class="flex-1 text-[11px] font-bold uppercase tracking-wider bg-slate-900/90 backdrop-blur-md text-white py-2.5 rounded-xl shadow hover:bg-slate-900 transition active:scale-95 disabled:opacity-40"
+          class="flex-1 min-h-[44px] text-[11px] font-bold uppercase tracking-wider bg-gradient-brand text-white py-2.5 rounded-xl shadow hover:brightness-105 transition active:scale-95 disabled:opacity-40 items-center justify-center"
         >
           {{ product.in_stock ? (hasSizes ? 'Pick size' : 'Quick add') : 'Sold out' }}
         </button>
+        <WishlistHeart :product="product" class="flex-shrink-0" />
       </div>
     </router-link>
 
     <div class="flex flex-col flex-1 p-3.5">
-      <p v-if="product.brand_name" class="text-[10px] uppercase tracking-[0.18em] text-gray-400 font-bold mb-1 truncate">{{ product.brand_name }}</p>
+      <p v-if="product.brand_name" class="text-[10px] uppercase tracking-[0.18em] text-[var(--color-content-secondary)] font-bold mb-1 truncate">{{ product.brand_name }}</p>
       <router-link :to="`/products/${product.slug}`" class="font-semibold text-[14px] leading-snug line-clamp-2 group-hover:text-brand-accent transition-colors min-h-[2.6em]">{{ product.name }}</router-link>
       <!-- Rating -->
       <div class="flex items-center gap-1 mt-1.5">
         <span class="flex text-[13px] leading-none" aria-label="rating">
           <span v-for="i in 5" :key="i" :class="i <= roundedRating ? 'text-amber-400' : 'text-gray-200'">★</span>
         </span>
-        <span v-if="reviewCount" class="text-[11px] text-gray-400 font-medium">({{ reviewCount }})</span>
-        <span v-else class="text-[11px] text-gray-300 font-medium">No reviews</span>
+        <span v-if="reviewCount" class="text-[11px] text-[var(--color-content-secondary)] font-medium">({{ reviewCount }})</span>
+        <span v-else class="text-[11px] text-[var(--color-content-secondary)] font-medium">No reviews</span>
       </div>
       <div class="flex items-baseline gap-2 mt-1.5">
-        <p class="text-slate-900 font-extrabold text-[15px]">{{ priceString }}</p>
-        <p v-if="compareAt" class="text-gray-400 text-xs line-through font-medium">{{ compareAt }}</p>
+        <p class="text-[var(--color-content)] font-extrabold text-[15px]">{{ priceString }}</p>
+        <p v-if="compareAt" class="text-[var(--color-content-secondary)] text-xs line-through font-medium">{{ compareAt }}</p>
       </div>
 
       <!-- Mobile / keyboard fallback add (hover bar is desktop-only) -->
@@ -60,7 +63,7 @@
           v-if="!pickerOpen"
           @click="onAdd"
           :disabled="!product.in_stock"
-          class="w-full rounded-xl bg-slate-900 text-white text-xs font-bold py-2.5 transition active:scale-95 disabled:opacity-40"
+          class="w-full rounded-xl bg-[var(--color-brand)] text-white text-xs font-bold py-2.5 transition active:scale-95 disabled:opacity-40"
         >
           {{ product.in_stock ? (hasSizes ? 'Select size' : 'Add to Cart') : 'Out of Stock' }}
         </button>
@@ -69,7 +72,7 @@
             v-for="size in product.size_options"
             :key="size"
             @click="addWithSize(size)"
-            class="rounded-full border border-gray-200 bg-white text-xs font-bold px-3 py-1.5 transition hover:border-slate-900 active:scale-95"
+            class="rounded-full border border-gray-200 bg-white text-xs font-bold px-3 py-1.5 transition hover:border-[var(--color-brand)] active:scale-95"
           >
             {{ size }}
           </button>
@@ -81,7 +84,7 @@
           v-for="size in product.size_options"
           :key="size"
           @click="addWithSize(size)"
-          class="rounded-full border border-gray-200 bg-white text-xs font-bold px-3 py-1.5 transition hover:border-slate-900 hover:bg-gray-50 active:scale-95"
+          class="rounded-full border border-gray-200 bg-white text-xs font-bold px-3 py-1.5 transition hover:border-[var(--color-brand)] hover:bg-gray-50 active:scale-95"
         >
           {{ size }}
         </button>
@@ -98,6 +101,7 @@
 import { computed, ref } from 'vue'
 import { useCartStore } from '../stores/cart'
 import { getProductDisplayPrice } from '../utils/pricing.js'
+import WishlistHeart from './WishlistHeart.vue'
 
 const props = defineProps({
   product: { type: Object, required: true },

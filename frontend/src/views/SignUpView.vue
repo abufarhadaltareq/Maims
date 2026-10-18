@@ -67,7 +67,7 @@
       <button
         type="submit"
         :disabled="auth.loading"
-        class="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold rounded-lg transition dynamic-shadow mt-2"
+        class="w-full py-3 bg-gradient-brand hover:brightness-110 disabled:opacity-50 text-white font-bold rounded-lg transition dynamic-shadow mt-2"
       >
         {{ auth.loading ? 'Creating account…' : 'Sign Up' }}
       </button>
@@ -75,7 +75,7 @@
 
     <p class="text-sm text-gray-600 text-center mt-6">
       Already have an account?
-      <router-link to="/log-in" class="text-blue-600 hover:underline font-semibold">Log In</router-link>
+      <router-link to="/log-in" class="text-brand hover:underline font-semibold">Log In</router-link>
     </p>
   </div>
 </template>

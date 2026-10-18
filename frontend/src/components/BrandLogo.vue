@@ -41,14 +41,14 @@
     <!-- Wordmark + tagline -->
     <span class="flex flex-col leading-none">
       <span
-        class="brand-wordmark font-semibold uppercase text-gray-900 transition-colors group-hover:text-black"
+        class="brand-wordmark font-semibold uppercase transition-colors group-hover:[color:var(--color-brand)]"
         :class="size === 'sm' ? 'text-base' : 'text-lg'"
       >
-        {{ wordmarkStart }}<span class="text-brand-accent">{{ wordmarkAccent }}</span>{{ wordmarkEnd }}
+        {{ wordmarkStart }}<span class="transition-colors group-hover:[color:var(--color-brand)]">{{ wordmarkAccent }}</span>{{ wordmarkEnd }}
       </span>
       <span
-        v-if="showTagline"
-        class="hidden sm:block mt-1 font-semibold uppercase text-gray-400"
+        v-if="showTagline && tagline"
+        class="hidden sm:block mt-1 font-semibold uppercase"
         :class="size === 'sm' ? 'text-[0.5rem] tracking-[0.3em]' : 'text-[0.55rem] tracking-[0.4em]'"
       >
         {{ tagline }}
@@ -93,7 +93,7 @@ const wordmarkEnd = computed(() => {
   return upper.slice(3)
 })
 
-const tagline = BRAND_CONFIG.tagline || 'Premium Fashion'
+const tagline = computed(() => site.tagline || BRAND_CONFIG.tagline || 'Premium Fashion')
 </script>
 
 <style scoped>

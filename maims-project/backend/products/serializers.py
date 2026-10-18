@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
-    Product, Category, CurrencyPrice, CustomerNotificationSettings, HeroSlide, Order, OrderItem, ProductMedia,
-    Review, SiteSettings, UserProfile,
+    Product, Category, CurrencyPrice, CustomerNotificationSettings, HeroBannerSettings, HeroSlide, Order, OrderItem, ProductMedia,
+    Review, SiteSettings, UserProfile, WishlistItem,
 )
 
 # 1. Currency Price Serializer
@@ -18,6 +18,17 @@ class HeroSlideSerializer(serializers.ModelSerializer):
     class Meta:
         model = HeroSlide
         fields = ("id", "title", "subtitle", "button_text", "button_link", "image_url", "order", "is_active")
+
+
+class HeroBannerSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HeroBannerSettings
+        fields = (
+            'hero_enabled', 'height_preset', 'overlay_strength', 'kenburns_intensity',
+            'hero_3d_enabled', 'hero_3d_opacity', 'hero_3d_blend',
+            'rotation_seconds', 'transition_ms', 'autoplay',
+            'accent_color', 'text_shadow', 'glass_cards',
+        )
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -72,6 +83,8 @@ class ProductSerializer(serializers.ModelSerializer):
     # Maps properties computed dynamically at the model layer
     in_stock = serializers.BooleanField(source='is_in_stock', read_only=True)
     size_options = serializers.SerializerMethodField()
+    color_options = serializers.SerializerMethodField()
+    length_options = serializers.SerializerMethodField()
     # Star summary for the product page. `rating_average`/`rating_count` are
     # annotated by the queryset; the fallbacks keep the serializer correct when a
     # product is fetched without those annotations (e.g. admin, signals).
@@ -98,6 +111,8 @@ class ProductSerializer(serializers.ModelSerializer):
             "material_type",
             "prices",
             "size_options",   # Passes clean parsed array list strings
+            "color_options",
+            "length_options",
             "media",          # Resolves empty gallery tray tray issue
             "average_rating",  # Star average shown under the product title
             "review_count",    # Number of published reviews
@@ -135,6 +150,12 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_size_options(self, obj):
         # Calls the model helper method to safely transform comma-split strings to arrays
         return obj.get_size_options()
+
+    def get_color_options(self, obj):
+        return obj.get_color_options()
+
+    def get_length_options(self, obj):
+        return obj.get_length_options()
 
 
 # 5. Order Item Serializer
@@ -177,7 +198,8 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = SiteSettings
         fields = (
-            "store_name", "logo_url",
+            "store_name", "logo_url", "tagline", "footer_about", "footer_bottom_note",
+            "announcement_enabled", "announcement_messages", "announcement_speed",
             "facebook_page_url", "facebook_shop_url",
             "instagram_url", "tiktok_url", "twitter_url", "youtube_url", "linkedin_url",
             "whatsapp_number", "whatsapp_enabled", "whatsapp_greeting",
@@ -339,3 +361,31 @@ class ReviewCreateSerializer(serializers.Serializer):
         attrs['comment'] = comment
         attrs['title'] = (attrs.get('title') or '').strip()
         return attrs
+
+
+
+# --- WISHLIST ---
+
+class WishlistItemSerializer(serializers.ModelSerializer):
+    """
+    One saved product in a customer's wishlist.
+
+    The nested product uses the same ProductSerializer as the catalogue, so the
+    wishlist page reuses ProductCard with zero extra mapping. The product is
+    read-only: a wishlist row is created from a product id in the request body,
+    never from a nested write.
+    """
+
+    product = ProductSerializer(read_only=True)
+
+    class Meta:
+        model = WishlistItem
+        fields = ('id', 'product', 'created_at')
+        read_only_fields = ('id', 'product', 'created_at')
+
+
+class WishlistAddSerializer(serializers.Serializer):
+    """Write path: the body carries a product id, not a nested product."""
+
+    product_id = serializers.IntegerField(min_value=1)
+

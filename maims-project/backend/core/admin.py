@@ -49,14 +49,26 @@ def dashboard_callback(request, context):
 
     Unfold renders templates/admin/index.html with this context, so the dashboard
     template reads ``orders_today``, ``open_orders``, ``queues``, ``pending_notifications``
-    and ``unanswered_reviews``.
+    and ``unanswered_reviews`` plus revenue / catalogue health cards.
     """
+    from datetime import timedelta
+    from django.db.models import Sum
+    from products.models import Category, Product
+
     today = timezone.localdate()
+    week_start = today - timedelta(days=6)
     open_statuses = ('new', 'accepted', 'packed', 'shipped')
     orders_url = reverse('admin:products_order_changelist')
+    revenue = (Order.objects.filter(is_paid=True, created_at__date__gte=week_start)
+               .values('currency').annotate(total=Sum('total_amount')).order_by('currency'))
     context.update({
         'orders_today': Order.objects.filter(created_at__date=today).count(),
         'open_orders': Order.objects.filter(status__in=open_statuses).count(),
+        'orders_week': Order.objects.filter(created_at__date__gte=week_start).count(),
+        'revenue_week': list(revenue),
+        'product_count': Product.objects.count(),
+        'visible_products': Product.objects.filter(is_visible=True).count(),
+        'category_count': Category.objects.count(),
         # The number that actually needs a human decision right now.
         'awaiting_decision': Order.objects.filter(status='new').count(),
         # Sends that did not get through. Surfaced because a silently failed
@@ -77,10 +89,15 @@ def dashboard_callback(request, context):
 
 
 def environment_callback(request):
-    """Header label so it is obvious which environment the admin is running in."""
+    """Header label so it is obvious which environment the admin is running in.
+
+    Production (DEBUG=False) shows a green "Live" badge; anything else shows
+    the amber "Development" badge. Set DEBUG=False + ALLOWED_HOSTS=maims.eu
+    on the server to flip it.
+    """
     if settings.DEBUG:
         return ['Development', 'warning']
-    return ['Live', 'success']
+    return ['Live · maims.eu', 'success']
 
 
 def new_orders_badge(request):

@@ -1,14 +1,21 @@
 <template>
   <div class="min-h-screen flex flex-col font-brand text-gray-900 bg-white">
     <!-- Header Block -->
-    <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
-      <div v-if="brand.announcement" class="bg-gradient-brand text-white">
-        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-8 flex items-center justify-center">
-          <p class="text-[11px] font-medium tracking-wide text-center truncate">{{ brand.announcement }}</p>
+    <header class="sticky top-0 z-50 bg-purple-500/10 backdrop-blur-md border-b border-purple-500/20 shadow-lg shadow-purple-500/5">
+      <!-- Scrolling admin ticker: Admin → Store settings → Top scrolling messages.
+           One message per line, loops seamlessly; hidden when disabled or empty. -->
+      <div v-if="site.tickerEnabled && site.tickerMessages.length" class="bg-gradient-brand text-white overflow-hidden" role="marquee" aria-label="Store announcements">
+        <div
+          class="ticker-track flex items-center whitespace-nowrap py-0 h-8 will-change-transform"
+          :style="{ animationDuration: `${site.tickerSpeed}s` }"
+        >
+          <span v-for="(msg, i) in [...site.tickerMessages, ...site.tickerMessages]" :key="i" class="mx-8 text-[11px] font-medium tracking-wide inline-flex items-center gap-8">
+            {{ msg }} <span aria-hidden="true">✦</span>
+          </span>
         </div>
       </div>
       <div class="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center justify-between gap-3 md:gap-8 h-16">
-        
+        <!-- Brand: logo + store name + tagline, all from Admin → Site settings -->
         <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <BrandLogo />
         </div>
@@ -60,8 +67,8 @@
           </div>
 
           <!-- Cart -->
-          <router-link to="/cart" class="relative p-2 sm:p-2.5 text-gray-700 hover:text-black hover:bg-gray-100 rounded-full transition-colors" aria-label="View cart">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <router-link to="/cart" class="relative p-2 sm:p-2.5 bg-white rounded-full transition-all duration-200 hover:scale-105 hover:shadow-lg hover:shadow-slate-900/20" aria-label="View cart">
+            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
               <path d="M3 6h18" stroke-width="2" stroke-linecap="round"></path>
               <path d="M16 10a4 4 0 0 1-8 0" stroke-width="2" stroke-linecap="round"></path>
@@ -71,10 +78,21 @@
             </span>
           </router-link>
 
+          <!-- Wishlist -->
+          <router-link
+            to="/wishlist"
+            class="relative p-2 sm:p-2.5 bg-white rounded-full transition-all duration-200 hover:scale-105 hover:shadow-lg hover:shadow-slate-900/20" aria-label="Wishlist"
+          >
+            <span class="text-xl text-purple-600">❤️</span>
+            <span v-if="wishlistStore.count" class="absolute -top-0.5 -right-0.5 bg-gradient-brand text-white text-[10px] min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full font-bold ring-2 ring-white">
+              {{ wishlistStore.count }}
+            </span>
+          </router-link>
+
           <!-- Account menu -->
           <div class="relative" @click.stop="isAccountOpen = !isAccountOpen">
-            <button class="flex items-center gap-1.5 p-2 sm:pl-2 sm:pr-3 text-gray-700 hover:text-black hover:bg-gray-100 rounded-full transition-colors font-semibold" aria-label="Account menu">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button class="flex items-center gap-1.5 p-2 sm:pl-2 sm:pr-3 bg-white rounded-full transition-all duration-200 hover:scale-105 hover:shadow-lg hover:shadow-slate-900/20 font-semibold" aria-label="Account menu">
+              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
               </svg>
               <span v-if="auth.isAuthenticated" class="max-w-[90px] truncate hidden sm:inline text-sm">{{ auth.username }}</span>
@@ -106,12 +124,13 @@
       </main>
     </div>
 
-    <!-- Footer: compact multi-column + newsletter -->
-    <footer class="footer-gradient-top bg-slate-950 text-slate-300 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
+    <!-- Footer: 3D purple glass — transparent purple shading with depth -->
+    <footer class="bg-slate-950 text-slate-300 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
       <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 pb-8 border-b border-white/10">
         <div class="col-span-2 lg:col-span-2">
           <BrandLogo size="sm" />
-          <p class="text-slate-400 text-[13px] leading-relaxed mt-3 max-w-xs">Curated premium fashion, delivered worldwide. New drops sync live from our Facebook Page.</p>
+          <!-- About line: Admin → Site settings → Brand & header → Footer about -->
+          <p class="text-slate-400 text-[13px] leading-relaxed mt-3 max-w-xs">{{ site.footerAbout }}</p>
           <!-- Newsletter (shown only when Admin → Customer notification settings allow it) -->
           <form v-if="site.newsletterSignupEnabled" @submit.prevent="subscribeNewsletter" class="mt-4 max-w-xs">
             <label class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-400">Get 10% off your first order</label>
@@ -119,14 +138,14 @@
               <input
                 v-model="newsletterEmail"
                 type="email" required placeholder="Email address"
-                class="flex-1 min-w-0 bg-white/10 border border-white/15 rounded-full px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-brand-accent focus:bg-white/15 transition"
+                class="flex-1 min-w-0 bg-white/10 border border-white/15 rounded-full px-4 py-2.5 text-white placeholder:text-slate-500 outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/30 transition"
               />
-              <button class="shrink-0 bg-white text-slate-900 text-xs font-extrabold uppercase tracking-wider px-4 py-2.5 rounded-full hover:bg-sky-100 transition active:scale-95">
+              <button class="shrink-0 bg-gradient-brand text-white text-xs font-extrabold uppercase tracking-wider px-4 py-2.5 rounded-full hover:brightness-110 transition active:scale-95">
                 {{ newsletterDone ? '✓ Joined' : 'Join' }}
               </button>
             </div>
-            <p v-if="newsletterDone" class="text-emerald-300 text-xs font-semibold mt-2">You're on the list — welcome!</p>
-            <p v-else-if="newsletterError" class="text-rose-300 text-xs font-semibold mt-2">{{ newsletterError }}</p>
+            <p v-if="newsletterDone" class="text-emerald-400 text-xs font-semibold mt-2">You're on the list — welcome!</p>
+            <p v-else-if="newsletterError" class="text-rose-400 text-xs font-semibold mt-2">{{ newsletterError }}</p>
           </form>
         </div>
         <nav aria-label="Shop">
@@ -145,26 +164,30 @@
               <router-link :to="`/legal#${legal.hash}`" class="hover:text-white transition">{{ legal.label }}</router-link>
             </li>
             <li v-if="brand.supportEmail"><a :href="`mailto:${brand.supportEmail}`" class="hover:text-white transition">{{ brand.supportEmail }}</a></li>
+            <li class="text-slate-500 text-xs pt-1">{{ site.storeName }} · {{ brand.domain }}</li>
           </ul>
         </nav>
         <div>
           <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-500 mb-3">Follow</p>
           <div class="flex flex-wrap gap-2">
-            <a v-if="site.facebookShopUrl" :href="site.facebookShopUrl" target="_blank" rel="noopener" title="Facebook Shop" class="w-9 h-9 rounded-full bg-white/10 hover:bg-[#1877F2] flex items-center justify-center transition"><SocialIcon name="facebook" class="w-4 h-4" /></a>
-            <a v-for="link in site.socialLinks" :key="link.key" :href="link.url" target="_blank" rel="noopener" :title="link.label" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"><SocialIcon :name="link.key" class="w-4 h-4" /></a>
-            <a v-if="site.whatsappEnabled" :href="site.whatsappBaseLink" target="_blank" rel="noopener" title="WhatsApp Chat" class="w-9 h-9 rounded-full bg-white/10 hover:bg-[#25D366] flex items-center justify-center transition"><SocialIcon name="whatsapp" class="w-4 h-4" /></a>
+            <!-- Social links — styled like header cart/wishlist/account icons -->
+            <a v-for="link in site.socialLinks" :key="link.key" :href="link.url" target="_blank" rel="noopener" :title="link.label" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"><SocialIcon :name="link.key" class="w-4 h-4 text-white" /></a>
+            <a v-if="site.whatsappEnabled" :href="site.whatsappBaseLink" target="_blank" rel="noopener" title="WhatsApp Chat" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"><SocialIcon name="whatsapp" class="w-4 h-4 text-white" /></a>
           </div>
-          <p class="text-slate-500 text-xs mt-4">Secure checkout<br/>Stripe · PayPal · WhatsApp</p>
+          <p class="text-slate-500 text-xs mt-4 leading-relaxed">Secure checkout<br/><span v-if="site.stripeEnabled">Stripe</span><span v-if="site.stripeEnabled && (site.paypalEnabled || site.whatsappEnabled)"> · </span><span v-if="site.paypalEnabled">PayPal</span><span v-if="site.paypalEnabled && site.whatsappEnabled"> · </span><span v-if="site.whatsappEnabled">WhatsApp</span><span v-if="!site.stripeEnabled && !site.paypalEnabled && !site.whatsappEnabled">Contact us to order</span></p>
         </div>
       </div>
       <div class="max-w-7xl mx-auto pt-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
-        <span class="font-semibold">© {{ new Date().getFullYear() }} {{ site.settings?.store_name || 'Maims' }} · All rights reserved</span>
-        <span>Premium fashion, delivered worldwide</span>
+        <span class="font-semibold">© {{ new Date().getFullYear() }} {{ site.storeName }} · All rights reserved</span>
+        <span class="text-slate-500">{{ site.footerBottomNote }}</span>
       </div>
     </footer>
 
     <!-- Floating WhatsApp / Facebook quick actions -->
     <SocialButtons />
+
+    <!-- AI chat assistant -->
+    <ChatbotWidget />
   </div>
 </template>
 
@@ -175,11 +198,13 @@ import { useRouter, useRoute } from 'vue-router'
 import { useCartStore, CURRENCIES } from './stores/cart'
 import { useAuthStore } from './stores/auth'
 import { useSiteStore } from './stores/site'
+import { useWishlistStore } from './stores/wishlist'
 // Top category nav (Aarong-style) replaces the old left sidebar
 import CategoryNav from './components/CategoryNav.vue'
 import SocialButtons from './components/SocialButtons.vue'
 import SocialIcon from './components/SocialIcon.vue'
 import BrandLogo from './components/BrandLogo.vue'
+import ChatbotWidget from './components/ChatbotWidget.vue'
 import { BRAND_CONFIG } from './brand.config'
 
 const router = useRouter()
@@ -187,6 +212,7 @@ const route = useRoute()
 const cartStore = useCartStore()
 const auth = useAuthStore()
 const site = useSiteStore()
+const wishlistStore = useWishlistStore()
 const brand = BRAND_CONFIG
 const currencies = CURRENCIES
 
@@ -252,10 +278,21 @@ onMounted(async () => {
   if (localStorage.getItem('token')) await auth.fetchMe()
   // Load admin-driven site settings (Facebook / WhatsApp / payment toggles)
   site.fetchSettings()
+  // Hydrate wishlist from the server when signed in
+  if (localStorage.getItem('token')) await wishlistStore.hydrate()
   // Closes open popups gracefully on outside view space mouse clicks
   window.addEventListener('click', () => {
     isCurrencyOpen.value = false
     isAccountOpen.value = false
   })
 })
+
+// Hydrate wishlist whenever the user logs in mid-session (token appears).
+watch(
+  () => localStorage.getItem('token'),
+  async (token) => {
+    if (token) await wishlistStore.hydrate()
+    else wishlistStore.clear()
+  }
+)
 </script>

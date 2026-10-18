@@ -41,8 +41,8 @@ from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
 from .models import (
     RESTOCK_LEVEL, Category, Collection, CurrencyPrice, CustomerNotificationSettings,
-    HeroSlide, Order, OrderItem,
-    OrderNotification, Product, ProductMedia, Review, SiteSettings,
+    HeroBannerSettings, HeroSlide, Order, OrderItem,
+    OrderNotification, Product, ProductMedia, Review, SiteSettings, WishlistItem,
 )
 
 CURRENCY_SYMBOLS = {'USD': '$', 'EUR': '€', 'SEK': 'kr', 'BDT': '৳', 'PKR': 'Rs'}
@@ -816,9 +816,13 @@ class ProductAdmin(MaimsModelAdmin):
             'description': 'Stock 0 removes the "add to cart" button. If the thumbnail is empty the '
                            'main image is used. Prices are set per currency in the table below.'}),
         ('Clothing attributes', {
-            'fields': ('fabric_type', 'stitching_type', 'material_type', 'size_options'),
-            'description': 'Only needed for clothing. Use <b>material type</b> for bags and jewellery, and '
-                           '<b>size options</b> for anything that is not S/M/L (for example "One Size").'}),
+            'fields': ('fabric_type', 'stitching_type', 'material_type', 'size_options',
+                       'color_options', 'length_options'),
+            'description': 'Only needed for clothing. Use <b>material type</b> for bags and jewellery. '
+                           '<b>Size options</b> holds bust sizes (e.g. 32,36,38,40…), '
+                           '<b>colour options</b> holds names or #hex swatches, and '
+                           '<b>length options</b> holds garment lengths (e.g. 53,54,56) — '
+                           'all comma-separated for the filter sidebar + product picker.'}),
     )
 
     @admin.action(description='Import latest Facebook page posts now')
@@ -961,6 +965,8 @@ class ProductAdmin(MaimsModelAdmin):
                 stitching_type=source.stitching_type,
                 material_type=source.material_type,
                 size_options=source.size_options,
+                color_options=source.color_options,
+                length_options=source.length_options,
                 stock=0,
             )
             for price in source.prices.all():
@@ -989,7 +995,8 @@ class ProductAdmin(MaimsModelAdmin):
     # --- CSV in / out
 
     EXPORT_COLUMNS = ['slug', 'name', 'category_slug', 'collection_slug', 'brand_name',
-                      'stock', 'size_options', 'fabric_type', 'stitching_type',
+                      'stock', 'size_options', 'color_options', 'length_options',
+                      'fabric_type', 'stitching_type',
                       'material_type', 'description',
                       *[f'price_{code}' for code in CURRENCY_CODES]]
 
@@ -1011,6 +1018,7 @@ class ProductAdmin(MaimsModelAdmin):
                 product.category.slug if product.category else '',
                 product.collection.slug if product.collection else '',
                 product.brand_name or '', product.stock, product.size_options or '',
+                product.color_options or '', product.length_options or '',
                 product.fabric_type or '', product.stitching_type or '',
                 product.material_type or '', product.description or '',
                 *[prices.get(code, '') for code in CURRENCY_CODES],
@@ -1284,9 +1292,16 @@ class SiteSettingsAdmin(MaimsModelAdmin):
                     'whatsapp_enabled', 'updated_at')
     list_editable = ('stripe_enabled', 'paypal_enabled', 'whatsapp_enabled')
     fieldsets = (
-        ('Brand', {
-            'fields': ('store_name', 'logo'),
-            'description': 'Upload a PNG or JPG logo (max 2MB). It appears in the header and footer. Leave it empty to keep the M monogram.'}),
+        ('Brand & header', {
+            'fields': ('store_name', 'logo', 'tagline', 'footer_about', 'footer_bottom_note'),
+            'description': 'The store name, logo and tagline appear in the header and footer — nothing is hardcoded. Upload a PNG or JPG logo (max 2MB); leave it empty to keep the M monogram.'}),
+        ('Brand color & content color', {
+            'fields': ('brand_color', 'content_color', 'content_text_secondary', 'heading_color'),
+            'description': 'Customize the brand color and content text colors. The purple gradient buttons use brand_color automatically.'
+        }),
+        ('Top scrolling messages', {
+            'fields': ('announcement_enabled', 'announcement_messages', 'announcement_speed'),
+            'description': 'The running ticker above the header. Write one message per line — they scroll one after another. Untick to hide the bar; speed is seconds per loop (10 = fast, 60 = slow).'}),
         ('Payments', {
             'fields': ('stripe_enabled', 'paypal_enabled'),
             'description': 'Untick a method to hide it at checkout. Card payments also need a valid '
@@ -1534,3 +1549,92 @@ class OrderNotificationAdmin(MaimsModelAdmin):
 
 
 maims_admin.register(OrderNotification, OrderNotificationAdmin)
+
+
+
+class WishlistItemAdmin(MaimsModelAdmin):
+    """
+    Read-mostly view of who saved what. A wishlist is customer intent, not a
+    task queue, so there is nothing to act on here — but seeing demand for a
+    product before it sells out is exactly the signal a shop owner wants, and
+    this list makes it visible at a glance.
+    """
+
+    list_display = ('product_link', 'customer', 'created_at')
+    list_display_links = ('product_link',)
+    list_filter = ('created_at',)
+    search_fields = ('product__name', 'product__slug', 'user__username', 'user__email')
+    readonly_fields = ('user', 'product', 'created_at')
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('product', 'user')
+
+    @admin.display(description='Product', ordering='product__name')
+    def product_link(self, obj):
+        return format_html(
+            '<strong><a href="{}">{}</a></strong>',
+            reverse('admin:products_product_change', args=[obj.product_id]),
+            obj.product.name,
+        )
+
+    @admin.display(description='Customer', ordering='user__username')
+    def customer(self, obj):
+        if not obj.user_id:
+            return '—'
+        name = obj.user.get_full_name() or obj.user.username
+        return format_html('<a href="{}">{}</a>',
+                           reverse('admin:auth_user_change', args=[obj.user_id]),
+                           name)
+
+
+class HeroBannerSettingsAdmin(MaimsModelAdmin):
+    """The homepage hero banner's stage directions — one row, edited in place.
+
+    HeroSlide rows are the *content* (images and copy); this row is the
+    *controls* (whether the banner shows, how tall it is, how transparent the
+    3D layer is, how fast it rotates, and the accent colour). Nothing here
+    requires a code change or a redeploy.
+    """
+    list_display = ('hero_enabled', 'height_preset', 'overlay_strength', 'kenburns_intensity',
+                    'hero_3d_enabled', 'hero_3d_opacity', 'rotation_seconds', 'accent_color', 'updated_at')
+    list_display_links = ('hero_enabled',)
+    list_editable = ('height_preset', 'overlay_strength', 'kenburns_intensity',
+                     'hero_3d_enabled', 'hero_3d_opacity', 'rotation_seconds', 'accent_color')
+    list_filter = ('hero_enabled', 'hero_3d_enabled', 'autoplay', 'glass_cards')
+    search_fields = ('accent_color',)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related()
+
+    def has_add_permission(self, request):
+        # Singleton: the row is created automatically by HeroBannerSettings.get().
+        return False
+
+    def has_delete_permission(self, request):
+        # Deleting the row would leave the homepage without a banner stage.
+        return False
+
+    fieldsets = (
+        ('Show / hide', {
+            'fields': ('hero_enabled', 'autoplay'),
+            'description': 'Untick <b>hero enabled</b> to hide the entire banner — the page then starts at the category strip. Untick <b>autoplay</b> to stop the slides rotating (useful for a single announcement).'}),
+        ('Layout', {
+            'fields': ('height_preset', 'overlay_strength', 'kenburns_intensity'),
+            'description': '<b>Height</b> fills more of the viewport. <b>Overlay</b> is the dark layer over the slide image, 0-95 — higher makes the text more readable but hides more of the photo. <b>Ken burns</b> is how much each slide zooms in during its rotation, 0-40.'}),
+        ('3D background (transparency)', {
+            'fields': ('hero_3d_enabled', 'hero_3d_opacity', 'hero_3d_blend'),
+            'description': 'The animated wireframe + drifting orbs behind the slides. Untick <b>show 3D</b> to switch it off entirely; <b>opacity</b> 0-100 dims it while keeping it enabled; <b>screen blend</b> lets the 3D layer sit on top of the photo instead of covering it.'}),
+        ('Motion', {
+            'fields': ('rotation_seconds', 'transition_ms'),
+            'description': 'Seconds between slides and the crossfade duration in milliseconds.'}),
+        ('Design tokens', {
+            'fields': ('accent_color', 'text_shadow', 'glass_cards'),
+            'description': 'Re-skin the banner without touching the stylesheet. <b>Accent colour</b> is used by the badge, progress bars and buttons. <b>Text shadow</b> keeps the headline readable over any photo. <b>Glassmorphism card</b> wraps the headline in a semi-transparent blurred card.'}),
+    )
+
+
+maims_admin.register(HeroBannerSettings, HeroBannerSettingsAdmin)
+maims_admin.register(WishlistItem, WishlistItemAdmin)

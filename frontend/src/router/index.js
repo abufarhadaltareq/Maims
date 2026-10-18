@@ -9,6 +9,7 @@ const SearchView = () => import('../views/SearchView.vue')
 const ProductDetail = () => import('../views/ProductDetail.vue')
 const CartView = () => import('../views/CartView.vue')
 const CheckoutView = () => import('../views/CheckoutView.vue')
+const WishlistView = () => import('../views/WishlistView.vue')
 const OrderHistoryView = () => import('../views/OrderHistoryView.vue')
 const SignUpView = () => import('../views/SignUpView.vue')
 const LogInView = () => import('../views/LogInView.vue')
@@ -52,6 +53,11 @@ const routes = [
     path: '/cart',
     name: 'cart',
     component: CartView
+  },
+  {
+    path: '/wishlist',
+    name: 'wishlist',
+    component: WishlistView
   },
   {
     path: '/checkout',

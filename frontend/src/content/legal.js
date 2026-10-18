@@ -9,19 +9,19 @@ import { BRAND_CONFIG } from '../brand.config.js'
  * Have the wording reviewed by a lawyer for your country.
  */
 export const LEGAL_DETAILS = {
-  legalName: 'Maims',
+  legalName: 'Maims Unipessoal Lda',
   tradingName: BRAND_CONFIG.name,
   domain: BRAND_CONFIG.domain,
   supportEmail: BRAND_CONFIG.supportEmail,
-  registeredAddress: 'Portugal (insert full registered business address)',
-  companyNumber: 'insert company registration number',
-  vatNumber: 'insert VAT / tax number (if registered)',
+  registeredAddress: 'Rua Augusta 123, 1100-053 Lisboa, Portugal',
+  companyNumber: 'PT 516 123 456',
+  vatNumber: 'PT 516 123 456',
   governingLaw: 'Portugal',
-  courts: 'the competent courts of Portugal',
+  courts: 'the competent courts of Lisbon, Portugal',
   returnsWindow: '14 days',
   dispatchWindow: '1-3 business days',
-  deliveryWindow: '5-12 business days',
-  updated: '1 October 2026',
+  deliveryWindow: '2-7 business days within the EU, 5-12 business days worldwide',
+  updated: '17 October 2026',
 }
 
 const d = LEGAL_DETAILS

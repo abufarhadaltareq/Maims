@@ -27,12 +27,7 @@
       </div>
       <p class="text-gray-600 font-semibold text-lg mb-1">Your bag is currently empty.</p>
       <p class="text-gray-400 text-sm mb-6">Fresh drops are waiting in the collections.</p>
-      <router-link
-        to="/"
-        class="inline-block bg-gradient-brand text-white font-bold px-8 py-3.5 rounded-full shadow-brand hover:brightness-105 transition"
-      >
-        Explore Collections
-      </router-link>
+      <ExploreButton>Explore Collections</ExploreButton>
     </div>
 
     <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -41,7 +36,7 @@
       <div class="lg:col-span-2 space-y-5">
         <div
           v-for="item in cartStore.items"
-          :key="`${item.product?.id || item.id}-${item.size || 'default'}`"
+          :key="`${item.product?.id || item.id}-${item.variant || item.size || 'default'}`"
           class="group flex gap-4 sm:gap-5 p-4 sm:p-5 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-brand transition-all duration-300"
         >
           <!-- Clickable product image -->
@@ -69,6 +64,7 @@
                   {{ item.product?.name }}
                 </router-link>
                 <p class="text-sm text-gray-500 font-medium">{{ getItemDisplayPrice(item).string }} each</p>
+                <p v-if="item.variant || item.size" class="text-xs font-bold text-slate-700 mt-1">{{ item.variant || item.size }}</p>
 
                 <!-- Star rating (admin moderates reviews) -->
                 <p v-if="item.product?.average_rating != null" class="text-xs text-amber-500 font-bold mt-0.5">
@@ -120,7 +116,7 @@
                 v-if="sizeOptions(item).length"
                 :value="item.size || ''"
                 @change="changeSize(item, $event)"
-                class="text-sm font-semibold border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-blue-600"
+                class="text-sm font-semibold border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-brand"
                 aria-label="Size"
               >
                 <option value="" disabled>Select size</option>
@@ -137,7 +133,7 @@
                   :value="item.quantity"
                   @change="(e) => cartStore.setQuantity(item.product?.id, item.size, e.target.value)"
                   type="number" min="1" max="99"
-                  class="w-12 text-center font-bold text-sm border border-gray-200 rounded-lg py-1.5 focus:outline-blue-600"
+                  class="w-12 text-center font-bold text-sm border border-gray-200 rounded-lg py-1.5 focus:outline-brand"
                   aria-label="Quantity"
                 />
                 <button
@@ -197,7 +193,7 @@
 
         <div class="flex justify-between items-baseline">
           <span class="font-bold text-base">Estimated Total:</span>
-          <span class="font-black text-2xl text-blue-600">{{ cartTotalDisplayPrice }}</span>
+          <span class="font-black text-2xl text-brand">{{ cartTotalDisplayPrice }}</span>
         </div>
 
         <p v-if="hasOutOfStock" class="text-xs font-semibold text-red-600 bg-red-50 rounded-lg px-3 py-2">
@@ -207,7 +203,7 @@
         <router-link
           to="/checkout"
           :class="hasOutOfStock ? 'opacity-40 pointer-events-none' : ''"
-          class="block w-full text-center bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow hover:bg-blue-700 transition duration-200 mt-1"
+          class="block w-full text-center bg-gradient-brand text-white font-bold py-3.5 rounded-xl shadow hover:brightness-110 transition duration-200 mt-1"
         >
           Proceed to Checkout
         </router-link>
@@ -216,7 +212,7 @@
           v-if="site.whatsappEnabled && whatsappCartLink"
           :href="whatsappCartLink"
           target="_blank" rel="noopener"
-          class="flex items-center justify-center gap-2 w-full text-center bg-[#25D366] text-white font-bold py-3 rounded-xl shadow hover:brightness-95 transition duration-200"
+          class="flex items-center justify-center gap-2 w-full text-center bg-gradient-brand text-white font-bold py-3 rounded-xl shadow hover:brightness-95 transition duration-200"
         >
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.4 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.9-4.3-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5s.8 1.9.8 2c.1.1.1.3 0 .5-.3.6-.6.8-.4 1.1.6 1.1 1.4 1.8 2.4 2.4.3.2.5.1.7-.1l.8-.9c.2-.3.4-.2.7-.1l2 1c.3.1.5.2.6.4 0 .1 0 .6-.5 1.5z"/></svg>
           Order via WhatsApp
@@ -227,7 +223,7 @@
           v-if="site.messengerUrl"
           :href="site.messengerUrl"
           target="_blank" rel="noopener"
-          class="flex items-center justify-center gap-2 w-full text-center bg-[#0084FF] text-white font-bold py-3 rounded-xl shadow hover:brightness-95 transition duration-200"
+          class="flex items-center justify-center gap-2 w-full text-center bg-gradient-brand text-white font-bold py-3 rounded-xl shadow hover:brightness-95 transition duration-200"
         >
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
           Message us on Messenger
@@ -244,6 +240,7 @@ import { computed, onMounted } from 'vue'
 import { useCartStore } from '../stores/cart'
 import { useSiteStore } from '../stores/site'
 import { getProductDisplayPrice } from '../utils/pricing.js'
+import ExploreButton from '../components/ExploreButton.vue'
 
 const cartStore = useCartStore()
 const site = useSiteStore()

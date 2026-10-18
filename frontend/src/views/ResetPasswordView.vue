@@ -39,7 +39,7 @@
       <button
         type="submit"
         :disabled="loading"
-        class="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold rounded-lg transition dynamic-shadow mt-2"
+        class="w-full py-3 bg-gradient-brand hover:brightness-110 disabled:opacity-50 text-white font-bold rounded-lg transition dynamic-shadow mt-2"
       >
         {{ loading ? 'Updating…' : 'Set new password' }}
       </button>
@@ -50,7 +50,7 @@
     </div>
 
     <p class="text-sm text-gray-600 text-center mt-6">
-      <router-link to="/log-in" class="text-blue-600 hover:underline font-semibold">
+      <router-link to="/log-in" class="text-brand hover:underline font-semibold">
         {{ done ? 'Go to log in' : 'Back to log in' }}
       </router-link>
     </p>

@@ -20,6 +20,25 @@
 }
 .maims-home__summary strong { color: var(--maims-ink); }
 
+/* KPI cards: the friendliest part of the dashboard — one click per card. */
+.maims-cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px; margin: 0 0 26px; max-width: 900px;
+}
+.maims-card {
+  display: block; background: #fff; border: 1px solid var(--maims-line);
+  border-radius: 14px; padding: 14px 16px; text-decoration: none;
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+a.maims-card:hover { box-shadow: 0 8px 24px -12px rgba(59, 7, 100, .35); transform: translateY(-1px); }
+.maims-card__label {
+  display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--maims-muted);
+}
+.maims-card__value { display: block; font-size: 30px; font-weight: 800; color: var(--maims-ink); line-height: 1.2; }
+.maims-card__value--small { font-size: 18px; }
+.maims-card__hint { display: block; font-size: 12px; color: var(--maims-muted); margin-top: 2px; }
+
 .maims-block { margin-bottom: 30px; max-width: 720px; }
 .maims-block h2 {
   font-size: 12px; text-transform: uppercase; letter-spacing: .1em;

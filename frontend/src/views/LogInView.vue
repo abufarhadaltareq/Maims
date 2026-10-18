@@ -29,7 +29,7 @@
       </div>
 
       <div class="text-right -mt-1">
-        <router-link to="/forgot-password" class="text-xs text-blue-600 hover:underline font-semibold">Forgot password?</router-link>
+        <router-link to="/forgot-password" class="text-xs text-brand hover:underline font-semibold">Forgot password?</router-link>
       </div>
 
       <div v-if="error" class="p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded">
@@ -39,7 +39,7 @@
       <button
         type="submit"
         :disabled="auth.loading"
-        class="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold rounded-lg transition dynamic-shadow mt-2"
+        class="w-full py-3 bg-gradient-brand hover:brightness-110 disabled:opacity-50 text-white font-bold rounded-lg transition dynamic-shadow mt-2"
       >
         {{ auth.loading ? 'Logging in…' : 'Log In' }}
       </button>
@@ -47,7 +47,7 @@
 
     <p class="text-sm text-gray-600 text-center mt-6">
       Don't have an account yet?
-      <router-link to="/sign-up" class="text-blue-600 hover:underline font-semibold">Sign Up</router-link>
+      <router-link to="/sign-up" class="text-brand hover:underline font-semibold">Sign Up</router-link>
     </p>
   </div>
 </template>

@@ -1,7 +1,7 @@
 <template>
   <div class="p-8 max-w-7xl mx-auto">
     <h2 class="text-xl font-bold mb-6">
-      Search Results for: <span class="text-blue-600">"{{ route.query.q }}"</span>
+      Search Results for: <span class="text-brand">"{{ route.query.q }}"</span>
     </h2>
 
     <div v-if="loading" class="text-gray-500">Searching...</div>

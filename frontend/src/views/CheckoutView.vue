@@ -72,7 +72,8 @@ const formattedItems = computed(() => {
     product_id: item.product.id,
     quantity: item.quantity || 1,
     price: itemPrice(item).toFixed(2),
-    selectedSize: item.size || ''
+    selectedSize: item.size || '',
+    variant: item.variant || item.size || ''
   }))
 })
 
@@ -253,12 +254,12 @@ const submitCheckoutForm = async () => {
         v-if="successMethod === 'whatsapp' && successWhatsappLink"
         :href="successWhatsappLink"
         target="_blank" rel="noopener"
-        class="block bg-[#25D366] text-white font-bold px-6 py-3.5 rounded-xl hover:brightness-95 transition shadow-sm"
+        class="block bg-gradient-brand text-white font-bold px-6 py-3.5 rounded-xl hover:brightness-95 transition shadow-sm"
       >
         Send Order on WhatsApp
       </a>
       <div class="flex gap-3">
-        <router-link to="/" class="flex-1 block bg-blue-600 text-white font-bold px-6 py-3.5 rounded-xl hover:bg-blue-700 transition shadow-sm">
+        <router-link to="/" class="flex-1 block bg-gradient-brand text-white font-bold px-6 py-3.5 rounded-xl hover:brightness-110 transition shadow-sm">
           Continue Shopping
         </router-link>
         <router-link to="/order-history" class="flex-1 block bg-gray-100 text-gray-800 font-bold px-6 py-3.5 rounded-xl hover:bg-gray-200 transition shadow-sm">
@@ -285,18 +286,18 @@ const submitCheckoutForm = async () => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">First Name</label>
-                <input type="text" v-model="form.first_name" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600" />
+                <input type="text" v-model="form.first_name" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand" />
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Last Name</label>
-                <input type="text" v-model="form.last_name" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600" />
+                <input type="text" v-model="form.last_name" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand" />
               </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Email Address</label>
-                <input type="email" v-model="form.email" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600" />
+                <input type="email" v-model="form.email" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand" />
                 <label v-if="site.newsletterCheckoutEnabled" class="mt-2 flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
                   <input
                     type="checkbox"
@@ -315,8 +316,8 @@ const submitCheckoutForm = async () => {
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Phone Number</label>
                 <div class="flex gap-2">
-                  <input type="text" v-model="form.country_code" required class="w-24 border border-gray-200 rounded-lg p-2.5 text-sm text-center focus:outline-blue-600" />
-                  <input type="tel" v-model="form.phone" required class="flex-1 border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600" />
+                  <input type="text" v-model="form.country_code" required class="w-24 border border-gray-200 rounded-lg p-2.5 text-sm text-center focus:outline-brand" />
+                  <input type="tel" v-model="form.phone" required class="flex-1 border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand" />
                 </div>
                 <label class="mt-2 flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
                   <input
@@ -335,11 +336,11 @@ const submitCheckoutForm = async () => {
               </div>
             </div>
 
-            <input type="text" v-model="form.address" placeholder="Address" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600" />
+            <input type="text" v-model="form.address" placeholder="Address" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand" />
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <input type="text" v-model="form.place" placeholder="City" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600" />
-              <input type="text" v-model="form.zipcode" placeholder="Zipcode" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-blue-600" />
+              <input type="text" v-model="form.place" placeholder="City" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand" />
+              <input type="text" v-model="form.zipcode" placeholder="Zipcode" required class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand" />
             </div>
           </div>
 
@@ -350,7 +351,7 @@ const submitCheckoutForm = async () => {
                 v-if="site.stripeEnabled"
                 type="button"
                 @click="paymentMethod = 'stripe'"
-                :class="paymentMethod === 'stripe' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'"
+                :class="paymentMethod === 'stripe' ? 'border-brand bg-purple-50' : 'border-gray-200'"
                 class="border-2 rounded-xl p-3 text-left transition"
               >
                 <p class="font-bold text-sm">💳 Card</p>
@@ -360,7 +361,7 @@ const submitCheckoutForm = async () => {
                 v-if="site.paypalEnabled"
                 type="button"
                 @click="paymentMethod = 'paypal'"
-                :class="paymentMethod === 'paypal' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'"
+                :class="paymentMethod === 'paypal' ? 'border-brand bg-purple-50' : 'border-gray-200'"
                 class="border-2 rounded-xl p-3 text-left transition"
               >
                 <p class="font-bold text-sm">🅿️ PayPal</p>
@@ -370,7 +371,7 @@ const submitCheckoutForm = async () => {
                 v-if="site.whatsappEnabled"
                 type="button"
                 @click="paymentMethod = 'whatsapp'"
-                :class="paymentMethod === 'whatsapp' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'"
+                :class="paymentMethod === 'whatsapp' ? 'border-brand bg-purple-50' : 'border-gray-200'"
                 class="border-2 rounded-xl p-3 text-left transition"
               >
                 <p class="font-bold text-sm">💬 WhatsApp Order</p>
@@ -388,13 +389,13 @@ const submitCheckoutForm = async () => {
             <p class="text-[11px] text-gray-400">Secured by Stripe. We never store your card number.</p>
             <p v-if="serverError" class="text-sm text-red-500">{{ serverError }}</p>
           </div>
-          <div v-else class="bg-blue-50 border border-blue-100 rounded-xl p-5 text-sm text-blue-900">
+          <div v-else class="bg-purple-50 border border-blue-100 rounded-xl p-5 text-sm text-blue-900">
             <p v-if="paymentMethod === 'paypal'" class="font-semibold">No card details needed here — once the order is placed we'll email you a secure PayPal payment link.</p>
             <p v-else class="font-semibold">No card needed — your order is saved, then sent to our WhatsApp Business number with one tap.</p>
             <p v-if="serverError" class="text-sm text-red-500 mt-2">{{ serverError }}</p>
           </div>
 
-          <button type="submit" :disabled="isProcessing" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition disabled:opacity-70">
+          <button type="submit" :disabled="isProcessing" class="w-full bg-gradient-brand text-white font-bold py-4 rounded-xl hover:brightness-110 transition disabled:opacity-70">
             <span v-if="isProcessing">Processing...</span>
             <span v-else-if="paymentMethod === 'stripe'">Pay {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
             <span v-else-if="paymentMethod === 'paypal'">Place PayPal Order · {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
@@ -404,10 +405,10 @@ const submitCheckoutForm = async () => {
 
         <div class="lg:col-span-5 bg-gray-50 border border-gray-100 rounded-xl p-6 space-y-4 text-left">
           <h2 class="font-bold text-lg tracking-tight mb-4">Review Your Bag</h2>
-          <div v-for="item in cartStore.items" :key="`${item.product.id}-${item.size || 'default'}`" class="flex justify-between py-2 border-b">
+          <div v-for="item in cartStore.items" :key="`${item.product.id}-${item.variant || item.size || 'default'}`" class="flex justify-between py-2 border-b">
             <div>
               <span class="font-semibold">{{ item.product.name }}</span>
-              <p v-if="item.size" class="text-xs text-gray-500">Size: {{ item.size }}</p>
+              <p v-if="item.variant || item.size" class="text-xs text-gray-500">{{ item.variant || `Size: ${item.size}` }}</p>
             </div>
             <span>{{ (itemPrice(item) * (item.quantity || 0)).toFixed(2) }} {{ cartStore.currentCurrency }}</span>
           </div>

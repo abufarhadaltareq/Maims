@@ -41,8 +41,8 @@
     <div v-else-if="!sorted.length" class="text-center py-16 border border-dashed border-gray-200 rounded-2xl bg-gray-50/60">
       <p class="font-bold text-lg text-gray-700">{{ showSocialOnly ? 'No Facebook drops yet' : 'No arrivals yet' }}</p>
       <p class="text-gray-400 text-sm mt-1 mb-5">{{ showSocialOnly ? 'Sync the Page to fill this shelf.' : 'Fresh pieces are on the way.' }}</p>
-      <button v-if="showSocialOnly" @click="showSocialOnly = false" class="text-sm font-bold bg-slate-900 text-white px-5 py-2.5 rounded-full hover:bg-slate-700 transition">Show everything</button>
-      <router-link v-else to="/" class="inline-block text-sm font-bold bg-slate-900 text-white px-5 py-2.5 rounded-full hover:bg-slate-700 transition">Back to homepage</router-link>
+      <button v-if="showSocialOnly" @click="showSocialOnly = false" class="text-sm font-bold bg-[var(--color-brand)] text-white px-5 py-2.5 rounded-full hover:bg-[var(--color-brand)]/80 transition">Show everything</button>
+      <router-link v-else to="/" class="inline-block text-sm font-bold bg-[var(--color-brand)] text-white px-5 py-2.5 rounded-full hover:bg-[var(--color-brand)]/80 transition">Back to homepage</router-link>
     </div>
 
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">

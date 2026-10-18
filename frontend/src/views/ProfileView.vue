@@ -2,7 +2,7 @@
   <div class="max-w-2xl mx-auto my-12 p-6">
     <div class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden text-left">
       
-      <div class="bg-gray-800 text-white px-8 py-6">
+      <div class="bg-[var(--color-brand)] text-white px-8 py-6">
         <h1 class="text-2xl font-black uppercase tracking-tight">Your Profile</h1>
         <p class="text-sm text-gray-400 mt-1">Manage your account information and default shipping address.</p>
       </div>
@@ -27,7 +27,7 @@
             <input
               v-model="profile.first_name"
               type="text"
-              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-brand font-medium text-sm transition"
               placeholder="First name"
             />
           </div>
@@ -36,7 +36,7 @@
             <input
               v-model="profile.last_name"
               type="text"
-              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-brand font-medium text-sm transition"
               placeholder="Last name"
             />
           </div>
@@ -52,7 +52,7 @@
             <input 
               v-model="profile.phone" 
               type="text" 
-              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-brand font-medium text-sm transition"
               placeholder="e.g., +351 912 345 678"
             />
           </div>
@@ -62,7 +62,7 @@
             <input 
               v-model="profile.address" 
               type="text" 
-              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-brand font-medium text-sm transition"
               placeholder="e.g., Rua Augusta, Nº 100"
             />
           </div>
@@ -73,7 +73,7 @@
               <input 
                 v-model="profile.zipcode" 
                 type="text" 
-                class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+                class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-brand font-medium text-sm transition"
                 placeholder="e.g., 1100-053"
               />
             </div>
@@ -82,7 +82,7 @@
               <input 
                 v-model="profile.place" 
                 type="text" 
-                class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+                class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-brand font-medium text-sm transition"
                 placeholder="e.g., Lisbon"
               />
             </div>
@@ -97,7 +97,7 @@
           <button
             type="submit"
             :disabled="saving"
-            class="w-full bg-blue-600 text-white py-3 rounded-lg font-black uppercase text-sm tracking-wider hover:bg-blue-700 disabled:bg-gray-300 transition shadow-sm"
+            class="w-full bg-gradient-brand text-white py-3 rounded-lg font-black uppercase text-sm tracking-wider hover:brightness-110 disabled:bg-gray-300 transition shadow-sm"
           >
             {{ saving ? 'Saving Changes...' : 'Save Profile Defaults' }}
           </button>
@@ -119,21 +119,21 @@
               v-model="pw.current"
               type="password"
               autocomplete="current-password"
-              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-brand font-medium text-sm transition"
               placeholder="Current password"
             />
             <input
               v-model="pw.next"
               type="password"
               autocomplete="new-password"
-              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-600 font-medium text-sm transition"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:border-brand font-medium text-sm transition"
               placeholder="New password (min. 8 characters)"
             />
             <button
               type="button"
               @click="updatePassword"
               :disabled="pwSaving"
-              class="w-full bg-gray-800 text-white py-2.5 rounded-lg font-black uppercase text-xs tracking-wider hover:bg-black disabled:bg-gray-300 transition"
+              class="w-full bg-[var(--color-brand)] text-white py-2.5 rounded-lg font-black uppercase text-xs tracking-wider hover:bg-[var(--color-brand)]/80 disabled:bg-gray-300 transition"
             >
               {{ pwSaving ? 'Updating…' : 'Update Password' }}
             </button>

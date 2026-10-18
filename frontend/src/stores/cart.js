@@ -61,15 +61,18 @@ export const useCartStore = defineStore('cart', {
       return qty
     },
 
-    addToCart(product, selectedSize = '', quantity = 1) {
+    addToCart(product, selectedSize = '', quantity = 1, variant = '') {
       const qty = Math.max(1, Math.min(99, Number(quantity) || 1))
-      const existingItem = this.items.find(item => item.product.id === product.id && (item.size || '') === (selectedSize || ''))
+      const normVariant = variant || selectedSize || ''
+      const existingItem = this.items.find(item => item.product.id === product.id && (item.variant || item.size || '') === (normVariant || ''))
       if (existingItem) {
         existingItem.quantity = Math.min(99, existingItem.quantity + qty)
         // Refresh snapshot so price/currency changes propagate
         existingItem.product = { ...existingItem.product, ...product }
+        existingItem.variant = normVariant
+        existingItem.size = selectedSize
       } else {
-        this.items.push({ product, size: selectedSize, quantity: qty })
+        this.items.push({ product, size: selectedSize, variant: normVariant, quantity: qty })
       }
       this.persist()
       this.lastAddedAt = Date.now()

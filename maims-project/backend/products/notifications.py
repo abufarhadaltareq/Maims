@@ -28,8 +28,10 @@ import urllib.request
 from decimal import Decimal
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import get_connection, send_mail
+from django.core.mail.message import EmailMessage, EmailMultiAlternatives
 from django.db import transaction
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from .models import Order, OrderNotification, SiteSettings
@@ -111,6 +113,16 @@ def _shorten(value, limit=300):
     """Provider errors can be long; keep the log and the admin table readable."""
     text = value if isinstance(value, str) else json.dumps(value)
     return text[:limit]
+
+
+def _next_attempt(order, channel, audience, event):
+    """Attempt number the next row for this send should carry (0 on first try)."""
+    last = (OrderNotification.objects
+            .filter(order=order, channel=channel, audience=audience, event=event)
+            .order_by('-attempts', '-created_at')
+            .values_list('attempts', flat=True)
+            .first())
+    return 0 if last is None else last + 1
 
 
 # --- message content ----------------------------------------------------------------
@@ -222,6 +234,85 @@ def customer_body(order):
     return '\n'.join(lines)
 
 
+# --- HTML order receipts ----------------------------------------------------------------
+
+def _receipt_item_rows(order):
+    """One <tr> per ordered product for the itemized receipt table."""
+    rows = []
+    for item in order.items.select_related('product').all():
+        qty = item.quantity or 1
+        label = item.product.name + (f' <span class="receipt-size">({item.size})</span>' if item.size else '')
+        rows.append(
+            '<tr>'
+            f'<td>{label}</td>'
+            f'<td class="num">{qty}</td>'
+            f'<td class="num">{money(item.price, order.currency)}</td>'
+            f'<td class="num">{money(item.price * qty, order.currency)}</td>'
+            '</tr>'
+        )
+    return ''.join(rows)
+
+
+def order_receipt_html(order, store=None):
+    """Full, itemized HTML receipt: order ID, items, shipping address and the
+    total breakdown, branded with the store's identity."""
+    store = store or _store()
+    lines = [
+        f'<p>Hello {order.first_name},</p>',
+        '<p>Your order status is now: '
+        f'<strong>{order.status_message_label}</strong>.</p>',
+    ]
+
+    if order.status == 'rejected':
+        lines += [
+            '<p>We are sorry — we are not able to take this order.</p>',
+            '<p>Nothing has been charged. If this looks wrong, reply to this message.</p>',
+        ]
+    elif order.status == 'accepted':
+        lines.append('<p>Good news — we have confirmed your order and will start packing it shortly.</p>')
+    elif order.status == 'packed':
+        lines.append('<p>Your order is packed and will be handed to the courier shortly.</p>')
+    elif order.status == 'shipped':
+        lines.append('<p>Your order is on its way!</p>')
+        if order.tracking_number:
+            lines.append(f'<p>Tracking number: {order.tracking_number}</p>')
+    elif order.status == 'delivered':
+        lines.append('<p>Your order has been delivered. We hope you love it!</p>')
+        review_hint = _first_product_url(order)
+        if review_hint:
+            lines.append(
+                f'<p>Tell us how it went: <a href="{review_hint}">{review_hint}</a></p>'
+            )
+    elif order.status == 'cancelled':
+        lines.append(
+            '<p>Your order has been cancelled. If this was unexpected, please contact us.</p>'
+        )
+
+    if order.items.filter(product__isnull=False).exists():
+        lines.append('<table class="receipt-items"><thead><tr>'
+                     '<th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>')
+        lines.append(_receipt_item_rows(order))
+        lines.append('</tbody>')
+        lines.append(
+            '<tfoot><tr><td colspan="3" class="num">Total</td>'
+            f'<td class="num"><strong>{money(order.total_amount, order.currency)}</strong></td></tr>'
+        )
+        lines.append('</tfoot>')
+        lines.append('</table>')
+
+    lines += [
+        '',
+        f'<p class="receipt-footer">Delivering to: {order.address}, {order.zipcode} {order.place}</p>',
+        '',
+        f'<p class="receipt-footer">Questions? Reply to this message '
+        f'or email {store.email_from_address or settings.DEFAULT_FROM_EMAIL}</p>',
+        '',
+        f'<p class="receipt-footer">Order #{order.pk} · {order.status_message_label} · '
+        f'{money(order.total_amount, order.currency)}</p>',
+    ]
+    return ''.join(lines)
+
+
 def admin_new_order_body(order):
     admin_base = getattr(settings, 'BACKEND_BASE_URL', '').rstrip('/')
     lines = [
@@ -255,15 +346,74 @@ def _first_product_url(order):
 # Each returns (ok, detail). They never raise: transport errors are converted to
 # ok=False with a short reason so the caller can record the failure.
 
-def _send_email(recipient, subject, body, from_email=None):
+def _email_connection(store=None):
+    """Return a live SMTP connection backed by SiteSettings when configured.
+
+    Falls back to Django's default backend so a shop that never touches the
+    admin still emails without any code change. A failed connection check is
+    logged, never raised, so a misconfigured SMTP setup only ever nulls the
+    channel to 'skipped'.
+    """
+    store = store or _store()
+    host = (store.smtp_host or '').strip()
+    if not host:
+        return None
+
+    port = store.smtp_port or 587
+    use_tls = bool(store.smtp_use_tls)
+    username = (store.smtp_username or '').strip() or None
+    password = store.smtp_password or None
+    if username == '':
+        username = None
     try:
-        send_mail(
-            subject=subject,
-            message=body,
-            from_email=from_email or settings.DEFAULT_FROM_EMAIL or None,
-            recipient_list=[recipient],
-            fail_silently=False,
+        return get_connection(
+            backend='django.core.mail.backends.smtp.EmailBackend',
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            use_tls=use_tls,
         )
+    except Exception:
+        logger.warning('Could not open SMTP connection via SiteSettings', exc_info=True)
+        return None
+
+
+def _send_email(recipient, subject, body, from_email=None, html='', store=None):
+    """Transmit the message and make sure the attempt is recorded unconditionally.
+
+    Both a plain-text body and an optional HTML alternative are sent in one
+    call. `from_email` defaults to the store's configured sender; when neither
+    is set the message is still dispatched by Django's default backend.
+    """
+    store = store or _store()
+    sender = (store.email_from_address or '').strip() or settings.DEFAULT_FROM_EMAIL
+    if not sender:
+        sender = None
+
+    connection = _email_connection(store) if html else None
+    has_part = bool(html)
+
+    try:
+        if has_part:
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=body,
+                from_email=sender,
+                to=[recipient],
+                connection=connection,
+            )
+            msg.attach_alternative(html, 'text/html')
+            msg.send()
+        else:
+            send_mail(
+                subject=subject,
+                message=body,
+                from_email=sender,
+                to=[recipient],
+                fail_silently=False,
+                connection=connection,
+            )
         return True, ''
     except Exception as exc:
         logger.warning('Email to %s failed: %s', recipient, exc)
@@ -323,6 +473,7 @@ def _record(order, channel, audience, event, ok, recipient='', subject='', body=
         subject=subject,
         body=body,
         error=error,
+        attempts=_next_attempt(order, channel, audience, event),
         sent_at=timezone.now() if ok else None,
     )
 
@@ -363,7 +514,8 @@ def notify_customer(order, event=None):
 
     # --- email
     if order.email and not _already_sent(order, 'email', 'customer', event):
-        ok, error = _send_email(order.email, subject, body)
+        html = order_receipt_html(order, store)
+        ok, error = _send_email(order.email, subject, body, html=html, store=store)
         _record(order, 'email', 'customer', event, ok, order.email, subject, body, error)
     elif not order.email:
         _record_skip(order, 'email', 'customer', event, 'No email address on the order')
@@ -408,7 +560,7 @@ def notify_admin_new_order(order):
 
     recipient = admin_recipient_email()
     if recipient and not _already_sent(order, 'email', 'admin', 'new'):
-        ok, error = _send_email(recipient, subject, body)
+        ok, error = _send_email(recipient, subject, body, html=order_receipt_html(order, store), store=store)
         _record(order, 'email', 'admin', 'new', ok, recipient, subject, body, error)
     else:
         _record_skip(order, 'email', 'admin', 'new',
@@ -522,7 +674,8 @@ def resend_failed(order, channel=None):
     Retry the failed sends for an order, from the admin.
 
     Failed rows are deleted first so the dedupe check (which only looks at
-    successful sends) does not short-circuit the retry.
+    successful sends) does not short-circuit the retry. The new attempt rows
+    carry on the attempt count so retries stay bounded.
     """
     failed = order.notifications.filter(status='failed')
     if channel:

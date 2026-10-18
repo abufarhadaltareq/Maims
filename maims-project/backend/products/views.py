@@ -22,14 +22,15 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Avg, Count, F, Prefetch, Q
 from rest_framework.authtoken.models import Token
-from .models import Category, CurrencyPrice, CustomerNotificationSettings, HeroSlide, Order, OrderItem, Product, Review, SiteSettings, UserProfile
+from .models import Category, CurrencyPrice, CustomerNotificationSettings, HeroBannerSettings, HeroSlide, Order, OrderItem, Product, Review, SiteSettings, UserProfile, WishlistItem
 from . import facebook
 from .serializers import (
-    CategorySerializer, CustomerNotificationSettingsSerializer, HeroSlideSerializer, OrderSerializer,
+    CategorySerializer, CustomerNotificationSettingsSerializer, HeroBannerSettingsSerializer, HeroSlideSerializer, OrderSerializer,
     ProductSerializer, ReviewCreateSerializer,
     ReviewSerializer, SiteSettingsSerializer, UserProfileSerializer,
-    RegisterSerializer, UserSerializer,
+    RegisterSerializer, UserSerializer, WishlistAddSerializer, WishlistItemSerializer,
 )
+from .chatbot import ChatbotAgent
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,11 @@ class NewsletterThrottle(_ScopedThrottle):
     scope = 'newsletter'
 
 
+class ChatbotThrottle(_ScopedThrottle):
+    """Caps AI chatbot requests to prevent scraping and abuse."""
+    scope = 'chatbot'
+
+
 # --- 🌟 RESTORED: PRODUCT VIEWS ---
 
 def product_queryset():
@@ -97,6 +103,64 @@ def product_queryset():
     )
 
 
+def apply_catalog_filters(queryset, params):
+    """Shared ?size= ?color= ?fabric= ?length= filtering for catalogue views.
+
+    Matches deshi-besh style browsing: comma-separated multi-values, case
+    insensitive. Size/length/color live in comma-separated CharFields so we
+    match with icontains per value; fabric is an exact choice field.
+    """
+    def _values(key):
+        raw = params.get(key) or params.get(f'{key}s') or ''
+        return [v.strip() for v in str(raw).split(',') if v.strip()]
+
+    for size in _values('size'):
+        queryset = queryset.filter(size_options__icontains=size)
+    for color in _values('color'):
+        queryset = queryset.filter(color_options__icontains=color)
+    for length in _values('length'):
+        queryset = queryset.filter(length_options__icontains=length)
+    fabrics = _values('fabric')
+    if fabrics:
+        q = Q()
+        for fabric in fabrics:
+            q |= Q(fabric_type__iexact=fabric)
+        queryset = queryset.filter(q)
+    return queryset
+
+
+def collect_facets(queryset, limit=60):
+    """Distinct sizes, colors, lengths and fabrics present in a queryset."""
+    from collections import Counter
+    sizes, colors, lengths = Counter(), Counter(), Counter()
+    fabrics = Counter()
+    for row in queryset.values_list('size_options', 'color_options', 'length_options', 'fabric_type'):
+        for counter, raw in ((sizes, row[0]), (colors, row[1]), (lengths, row[2])):
+            if raw:
+                for part in str(raw).split(','):
+                    val = part.strip()
+                    if val:
+                        counter[val] += 1
+        if row[3]:
+            fabrics[row[3]] += 1
+
+    def _sorted(counter):
+        def _key(item):
+            name, _ = item
+            try:
+                return (0, float(name))
+            except ValueError:
+                return (1, name.lower())
+        return [{'value': name, 'count': count} for name, count in sorted(counter.items(), key=_key)][:limit]
+
+    return {
+        'sizes': _sorted(sizes),
+        'colors': _sorted(colors),
+        'lengths': _sorted(lengths),
+        'fabrics': [{'value': name, 'count': count} for name, count in sorted(fabrics.items())],
+    }
+
+
 class LatestProductsList(APIView):
     permission_classes = [AllowAny]
 
@@ -116,8 +180,67 @@ class LatestProductsList(APIView):
         else:
             products = product_queryset().all()
 
+        # Visible storefront rows only + ?size/?color/?fabric/?length= filters
+        # from the deshi-besh style sidebar.
+        products = apply_catalog_filters(
+            products.filter(is_visible=True), request.query_params)
+
         serializer = ProductSerializer(products, many=True, context={'request': request})
         return Response(serializer.data)
+
+
+class ProductFacets(APIView):
+    """Distinct sizes/colors/lengths/fabrics for the filter sidebar.
+
+    GET /api/v1/facets/?category=<slug> — scoped to a category when given,
+    whole visible catalogue otherwise.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, format=None):
+        qs = product_queryset().filter(is_visible=True)
+        category_slug = request.query_params.get('category', '').strip()
+        if category_slug and category_slug != 'undefined':
+            try:
+                category = Category.objects.get(slug=category_slug)
+                child_ids = list(category.children.values_list('id', flat=True))
+                qs = qs.filter(Q(category=category) | Q(category_id__in=child_ids))
+            except Category.DoesNotExist:
+                return Response({'sizes': [], 'colors': [], 'lengths': [], 'fabrics': []})
+        return Response(collect_facets(qs))
+
+
+class FavoriteBrandsList(APIView):
+    """Brand rail for the catalogue page (deshi-besh 'Favorite Brands').
+
+    Derived from Product.brand_name so the shop never configures it twice:
+    the most-used brand names with a representative image each.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, format=None):
+        from django.db.models import Count
+        limit = request.query_params.get('limit', '12')
+        try:
+            limit = max(1, min(int(limit), 30))
+        except (TypeError, ValueError):
+            limit = 12
+        rows = (product_queryset().filter(is_visible=True)
+                .exclude(brand_name__isnull=True).exclude(brand_name='')
+                .values('brand_name').annotate(total=Count('id'))
+                .order_by('-total')[:limit])
+        brands = []
+        for row in rows:
+            name = row['brand_name']
+            sample = (product_queryset().filter(is_visible=True, brand_name=name)
+                      .order_by('-date_added').first())
+            brands.append({
+                'name': name,
+                'count': row['total'],
+                'image': sample.get_image() if sample else '',
+                'slug': sample.slug if sample else '',
+            })
+        return Response(brands)
 
 
 class SocialFeedList(APIView):
@@ -141,7 +264,7 @@ class SocialFeedList(APIView):
                     .order_by('-date_added')[:limit])
         serializer = ProductSerializer(products, many=True, context={'request': request})
         return Response(serializer.data)
-    
+
 class ProductDetail(APIView):
     """
     Handles fetching data for an individual product's detail page.
@@ -1020,7 +1143,7 @@ def change_password(request):
     Token.objects.filter(user=request.user).delete()
     token = Token.objects.create(user=request.user)
     return Response({'message': 'Password changed successfully.', 'token': token.key})
-    
+
 # 🌟 ADD THIS NEW FUNCTION AT THE BOTTOM
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])  # Only logged-in users can view their history
@@ -1338,3 +1461,140 @@ class ReviewDetail(APIView):
             return Response({'error': 'Review not found.'},
                             status=status.HTTP_404_NOT_FOUND)
         return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --- WISHLIST ---
+
+class WishlistList(APIView):
+    """
+    GET  /api/v1/wishlist/   the current user's saved products (newest first)
+    POST /api/v1/wishlist/   save a product  { product_id: <id> }
+
+    POST is idempotent: hearting a product that is already saved returns the
+    existing row (200) instead of an error, so a double-tap or a retried
+    request can never duplicate a row or surface a scary 409 to the customer.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # select_related collapses user+product into one row; ProductSerializer
+        # prefetches its own prices/media/category so the catalogue data is
+        # complete without a per-item query on this side.
+        items = WishlistItem.objects.filter(user=request.user).select_related('product')
+        serializer = WishlistItemSerializer(items, many=True)
+        return Response({'results': serializer.data, 'count': len(serializer.data)})
+
+    def post(self, request):
+        serializer = WishlistAddSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product_id = serializer.validated_data['product_id']
+
+        try:
+            product = Product.objects.get(pk=product_id)
+        except Product.DoesNotExist:
+            return Response({'error': 'Product not found.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        # Idempotent add: return the existing row when already saved.
+        existing = WishlistItem.objects.filter(user=request.user, product=product).first()
+        if existing:
+            return Response(WishlistItemSerializer(existing).data,
+                            status=status.HTTP_200_OK)
+
+        item = WishlistItem.objects.create(user=request.user, product=product)
+        return Response(WishlistItemSerializer(item).data,
+                        status=status.HTTP_201_CREATED)
+
+
+class WishlistDetail(APIView):
+    """
+    DELETE /api/v1/wishlist/<id>/  remove a saved product.
+
+    IDOR GUARD: the lookup is scoped to the requesting user, so deleting another
+    customer's wishlist row returns 404 rather than 403 — the API must not
+    confirm that someone else's row id exists.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        deleted, _ = WishlistItem.objects.filter(pk=pk, user=request.user).delete()
+        if not deleted:
+            return Response({'error': 'Wishlist item not found.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --- Hero banner ---------------------------------------------------------------
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def hero_banner_settings(request):
+    """Public read of the hero banner controls.
+
+    The admin edits one row; every visitor reads it. No auth needed so the
+    homepage renders before the customer is logged in.
+    """
+    settings = HeroBannerSettings.get()
+    return Response(HeroBannerSettingsSerializer(settings).data)
+
+
+# --- 🤖 AI CHATBOT AGENT VIEWS --------------------------------------------------
+
+class ChatbotView(APIView):
+    """
+    POST /api/v1/chatbot/chat/
+    Accepts: { "message": "...", "session_id": "...", "currency": "EUR" }
+    Returns: { "reply": "...", "products": [...], "suggestions": [...], "action": {...} }
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [ChatbotThrottle]
+
+    def post(self, request):
+        message = str(request.data.get('message') or '').strip()
+        if not message:
+            return Response({'error': 'Message cannot be empty.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Cap message length to prevent memory abuse
+        if len(message) > 1000:
+            message = message[:1000]
+
+        session_id = str(request.data.get('session_id') or '').strip()[:64]
+        currency = str(request.data.get('currency') or 'EUR').strip().upper()
+        if currency not in ('EUR', 'USD', 'PKR', 'SEK', 'BDT'):
+            currency = 'EUR'
+
+        user = request.user if request.user and request.user.is_authenticated else None
+
+        agent = ChatbotAgent(currency=currency, user=user, session_id=session_id)
+        response_payload = agent.respond(message)
+
+        return Response(response_payload, status=status.HTTP_200_OK)
+
+
+class ChatbotSuggestionsView(APIView):
+    """
+    GET /api/v1/chatbot/suggestions/
+    Returns initial quick-prompts and greeting for the storefront chat assistant.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        store = SiteSettings.get()
+        store_name = store.store_name or 'Maims'
+        return Response({
+            'store_name': store_name,
+            'greeting': f"Hello and welcome to {store_name}! ✨ I am your personal AI shopping stylist and order assistant. How can I assist you today?",
+            'suggestions': [
+                "Show latest arrivals",
+                "Pure silk sarees under €100",
+                "Unstitched festive suits",
+                "Track my order",
+                "How long does shipping take?",
+                "Chat on WhatsApp",
+            ]
+        })
+
+
