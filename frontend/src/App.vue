@@ -16,7 +16,7 @@
       </div>
       <div class="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 sm:gap-3 md:gap-8 h-16">
         <!-- Left: hamburger category menu (dropdown) -->
-        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 md:min-w-[220px]">
           <div class="relative" @click.stop="isCatMenuOpen = !isCatMenuOpen">
             <button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors" aria-label="Open category menu">
               <svg class="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -38,18 +38,37 @@
               <span v-else class="block px-4 py-2 text-sm text-gray-400">Loading…</span>
             </div>
           </div>
-          <!-- Brand (desktop: left; mobile: centered via order below) -->
+          <!-- Brand left on desktop only -->
           <div class="hidden md:flex items-center gap-1.5 sm:gap-2 min-w-0">
             <BrandLogo />
           </div>
         </div>
 
-        <!-- Center: logo + search stacked on mobile, side-by-side centered on desktop -->
-        <div class="flex-1 min-w-0 flex flex-col items-center gap-1 md:flex-row md:items-center md:justify-center md:gap-6">
-          <div class="md:hidden flex items-center justify-center">
-            <BrandLogo size="sm" :showTagline="false" />
-          </div>
-          <!-- Central Search Context -->
+        <!-- Center (mobile): logo mark only, centered -->
+        <div class="flex-1 flex md:hidden items-center justify-center min-w-0">
+          <router-link to="/" aria-label="Maims — go to homepage" class="inline-flex items-center justify-center select-none">
+            <img
+              v-if="site.logoUrl"
+              :src="site.logoUrl"
+              alt="Maims logo"
+              class="h-9 max-w-[7rem] shrink-0 object-contain"
+            />
+            <svg v-else class="h-9 w-9 shrink-0" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="maimsLogoGradMobile" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#1e293b" />
+                  <stop offset="0.55" stop-color="#0ea5e9" />
+                  <stop offset="1" stop-color="#38bdf8" />
+                </linearGradient>
+              </defs>
+              <rect width="40" height="40" rx="12" fill="url(#maimsLogoGradMobile)" />
+              <path d="M13 27.5V12.5L20 22.5L27 12.5V27.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </router-link>
+        </div>
+
+        <!-- Center (desktop): search -->
+        <div class="hidden md:flex flex-1 min-w-0 items-center justify-center">
           <div class="w-full max-w-xl min-w-0">
             <div class="group relative w-full">
               <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-accent transition-colors">
@@ -61,14 +80,20 @@
               v-model="searchQuery"
               @keyup.enter="performSearch"
               placeholder="Search for products..."
-              class="w-full bg-gray-50 border border-gray-200 rounded-full py-2 md:py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand-accent focus:bg-white focus:ring-4 focus:ring-brand-accent/10 transition"
+              class="w-full bg-gray-50 border border-gray-200 rounded-full py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand-accent focus:bg-white focus:ring-4 focus:ring-brand-accent/10 transition"
             >
             </div>
           </div>
         </div>
         
         <!-- Right Utility Actions -->
-        <div class="flex items-center gap-0.5 sm:gap-1.5">
+        <div class="flex items-center gap-0.5 sm:gap-1.5 md:min-w-[220px] md:justify-end">
+          <!-- Mobile search icon (opens expandable search row) -->
+          <button @click.stop="isMobileSearchOpen = !isMobileSearchOpen" class="md:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors" aria-label="Search">
+            <svg class="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path>
+            </svg>
+          </button>
           <!-- Currency Picker -->
           <div class="relative select-none" @click.stop="isCurrencyOpen = !isCurrencyOpen">
             <button class="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-full hover:bg-gray-100 transition-colors" aria-label="Change currency">
@@ -142,8 +167,26 @@
           </div>
         </div>
       </div>
-      <!-- Aarong-style category row under navbar (replaces sidebar) -->
-      <CategoryNav />
+      <!-- Mobile expandable search row (icon toggles it, hidden on desktop) -->
+      <div v-if="isMobileSearchOpen" class="md:hidden border-t border-gray-100 px-4 py-2">
+        <div class="group relative w-full">
+          <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path>
+            </svg>
+          </span>
+          <input
+            v-model="searchQuery"
+            @keyup.enter="performSearch(); isMobileSearchOpen = false"
+            placeholder="Search for products..."
+            class="w-full bg-gray-50 border border-gray-200 rounded-full py-2 pl-10 pr-4 text-sm outline-none focus:border-brand-accent focus:bg-white focus:ring-4 focus:ring-brand-accent/10 transition"
+          >
+        </div>
+      </div>
+      <!-- Aarong-style category row under navbar (desktop only — hidden on mobile) -->
+      <div class="hidden md:block">
+        <CategoryNav />
+      </div>
     </header>
 
     <!-- Full-width content (no sidebar gutter) -->
@@ -262,6 +305,7 @@ const searchQuery = ref('')
 const isCurrencyOpen = ref(false)
 const isAccountOpen = ref(false)
 const isCatMenuOpen = ref(false)
+const isMobileSearchOpen = ref(false)
 const navCats = ref([])
 const newsletterEmail = ref('')
 const newsletterDone = ref(false)
@@ -288,6 +332,7 @@ watch(() => route.path, () => {
   isCurrencyOpen.value = false
   isAccountOpen.value = false
   isCatMenuOpen.value = false
+  isMobileSearchOpen.value = false
 })
 
 const performSearch = () => {
@@ -323,6 +368,7 @@ onMounted(async () => {
     isCurrencyOpen.value = false
     isAccountOpen.value = false
     isCatMenuOpen.value = false
+    isMobileSearchOpen.value = false
   })
 })
 
