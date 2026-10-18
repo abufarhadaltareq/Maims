@@ -27,7 +27,7 @@ class HeroBannerSettingsSerializer(serializers.ModelSerializer):
             'hero_enabled', 'height_preset', 'overlay_strength', 'kenburns_intensity',
             'hero_3d_enabled', 'hero_3d_opacity', 'hero_3d_blend',
             'rotation_seconds', 'transition_ms', 'autoplay',
-            'accent_color', 'text_shadow', 'glass_cards',
+            'accent_color',
         )
 
 

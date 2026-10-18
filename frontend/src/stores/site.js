@@ -97,8 +97,6 @@ export const useSiteStore = defineStore('site', {
     heroTransition: (s) => Number(s.hero?.transition_ms) || 1100,
     heroAutoplay: (s) => s.hero?.autoplay !== false,
     heroAccent: (s) => s.hero?.accent_color || '#0ea5e9',
-    heroTextShadow: (s) => s.hero?.text_shadow !== false,
-    heroGlassCards: (s) => s.hero?.glass_cards !== false,
   },
   actions: {
     async fetchSettings() {

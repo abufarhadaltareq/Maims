@@ -1603,7 +1603,7 @@ class HeroBannerSettingsAdmin(MaimsModelAdmin):
     list_display_links = ('hero_enabled',)
     list_editable = ('height_preset', 'overlay_strength', 'kenburns_intensity',
                      'hero_3d_enabled', 'hero_3d_opacity', 'rotation_seconds', 'accent_color')
-    list_filter = ('hero_enabled', 'hero_3d_enabled', 'autoplay', 'glass_cards')
+    list_filter = ('hero_enabled', 'hero_3d_enabled', 'autoplay')
     search_fields = ('accent_color',)
 
     def get_queryset(self, request):
@@ -1631,8 +1631,8 @@ class HeroBannerSettingsAdmin(MaimsModelAdmin):
             'fields': ('rotation_seconds', 'transition_ms'),
             'description': 'Seconds between slides and the crossfade duration in milliseconds.'}),
         ('Design tokens', {
-            'fields': ('accent_color', 'text_shadow', 'glass_cards'),
-            'description': 'Re-skin the banner without touching the stylesheet. <b>Accent colour</b> is used by the badge, progress bars and buttons. <b>Text shadow</b> keeps the headline readable over any photo. <b>Glassmorphism card</b> wraps the headline in a semi-transparent blurred card.'}),
+            'fields': ('accent_color',),
+            'description': 'Re-skin the banner without touching the stylesheet. <b>Accent colour</b> is used by the navigation dots and progress bars.'}),
     )
 
 
