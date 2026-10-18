@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-md mx-auto my-12 p-8 bg-white rounded-xl shadow-lg border border-gray-100">
+  <div class="max-w-md mx-auto my-12 p-8 bg-purple-500/10 backdrop-blur-md rounded-2xl shadow-xl border border-purple-500/20">
     <h2 class="text-3xl font-black text-gray-800 mb-2 text-center">Create an Account</h2>
     <p class="text-sm text-gray-500 text-center mb-6">Join Maims for faster checkout & order tracking.</p>
 
@@ -10,7 +10,7 @@
           <input
             type="text"
             v-model="first_name"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
             placeholder="Amina"
           >
         </div>
@@ -19,7 +19,7 @@
           <input
             type="text"
             v-model="last_name"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
             placeholder="Khan"
           >
         </div>
@@ -30,7 +30,7 @@
         <input
           type="text"
           v-model="username"
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
           placeholder="Choose a username"
           required
         >
@@ -41,7 +41,7 @@
         <input
           type="email"
           v-model="email"
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
           placeholder="you@example.com"
           required
         >
@@ -52,7 +52,7 @@
         <input
           type="password"
           v-model="password"
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
           placeholder="Min. 8 characters"
           minlength="8"
           required

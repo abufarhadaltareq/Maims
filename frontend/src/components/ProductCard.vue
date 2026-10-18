@@ -24,12 +24,6 @@
            bubbling into the card's router-link (which would navigate away
            mid-click instead of just toggling the heart / adding to bag). -->
       <div @click.stop class="absolute inset-x-2.5 bottom-2.5 flex gap-2 items-center translate-y-16 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-        <router-link
-          :to="`/products/${product.slug}`"
-          class="flex-1 min-h-[44px] text-center text-[11px] font-bold uppercase tracking-wider bg-gradient-brand text-white py-2.5 rounded-xl shadow hover:brightness-105 transition active:scale-95 items-center justify-center no-underline"
-        >
-          Quick view
-        </router-link>
         <button
           @click.prevent="onAdd"
           :disabled="!product.in_stock"

@@ -10,12 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import dj_database_url
 import os
-from pathlib import Path
-
-from django.templatetags.static import static
 from django.urls import reverse_lazy
+from django.templatetags.static import static
 from django.utils.translation import gettext_lazy as _
+from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -52,15 +52,43 @@ if not DEBUG and SECRET_KEY == _INSECURE_DEV_KEY:
         'SECRET_KEY environment variable must be set to a strong, unique value when DEBUG=False.'
     )
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+# ALLOWED_HOSTS: read from env var, default to localhosts in DEBUG, else empty (must be set in production).
+_allowed_hosts = os.environ.get('ALLOWED_HOSTS')
+if _allowed_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts.split(',') if h.strip()]
+else:
+    if DEBUG:
+        ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+    else:
+        ALLOWED_HOSTS = []
 
 # maims.eu production hosts: CSRF_TRUSTED_ORIGINS must list the exact https
 # origins or admin POSTs (login, save, actions) return 403 once DEBUG=False.
 # Example: CSRF_TRUSTED_ORIGINS=https://maims.eu,https://www.maims.eu
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get(
-    'CSRF_TRUSTED_ORIGINS',
-    'https://maims.eu,https://www.maims.eu,http://localhost:5173,http://127.0.0.1:5173'
-).split(',') if o.strip()]
+_csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS')
+if _csrf_origins:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = []
+
+# FRONTEND_BASE_URL and BACKEND_BASE_URL: read from env vars. In production they are required.
+FRONTEND_BASE_URL = os.environ.get('FRONTEND_BASE_URL')
+if not FRONTEND_BASE_URL:
+    if not DEBUG:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured('FRONTEND_BASE_URL environment variable is required in production.')
+    FRONTEND_BASE_URL = ''
+else:
+    FRONTEND_BASE_URL = FRONTEND_BASE_URL.rstrip('/')
+
+BACKEND_BASE_URL = os.environ.get('BACKEND_BASE_URL')
+if not BACKEND_BASE_URL:
+    if not DEBUG:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured('BACKEND_BASE_URL environment variable is required in production.')
+    BACKEND_BASE_URL = ''
+else:
+    BACKEND_BASE_URL = BACKEND_BASE_URL.rstrip('/')
 
 # Where the built Vue storefront lives. Served at / when the file exists
 # (production), otherwise / falls through to the /health/ JSON probe.
@@ -182,13 +210,25 @@ if os.environ.get('DB_ENGINE', 'postgresql').lower() == 'sqlite':
         }
     }
 else:
-    _database_url = os.environ.get('DATABASE_URL')
-    _config = _postgres_from_url(_database_url) if _database_url else _postgres_from_env()
-    # Reuse connections between requests when talking to PostgreSQL. Kept at 0
-    # (no persistence) by default so short-lived/test processes stay predictable;
+    # Use dj-database-url to parse DATABASE_URL (e.g., from Neon).
+    # If not set, fall back to discrete POSTGRES_* env vars.
+    DATABASES = {
+        'default': dj_database_url.parse(
+            os.environ.get('DATABASE_URL') or
+            f"postgres://{os.environ.get('POSTGRES_USER', 'maims_user')}:"
+            f"{os.environ.get('POSTGRES_PASSWORD', 'maims_password')}@"
+            f"{os.environ.get('POSTGRES_HOST', '127.0.0.1')}:"
+            f"{os.environ.get('POSTGRES_PORT', '5432')}/"
+            f"{os.environ.get('POSTGRES_DB', 'maims_db')}"
+        )
+    }
+    # Enforce SSL in production (when not DEBUG).
+    if not DEBUG:
+        DATABASES['default']['OPTIONS'] = {'sslmode': 'require'}
+    # Reuse connections between requests when talking to PostgreSQL.
+    # Kept at 0 (no persistence) by default so short-lived/test processes stay predictable;
     # production should set DB_CONN_MAX_AGE (e.g. 600).
-    _config['CONN_MAX_AGE'] = int(os.environ.get('DB_CONN_MAX_AGE', '0'))
-    DATABASES = {'default': _config}
+    DATABASES['default']['CONN_MAX_AGE'] = int(os.environ.get('DB_CONN_MAX_AGE', '0'))
 
 
 # Password validation
@@ -241,9 +281,8 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # entry" — the whole catalogue endpoint 500s as soon as one product has a photo.
 STORAGES = {
     'default': {
-        # Swap this for S3Boto3Storage/ whitenoise-free object storage when the
-        # catalogue outgrows the local disk; nothing else needs to change.
-        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        # Use Cloudinary for media in production; local file storage only when DEBUG.
+        'BACKEND': 'django.core.files.storage.FileSystemStorage' if DEBUG else 'django_cloudinary_storage.storage.MediaCloudinaryStorage',
     },
     'staticfiles': {
         'BACKEND': (
@@ -459,7 +498,12 @@ LOGGING = {
 # CORS is allow-listed by default. Allow-all is only enabled when the operator
 # explicitly opts in — it is NEVER auto-enabled just because DEBUG is on.
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False').lower() in ('true', '1', 'yes')
-CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').split(',') if o.strip()]
+# CORS_ALLOWED_ORIGINS: read from env var; in production set to https://maims.eu,https://www.maims.eu.
+_cors_allowed = os.environ.get('CORS_ALLOWED_ORIGINS')
+if _cors_allowed:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_allowed.split(',') if o.strip()]
+else:
+    CORS_ALLOWED_ORIGINS = []
 # Auth uses the Authorization header (token), not cookies, so credentials aren't needed.
 CORS_ALLOW_CREDENTIALS = False
 
@@ -505,11 +549,10 @@ FACEBOOK_SYNC_DEFAULT_STOCK = int(os.environ.get('FACEBOOK_SYNC_DEFAULT_STOCK', 
 # Currency for "price: 2500" lines that carry no currency symbol.
 FACEBOOK_SYNC_DEFAULT_CURRENCY = os.environ.get('FACEBOOK_SYNC_DEFAULT_CURRENCY', 'EUR')
 
-# Real Live Email Settings Configuration
-# Gmail's SMTP endpoint is hardcoded above, so when no credentials are supplied
-# the real backend would raise on every send. Fall back to the console backend
-# (writes the message to stdout, never to a customer) so order notifications
-# can never take down a request or a management command.
+# EMAIL: Render free tier blocks SMTP ports (25, 465, 587). Use console backend for local dev
+# or integrate a third‑party service (SendGrid, Mailgun, etc.) in production.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# SMTP settings are kept for compatibility but will not be used when EMAIL_BACKEND is console.
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')

@@ -7,11 +7,13 @@
     <div v-if="product" class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-12 items-start">
       <div class="space-y-8">
         <div class="relative rounded-[2rem] overflow-hidden shadow-2xl shadow-slate-300/40 transform-gpu hover:-translate-y-1 transition-all duration-500 bg-white">
-          <WishlistHeart
-            :product="product"
-            tip-below
-            className="absolute top-4 right-4 z-10 w-10 h-10 sm:w-12 sm:h-12 border-2 border-white !bg-white shadow-lg shadow-slate-900/25 hover:!bg-white/90 hover:!scale-110 transition-all duration-200"
-          />
+          <div class="absolute top-4 right-4 z-10">
+            <WishlistHeart
+              :product="product"
+              tip-below
+              className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-white !bg-white shadow-lg shadow-slate-900/25 hover:!bg-white/90 hover:!scale-110 transition-all duration-200"
+            />
+          </div>
           
           <div class="h-[640px] sm:h-[760px] lg:h-[880px] bg-[var(--color-brand)]/5 flex items-center justify-center overflow-hidden cursor-zoom-in group" @click="openLightbox">
             <template v-if="activeMedia">

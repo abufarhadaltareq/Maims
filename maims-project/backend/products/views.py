@@ -457,6 +457,7 @@ def _build_order_items(order, items, currency):
         OrderItem.objects.create(
             order=order,
             product=product,
+            product_name=product.name,
             size=size,
             price=unit_price,     # server-side price only
             quantity=qty,

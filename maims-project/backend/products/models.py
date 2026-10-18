@@ -48,6 +48,8 @@ class HeroSlide(models.Model):
     subtitle = models.TextField(blank=True, null=True, default="Discover curated premium clothing collections tailored just for you.")
     button_text = models.CharField(max_length=100, blank=True, null=True, default='Shop Latest Drop')
     # Where the button goes: internal path (/category/women) or full URL
+    badge_text = models.CharField(max_length=100, blank=True, null=True, default='New season drop',
+                                   help_text='Small pill shown above the title')
     button_link = models.CharField(max_length=500, blank=True, null=True, default='#latest-products',
                                    help_text="Internal path like /category/women-clothing or #latest-products, or full https:// URL")
     image = models.ImageField(upload_to='uploads/hero/', blank=True, null=True)
@@ -250,6 +252,7 @@ class Product(models.Model):
     is_visible = models.BooleanField(default=True, db_index=True,
         help_text="Untick to hide this product from the storefront without deleting it.")
     date_added = models.DateTimeField(auto_now_add=True)
+
 
     class Meta:
         ordering = ('-date_added',)
@@ -836,11 +839,13 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, blank=True, null=True)
     size = models.CharField(max_length=50, blank=True, null=True)
     stitching_selected = models.CharField(max_length=50, default='unstitched')
     price = models.DecimalField(max_digits=10, decimal_places=2)
     quantity = models.IntegerField(default=1)
+    product_name = models.CharField(max_length=255, blank=True, default='',
+        help_text='Snapshot of the product name at order time, so receipts survive product cleanup.')
 
     class Meta:
         verbose_name = 'Order item'

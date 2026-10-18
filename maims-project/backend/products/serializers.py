@@ -17,7 +17,7 @@ class HeroSlideSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = HeroSlide
-        fields = ("id", "title", "subtitle", "button_text", "button_link", "image_url", "order", "is_active")
+        fields = ("id", "title", "subtitle", "badge_text", "button_text", "button_link", "image_url", "order", "is_active")
 
 
 class HeroBannerSettingsSerializer(serializers.ModelSerializer):
@@ -164,7 +164,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = OrderItem
-        fields = ("id", "product", "size", "stitching_selected", "price", "quantity")
+        fields = ("id", "product", "product_name", "size", "stitching_selected", "price", "quantity")
 
 
 # 6. Order Serializer

@@ -94,10 +94,10 @@
                     :to="`/products/${item.product.slug}`" 
                     class="font-black text-gray-900 text-base hover:text-brand hover:underline transition"
                   >
-                    {{ item.product.name }}
+                    {{ item.product?.name || item.product_name || 'Unknown Product' }}
                   </router-link>
                   <p v-else class="font-black text-gray-900 text-base">
-                    {{ item.product ? item.product.name : 'Unknown Product' }}
+                    {{ item.product?.name || item.product_name || 'Unknown Product' }}
                   </p>
                   
                   <p class="text-xs text-gray-500 font-semibold mt-1">

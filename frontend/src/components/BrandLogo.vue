@@ -41,14 +41,14 @@
     <!-- Wordmark + tagline -->
     <span class="flex flex-col leading-none">
       <span
-        class="brand-wordmark font-semibold uppercase transition-colors group-hover:[color:var(--color-brand)]"
+        class="brand-wordmark font-semibold uppercase text-[var(--color-brand)] transition-colors group-hover:[color:var(--color-brand)]"
         :class="size === 'sm' ? 'text-base' : 'text-lg'"
       >
         {{ wordmarkStart }}<span class="transition-colors group-hover:[color:var(--color-brand)]">{{ wordmarkAccent }}</span>{{ wordmarkEnd }}
       </span>
       <span
         v-if="showTagline && tagline"
-        class="hidden sm:block mt-1 font-semibold uppercase"
+        class="hidden sm:block mt-1 font-semibold uppercase text-[var(--color-brand)]/70"
         :class="size === 'sm' ? 'text-[0.5rem] tracking-[0.3em]' : 'text-[0.55rem] tracking-[0.4em]'"
       >
         {{ tagline }}

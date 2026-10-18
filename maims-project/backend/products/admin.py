@@ -1258,14 +1258,14 @@ class CollectionAdmin(MaimsModelAdmin):
 
 
 class HeroSlideAdmin(MaimsModelAdmin):
-    list_display = ('thumb', 'title', 'order', 'is_active', 'button_text')
+    list_display = ('thumb', 'title', 'order', 'is_active', 'badge_text', 'button_text')
     list_display_links = ('thumb', 'title')
     list_editable = ('order', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('title', 'subtitle')
     readonly_fields = ('image_preview',)
     fieldsets = (
-        ('Text on the slide', {'fields': ('title', 'subtitle', 'button_text', 'button_link')}),
+        ('Text on the slide', {'fields': ('title', 'subtitle', 'badge_text', 'button_text', 'button_link')}),
         ('Background image', {
             'fields': ('image', 'external_image_url', 'image_preview'),
             'description': 'Upload an image OR paste an external https:// URL. The upload wins if both are set.'}),

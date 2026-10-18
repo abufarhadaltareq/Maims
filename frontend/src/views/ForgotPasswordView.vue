@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-md mx-auto my-12 p-8 bg-white rounded-xl shadow-lg border border-gray-100">
+  <div class="max-w-md mx-auto my-12 p-8 bg-purple-500/10 backdrop-blur-md rounded-2xl shadow-xl border border-purple-500/20">
     <h2 class="text-3xl font-black text-gray-800 mb-2 text-center">Forgot your password?</h2>
     <p class="text-sm text-gray-500 text-center mb-6">
       Enter the email of your account and we'll send you a link to set a new password.
@@ -11,7 +11,7 @@
         <input
           type="email"
           v-model="email"
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:outline-none"
           placeholder="you@example.com"
           autocomplete="email"
           required

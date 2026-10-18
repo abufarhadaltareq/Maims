@@ -26,7 +26,7 @@
            :class="{ 'drop-shadow-lg': siteStore.heroTextShadow, 'backdrop-blur-md bg-white/10 border border-white/20 rounded-[2rem] p-10': siteStore.heroGlassCards }">
         <p class="animate-slide-left inline-flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.28em] px-4 py-1.5 mb-5 rounded-full" style="animation-delay: 0s; background: color-mix(in srgb, var(--hero-accent) 22%, transparent); color: #fff; border: 1px solid color-mix(in srgb, var(--hero-accent) 55%, transparent)">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
-          New season drop
+          {{ heroSlides[currentSlide]?.badge_text || 'New season drop' }}
         </p>
         <h1 class="animate-slide-right text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-4 tracking-tight text-balance" style="animation-delay: .08s">
           {{ heroSlides[currentSlide]?.title }}
@@ -86,7 +86,7 @@
     <section v-if="isHomePage && showcase.length" v-reveal class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-4">
       <div class="text-center mb-8">
         <p class="text-[11px] uppercase tracking-[0.3em] text-brand-accent font-bold mb-2">Collections</p>
-        <h2 class="text-3xl font-bold tracking-tight text-gradient-brand">Shop by Category</h2>
+        <h2 class="text-3xl font-extrabold tracking-tight text-gradient-brand">Shop by Category</h2>
         <p class="text-gray-500 mt-2">Curated collections — pick a lane, find your fit.</p>
       </div>
       <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-x-3 gap-y-8">
@@ -119,7 +119,7 @@
       <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-3 mb-6">
         <div>
           <p class="text-[11px] uppercase tracking-[0.3em] text-brand-accent font-bold mb-1.5">Just landed</p>
-          <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">{{ categoryTitle }}</h2>
+          <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-gradient-brand">{{ categoryTitle }}</h2>
           <p class="text-gray-500 text-sm mt-1">{{ products.length }} fresh pieces{{ brands.length ? ` · ${brands.length} brands` : '' }}</p>
         </div>
         <div class="flex items-center gap-4">
@@ -134,7 +134,7 @@
 
       <!-- Favorite brands rail (deshi-besh style, homepage only) -->
       <div v-if="isHomePage && brands.length" class="mb-8">
-        <h3 class="text-center text-2xl font-light tracking-wide mb-5">Favorite Brands</h3>
+        <h3 class="text-center text-2xl font-extrabold tracking-tight text-gradient-brand mb-5">Favorite Brands</h3>
         <div class="flex gap-4 overflow-x-auto no-scrollbar pb-2 snap-x">
           <button
             v-for="b in brands"
@@ -220,7 +220,7 @@
     <!-- ===== Value props — compact trust strip (deshi-besh style) ===== -->
     <section v-if="isHomePage" v-reveal class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div v-for="prop in valueProps" :key="prop.title" class="flex flex-col items-center text-center gap-2 bg-gray-100/80 rounded-xl px-4 py-6">
+        <div v-for="prop in valueProps" :key="prop.title" class="flex flex-col items-center text-center gap-2 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-6 hover:shadow-brand transition">
           <span class="w-10 h-10 flex items-center justify-center text-[var(--color-content)]" v-html="prop.icon"></span>
           <span>
             <span class="block text-[14px] font-bold text-[var(--color-content)] leading-tight">{{ prop.title }}</span>
@@ -235,7 +235,7 @@
       <section v-for="entry in showcase" :key="'sec-' + entry.category.id" v-reveal>
         <div class="flex items-end justify-between mb-6">
           <div class="min-w-0">
-            <h2 class="text-2xl font-bold tracking-tight mb-1">{{ entry.category.name }}</h2>
+            <h2 class="text-2xl font-extrabold tracking-tight text-gradient-brand mb-1">{{ entry.category.name }}</h2>
             <p v-if="entry.category.description" class="text-gray-500 text-sm max-w-xl">{{ entry.category.description }}</p>
           </div>
           <router-link :to="`/category/${entry.category.slug}`" class="text-sm font-semibold text-brand-accent underline decoration-brand-accent/40 hover:decoration-brand-accent whitespace-nowrap ml-4">
