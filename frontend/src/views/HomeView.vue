@@ -370,12 +370,12 @@ const startImageRotation = () => {
   }, interval)
 }
 
-// Admin-controlled hero height: compact by default, ~bit smaller than before.
+// Admin-controlled hero height: big gallery.
 const heroHeightStyle = computed(() => {
   switch (siteStore.heroHeight) {
-    case 'medium': return '52svh'
-    case 'full': return '78svh'
-    default: return '62svh'
+    case 'medium': return '68svh'
+    case 'full': return '92svh'
+    default: return '80svh'
   }
 })
 

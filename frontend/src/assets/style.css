@@ -191,6 +191,15 @@
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+@keyframes icon-3d-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-2px) scale(1.04); }
+}
+@keyframes wishlist-beat {
+  0%, 100% { transform: scale(1); }
+  25%      { transform: scale(1.18); }
+  50%      { transform: scale(1); }
+}
 /* Top header ticker: seamless leftward loop. Duration is set inline from
    Admin → Site settings → announcement_speed (seconds per loop). The content
    is rendered twice so -50% lands exactly on the loop point. */
@@ -240,6 +249,16 @@
   animation: soft-fade 0.8s ease both;
 }
 
+/* 3D navbar icons: gentle float + depth shadow, heartbeat for wishlist. */
+.icon-3d {
+  animation: icon-3d-float 3.5s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+.icon-wishlist-beat {
+  display: inline-block;
+  animation: wishlist-beat 2.2s ease-in-out infinite;
+}
+
 /* Gradient animation — subtle left-right shift for gradient text. */
 @keyframes gradient-x {
   0%   { background-position: 0% 50%; }
@@ -273,7 +292,7 @@
   .animate-hero-glow, .animate-media-switch, .animate-bounce,
   .animate-slide-left, .animate-slide-right, .animate-floaty,
   .animate-ring-pulse, .animate-shimmer, .animate-fade-slide-up,
-  .animate-soft-fade { animation: none !important; }
+  .animate-soft-fade, .icon-3d, .icon-wishlist-beat { animation: none !important; }
 }
 
 /* Print styles — clean. */

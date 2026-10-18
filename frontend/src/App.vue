@@ -14,11 +14,11 @@
           </span>
         </div>
       </div>
-      <div class="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 sm:gap-3 md:gap-8 h-16">
+      <div class="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 sm:gap-3 md:gap-8 h-16 md:h-20">
         <!-- Left: hamburger category menu (dropdown) -->
-        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 md:min-w-[220px]">
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div class="relative" @click.stop="isCatMenuOpen = !isCatMenuOpen">
-            <button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors" aria-label="Open category menu">
+            <button class="icon-3d flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-full hover:bg-gray-100 transition-colors" aria-label="Open category menu">
               <svg class="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
               </svg>
@@ -38,22 +38,18 @@
               <span v-else class="block px-4 py-2 text-sm text-gray-400">Loading…</span>
             </div>
           </div>
-          <!-- Brand left on desktop only -->
-          <div class="hidden md:flex items-center gap-1.5 sm:gap-2 min-w-0">
-            <BrandLogo />
-          </div>
         </div>
 
-        <!-- Center (mobile): logo mark only, centered -->
-        <div class="flex-1 flex md:hidden items-center justify-center min-w-0">
+        <!-- Center: logo mark only (bigger), centered on ALL screens — no brand name, no slogan -->
+        <div class="flex-1 flex items-center justify-center min-w-0">
           <router-link to="/" aria-label="Maims — go to homepage" class="inline-flex items-center justify-center select-none">
             <img
               v-if="site.logoUrl"
               :src="site.logoUrl"
               alt="Maims logo"
-              class="h-9 max-w-[7rem] shrink-0 object-contain"
+              class="h-11 md:h-14 max-w-[10rem] md:max-w-[12rem] shrink-0 object-contain"
             />
-            <svg v-else class="h-9 w-9 shrink-0" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <svg v-else class="h-11 w-11 md:h-14 md:w-14 shrink-0 drop-shadow-md" viewBox="0 0 40 40" fill="none" aria-hidden="true">
               <defs>
                 <linearGradient id="maimsLogoGradMobile" x1="0" y1="0" x2="1" y2="1">
                   <stop offset="0" stop-color="#1e293b" />
@@ -66,34 +62,9 @@
             </svg>
           </router-link>
         </div>
-
-        <!-- Center (desktop): search -->
-        <div class="hidden md:flex flex-1 min-w-0 items-center justify-center">
-          <div class="w-full max-w-xl min-w-0">
-            <div class="group relative w-full">
-              <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-accent transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path>
-                </svg>
-              </span>
-            <input
-              v-model="searchQuery"
-              @keyup.enter="performSearch"
-              placeholder="Search for products..."
-              class="w-full bg-gray-50 border border-gray-200 rounded-full py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand-accent focus:bg-white focus:ring-4 focus:ring-brand-accent/10 transition"
-            >
-            </div>
-          </div>
-        </div>
         
         <!-- Right Utility Actions -->
-        <div class="flex items-center gap-0.5 sm:gap-1.5 md:min-w-[220px] md:justify-end">
-          <!-- Mobile search icon (opens expandable search row) -->
-          <button @click.stop="isMobileSearchOpen = !isMobileSearchOpen" class="md:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors" aria-label="Search">
-            <svg class="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path>
-            </svg>
-          </button>
+        <div class="flex items-center gap-0.5 sm:gap-1.5 shrink-0">
           <!-- Currency Picker -->
           <div class="relative select-none" @click.stop="isCurrencyOpen = !isCurrencyOpen">
             <button class="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-full hover:bg-gray-100 transition-colors" aria-label="Change currency">
@@ -122,8 +93,8 @@
           </div>
 
           <!-- Cart -->
-          <router-link to="/cart" class="relative p-2 sm:p-2.5 bg-white rounded-full transition-all duration-200 hover:scale-105 hover:shadow-lg hover:shadow-slate-900/20" aria-label="View cart">
-            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <router-link to="/cart" class="icon-3d relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-gradient-to-b from-white to-purple-50 border border-purple-100 rounded-full shadow-md shadow-purple-500/20 transition-all duration-200 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/30 active:scale-95" aria-label="View cart">
+            <svg class="w-5 h-5 md:w-6 md:h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
               <path d="M3 6h18" stroke-width="2" stroke-linecap="round"></path>
               <path d="M16 10a4 4 0 0 1-8 0" stroke-width="2" stroke-linecap="round"></path>
@@ -136,9 +107,9 @@
           <!-- Wishlist -->
           <router-link
             to="/wishlist"
-            class="relative p-2 sm:p-2.5 bg-white rounded-full transition-all duration-200 hover:scale-105 hover:shadow-lg hover:shadow-slate-900/20" aria-label="Wishlist"
+            class="icon-3d relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-gradient-to-b from-white to-rose-50 border border-rose-100 rounded-full shadow-md shadow-rose-500/20 transition-all duration-200 hover:scale-110 hover:shadow-lg hover:shadow-rose-500/30 active:scale-95" aria-label="Wishlist"
           >
-            <span class="text-xl text-purple-600">❤️</span>
+            <span class="text-lg md:text-xl leading-none icon-wishlist-beat">❤️</span>
             <span v-if="wishlistStore.count" class="absolute -top-0.5 -right-0.5 bg-gradient-brand text-white text-[10px] min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full font-bold ring-2 ring-white">
               {{ wishlistStore.count }}
             </span>
@@ -146,11 +117,10 @@
 
           <!-- Account menu -->
           <div class="relative" @click.stop="isAccountOpen = !isAccountOpen">
-            <button class="flex items-center gap-1.5 p-2 sm:pl-2 sm:pr-3 bg-white rounded-full transition-all duration-200 hover:scale-105 hover:shadow-lg hover:shadow-slate-900/20 font-semibold" aria-label="Account menu">
-              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button class="icon-3d flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-gradient-to-b from-white to-purple-50 border border-purple-100 rounded-full shadow-md shadow-purple-500/20 transition-all duration-200 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/30 active:scale-95 font-semibold" aria-label="Account menu">
+              <svg class="w-5 h-5 md:w-6 md:h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
               </svg>
-              <span v-if="auth.isAuthenticated" class="max-w-[90px] truncate hidden sm:inline text-sm">{{ auth.username }}</span>
             </button>
             <div v-if="isAccountOpen" class="absolute right-0 mt-2 bg-white border border-gray-100 shadow-xl rounded-2xl w-48 z-50 py-1.5 overflow-hidden">
               <template v-if="auth.isAuthenticated">
@@ -167,25 +137,23 @@
           </div>
         </div>
       </div>
-      <!-- Mobile expandable search row (icon toggles it, hidden on desktop) -->
-      <div v-if="isMobileSearchOpen" class="md:hidden border-t border-gray-100 px-4 py-2">
-        <div class="group relative w-full">
-          <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path>
-            </svg>
-          </span>
-          <input
-            v-model="searchQuery"
-            @keyup.enter="performSearch(); isMobileSearchOpen = false"
-            placeholder="Search for products..."
-            class="w-full bg-gray-50 border border-gray-200 rounded-full py-2 pl-10 pr-4 text-sm outline-none focus:border-brand-accent focus:bg-white focus:ring-4 focus:ring-brand-accent/10 transition"
-          >
+      <!-- Second navbar row: full-width search bar (all screens) — category menus removed -->
+      <div class="border-t border-gray-100">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-2">
+          <div class="group relative w-full max-w-2xl mx-auto">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-accent transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path>
+              </svg>
+            </span>
+            <input
+              v-model="searchQuery"
+              @keyup.enter="performSearch()"
+              placeholder="Search for products..."
+              class="w-full bg-gray-50 border border-gray-200 rounded-full py-2 md:py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand-accent focus:bg-white focus:ring-4 focus:ring-brand-accent/10 transition"
+            >
+          </div>
         </div>
-      </div>
-      <!-- Aarong-style category row under navbar (desktop only — hidden on mobile) -->
-      <div class="hidden md:block">
-        <CategoryNav />
       </div>
     </header>
 
@@ -272,11 +240,9 @@ import { useCartStore, CURRENCIES } from './stores/cart'
 import { useAuthStore } from './stores/auth'
 import { useSiteStore } from './stores/site'
 import { useWishlistStore } from './stores/wishlist'
-// Top category nav (Aarong-style) replaces the old left sidebar
-import CategoryNav from './components/CategoryNav.vue'
+import BrandLogo from './components/BrandLogo.vue'
 import SocialButtons from './components/SocialButtons.vue'
 import SocialIcon from './components/SocialIcon.vue'
-import BrandLogo from './components/BrandLogo.vue'
 import ChatbotWidget from './components/ChatbotWidget.vue'
 import { BRAND_CONFIG } from './brand.config'
 
@@ -305,7 +271,6 @@ const searchQuery = ref('')
 const isCurrencyOpen = ref(false)
 const isAccountOpen = ref(false)
 const isCatMenuOpen = ref(false)
-const isMobileSearchOpen = ref(false)
 const navCats = ref([])
 const newsletterEmail = ref('')
 const newsletterDone = ref(false)
@@ -332,7 +297,6 @@ watch(() => route.path, () => {
   isCurrencyOpen.value = false
   isAccountOpen.value = false
   isCatMenuOpen.value = false
-  isMobileSearchOpen.value = false
 })
 
 const performSearch = () => {
@@ -368,7 +332,6 @@ onMounted(async () => {
     isCurrencyOpen.value = false
     isAccountOpen.value = false
     isCatMenuOpen.value = false
-    isMobileSearchOpen.value = false
   })
 })
 
