@@ -91,7 +91,10 @@ export const useSiteStore = defineStore('site', {
     heroOverlay: (s) => Number(s.hero?.overlay_strength) || 45,
     heroKenburns: (s) => Number(s.hero?.kenburns_intensity) || 12,
     hero3DEnabled: (s) => s.hero?.hero_3d_enabled !== false,
-    hero3DOpacity: (s) => Number(s.hero?.hero_3d_opacity) ?? 45,
+    hero3DOpacity: (s) => {
+      const n = Number(s.hero?.hero_3d_opacity)
+      return Number.isFinite(n) ? n : 45
+    },
     hero3DBlend: (s) => s.hero?.hero_3d_blend !== false,
     heroRotation: (s) => Number(s.hero?.rotation_seconds) || 5,
     heroTransition: (s) => Number(s.hero?.transition_ms) || 1100,
