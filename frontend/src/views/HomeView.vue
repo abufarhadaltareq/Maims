@@ -357,9 +357,9 @@ const startImageRotation = () => {
 // Admin-controlled hero height: medium/tall/full map to viewport units.
 const heroHeightStyle = computed(() => {
   switch (siteStore.heroHeight) {
-    case 'medium': return 'min-h-[70svh]'
-    case 'full': return 'min-h-[100svh]'
-    default: return 'min-h-[85svh]'
+    case 'medium': return '88svh'
+    case 'full': return '100svh'
+    default: return '100svh'
   }
 })
 
