@@ -33,6 +33,14 @@ from .serializers import (
 from .chatbot import ChatbotAgent
 
 logger = logging.getLogger(__name__)
+DELIVERY_FEE_SEK = Decimal('85.00')
+RATES_TO_USD = {
+    'SEK': Decimal('0.095'),
+    'PKR': Decimal('0.0036'),
+    'EUR': Decimal('1.08'),
+    'BDT': Decimal('0.0085'),
+    'USD': Decimal('1.0'),
+}
 
 # 🔑 Make sure STRIPE_SECRET_KEY is added to your settings.py
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -323,14 +331,12 @@ class HeroSlideList(APIView):
 class CategoryShowcase(APIView):
     """
     Homepage "Shop by Category" payload: each homepage-flagged category
-    with up to 8 preview products (children products included).
+    with up to 8 preview products (child products included).
     """
     permission_classes = [AllowAny]
 
     def get(self, request, format=None):
-        cats = Category.objects.filter(
-            parent__isnull=True, show_on_homepage=True
-        ).annotate(
+        cats = Category.objects.filter(show_on_homepage=True).annotate(
             product_count=Count(
                 'products',
                 filter=Q(products__is_visible=True),
@@ -485,6 +491,15 @@ def _build_order_items(order, items, currency):
         )
         subtotal += unit_price * qty
     return subtotal
+
+
+def _delivery_fee(currency):
+    """Convert the fixed SEK delivery fee to the order's selected currency."""
+    target = (currency or 'EUR').upper()
+    if target not in RATES_TO_USD:
+        raise _CheckoutError('Unsupported delivery currency.')
+    amount = DELIVERY_FEE_SEK * RATES_TO_USD['SEK'] / RATES_TO_USD[target]
+    return amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
 def _reserve_stock(order):
@@ -855,21 +870,22 @@ def checkout(request):
             subtotal = _build_order_items(order, data.get('items', []), raw_currency)
             if subtotal <= 0:
                 raise _CheckoutError('Cart total must be greater than zero.')
-            order.total_amount = subtotal
+            order.delivery_fee = _delivery_fee(raw_currency)
+            order.total_amount = subtotal + order.delivery_fee
 
             # PayPal / WhatsApp: no Stripe intent — the order is created unpaid
             # and stock is reserved atomically right now. PayPal is captured
             # later (manually by the shop until a PayPal client ID exists).
             if payment_method in ('paypal', 'whatsapp'):
                 _reserve_stock(order)
-                order.save(update_fields=['total_amount'])
+                order.save(update_fields=['total_amount', 'delivery_fee'])
                 payload = _checkout_response_payload(order)
                 # Customer/admin notifications are dispatched by the post_save
                 # signal on Order, which defers to on_commit internally — so they
                 # only go out once this transaction actually commits.
                 return Response(payload, status=status.HTTP_201_CREATED)
 
-            order.save(update_fields=['total_amount'])
+            order.save(update_fields=['total_amount', 'delivery_fee'])
 
         # 2. Stripe: charge the SERVER-computed subtotal (converted to cents).
         #    Run outside the DB transaction so a slow Stripe call never holds locks.

@@ -287,7 +287,7 @@ class OrderAdmin(MaimsModelAdmin):
     search_fields = ('=id', 'first_name', 'last_name', 'email', 'phone', 'tracking_number',
                      'stripe_payment_intent_id', 'admin_note')
     autocomplete_fields = ('user',)
-    readonly_fields = ('order_ref', 'age', 'created_at', 'total_amount',
+    readonly_fields = ('order_ref', 'age', 'created_at', 'total_amount', 'delivery_fee',
                        'stripe_payment_intent_id', 'items_block', 'contact_customer')
     inlines = (OrderItemInline, OrderNotificationInline)
     fieldsets = (
@@ -301,7 +301,7 @@ class OrderAdmin(MaimsModelAdmin):
                            'opt-in box at checkout. marketing_opt_in is the proof of '
                            'email-marketing consent for this address.'}),
         ('Payment', {
-            'fields': ('total_amount', 'currency', 'payment_method', 'is_paid', 'stripe_payment_intent_id'),
+            'fields': ('total_amount', 'delivery_fee', 'currency', 'payment_method', 'is_paid', 'stripe_payment_intent_id'),
             'description': 'Card payments are confirmed by Stripe automatically. If a status looks wrong, '
                            'fix it with the actions on the orders list.'}),
         ('Fulfilment', {
@@ -1258,17 +1258,16 @@ class CollectionAdmin(MaimsModelAdmin):
 
 
 class HeroSlideAdmin(MaimsModelAdmin):
-    list_display = ('thumb', 'title', 'order', 'is_active', 'badge_text', 'button_text')
+    list_display = ('thumb', 'title', 'media_type', 'order', 'is_active')
     list_display_links = ('thumb', 'title')
     list_editable = ('order', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('title', 'subtitle')
     readonly_fields = ('image_preview',)
     fieldsets = (
-        ('Text on the slide', {'fields': ('title', 'subtitle', 'badge_text', 'button_text', 'button_link')}),
-        ('Background image', {
-            'fields': ('image', 'external_image_url', 'image_preview'),
-            'description': 'Upload an image OR paste an external https:// URL. The upload wins if both are set.'}),
+        ('Media', {
+            'fields': ('media_type', 'title', 'image', 'external_image_url', 'video', 'external_video_url', 'image_preview'),
+            'description': 'Choose an image or video slide. Upload a file or paste a hosted URL.'}),
         ('Position', {
             'fields': ('order', 'is_active'),
             'description': 'Order 1 shows first. Untick <b>active</b> to hide a slide without deleting it.'}),
@@ -1276,14 +1275,25 @@ class HeroSlideAdmin(MaimsModelAdmin):
 
     @admin.display(description='')
     def thumb(self, obj):
+        if obj.media_type == 'video' and obj.get_video_url():
+            return format_html(
+                '<video src="{}" muted playsinline preload="metadata" '
+                'style="width:96px;height:48px;object-fit:cover;"></video>',
+                obj.get_video_url(),
+            )
         return thumbnail(obj.get_image_url(), width=96, height=48)
 
     @admin.display(description='Preview')
     def image_preview(self, obj):
+        if obj.media_type == 'video' and obj.get_video_url():
+            return format_html(
+                '<video src="{}" controls muted playsinline style="max-width:520px;max-height:320px;"></video>',
+                obj.get_video_url(),
+            )
         url = obj.get_image_url()
         if url:
-            return mark_safe(f'<img src="{escape(url)}" style="max-width:520px;border-radius:12px;" />')
-        return 'No image yet — upload one or paste an external URL.'
+            return format_html('<img src="{}" style="max-width:520px;max-height:320px;object-fit:contain;" />', url)
+        return 'No media yet — upload a file or paste an external URL.'
 
 
 class SiteSettingsAdmin(MaimsModelAdmin):

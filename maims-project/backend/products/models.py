@@ -55,6 +55,16 @@ class HeroSlide(models.Model):
     image = models.ImageField(upload_to='uploads/hero/', blank=True, null=True)
     external_image_url = models.URLField(blank=True, null=True,
                                          help_text="Optional: paste an https:// image URL instead of uploading")
+    media_type = models.CharField(
+        max_length=10,
+        choices=(('image', 'Image'), ('video', 'Video')),
+        default='image',
+    )
+    video = models.FileField(upload_to='uploads/hero/videos/', blank=True, null=True)
+    external_video_url = models.URLField(
+        blank=True, null=True,
+        help_text="Optional https:// video URL. Uploaded video takes precedence.",
+    )
     order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -70,14 +80,19 @@ class HeroSlide(models.Model):
             return self.image.url
         return self.external_image_url or ''
 
+    def get_video_url(self):
+        if self.video:
+            return self.video.url
+        return self.external_video_url or ''
+
 
 class HeroBannerSettings(models.Model):
-    """Singleton: global controls for the homepage hero banner.
+    """Singleton: global controls for the homepage hero gallery.
 
     A dedicated model (rather than env vars) so the shop can toggle the
     banner, pick its look and tune its transparency from the admin — no
     code change, no redeploy. There is exactly one row (pk=1); `HeroSlide`
-    rows are the *content* (the images and copy), this row is the *stage*
+    rows are the *content* (images and videos), this row is the *stage*
     (whether the stage is open and how it looks).
     """
 
@@ -710,6 +725,7 @@ class Order(models.Model):
     zipcode = models.CharField(max_length=20)
     place = models.CharField(max_length=100)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='EUR')
     # How the customer is paying: card via Stripe, PayPal, or a WhatsApp order
     # (confirmed by the shop on chat). Cash on Delivery was removed — the

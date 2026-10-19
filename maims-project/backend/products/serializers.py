@@ -14,10 +14,12 @@ class CurrencyPriceSerializer(serializers.ModelSerializer):
 # 2. Category Serializer
 class HeroSlideSerializer(serializers.ModelSerializer):
     image_url = serializers.CharField(source='get_image_url', read_only=True)
+    video_url = serializers.CharField(source='get_video_url', read_only=True)
 
     class Meta:
         model = HeroSlide
-        fields = ("id", "title", "subtitle", "badge_text", "button_text", "button_link", "image_url", "order", "is_active")
+        fields = ("id", "title", "subtitle", "badge_text", "button_text", "button_link",
+                  "image_url", "video_url", "media_type", "order", "is_active")
 
 
 class HeroBannerSettingsSerializer(serializers.ModelSerializer):
@@ -57,7 +59,17 @@ class CategorySerializer(serializers.ModelSerializer):
         children = getattr(obj, '_prefetched_children', None)
         if children is None:
             children = obj.children.all()
-        return [{"id": c.id, "name": c.name, "slug": c.slug} for c in children]
+        return [
+            {
+                "id": c.id,
+                "name": c.name,
+                "slug": c.slug,
+                "image_url": c.get_image(),
+                "show_on_homepage": c.show_on_homepage,
+                "homepage_order": c.homepage_order,
+            }
+            for c in children
+        ]
 
 
 # 3. Product Media Serializer (For Multiple Gallery Images/Videos)
@@ -184,6 +196,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = (
             "id", "first_name", "last_name", "email", "phone",
             "address", "zipcode", "place", "total_amount", "currency",
+            "delivery_fee",
             "payment_method",
             "is_paid", "created_at", "items",
             # Fulfilment progress (read-only for the customer).
@@ -388,4 +401,3 @@ class WishlistAddSerializer(serializers.Serializer):
     """Write path: the body carries a product id, not a nested product."""
 
     product_id = serializers.IntegerField(min_value=1)
-

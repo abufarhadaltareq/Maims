@@ -23,10 +23,10 @@ from rest_framework.test import APIClient
 from . import facebook
 
 from .models import (
-    Category, CurrencyPrice, CustomerNotificationSettings, Order, OrderItem, Product,
+    Category, CurrencyPrice, CustomerNotificationSettings, HeroSlide, Order, OrderItem, Product,
     Review, SiteSettings, UserProfile,
 )
-from .views import _build_order_items, _CheckoutError, _mark_paid_and_reserve, _reserve_stock
+from .views import _build_order_items, _CheckoutError, _delivery_fee, _mark_paid_and_reserve, _reserve_stock
 
 
 class AdminPageTests(TestCase):
@@ -296,8 +296,9 @@ class CheckoutPricingSecurityTests(TestCase):
                                self._payload(total_amount='0.01'), format='json')
         self.assertEqual(res.status_code, 201, res.content)
         order = Order.objects.get(id=res.data['order_id'])
-        # 2 x 10.00 from the DB, NOT the forged 0.01.
-        self.assertEqual(order.total_amount, Decimal('20.00'))
+        # 2 x 10.00 from the DB, NOT the forged 0.01, plus converted delivery.
+        self.assertEqual(order.delivery_fee, Decimal('7.48'))
+        self.assertEqual(order.total_amount, Decimal('27.48'))
 
     def test_missing_required_fields_rejected(self):
         res = self.client.post('/api/v1/checkout/',
@@ -426,6 +427,32 @@ class ProductVisibilityTests(TestCase):
         self.assertEqual(response.data[0]['product_count'], 1)
 
 
+class HomepageMediaAndDeliveryTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_active_video_slide_is_available_to_homepage(self):
+        HeroSlide.objects.create(
+            title='Campaign film',
+            media_type='video',
+            external_video_url='https://example.com/campaign.mp4',
+            is_active=True,
+        )
+
+        response = self.client.get('/api/v1/hero-slides/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]['media_type'], 'video')
+        self.assertEqual(response.data[0]['video_url'], 'https://example.com/campaign.mp4')
+
+    def test_delivery_fee_is_converted_from_sek(self):
+        self.assertEqual(_delivery_fee('SEK'), Decimal('85.00'))
+        self.assertEqual(_delivery_fee('EUR'), Decimal('7.48'))
+        self.assertEqual(_delivery_fee('USD'), Decimal('8.08'))
+        self.assertEqual(_delivery_fee('PKR'), Decimal('2243.06'))
+        self.assertEqual(_delivery_fee('BDT'), Decimal('950.00'))
+
+
 class CurrencyPricingTests(TestCase):
     """A currency with no stored price must be rejected, never substituted."""
 
@@ -455,7 +482,7 @@ class CurrencyPricingTests(TestCase):
     def test_priced_currency_is_charged_the_db_amount(self):
         res = self.client.post('/api/v1/checkout/', self._payload('EUR'), format='json')
         self.assertEqual(res.status_code, 201, res.content)
-        self.assertEqual(Order.objects.get().total_amount, Decimal('100.00'))
+        self.assertEqual(Order.objects.get().total_amount, Decimal('107.48'))
 
 
 class DuplicateCartLineTests(TestCase):
@@ -490,7 +517,7 @@ class DuplicateCartLineTests(TestCase):
         order = Order.objects.get(id=res.data['order_id'])
         self.assertEqual(order.items.count(), 1)          # merged into a single line
         self.assertEqual(order.items.first().quantity, 2)
-        self.assertEqual(order.total_amount, Decimal('20.00'))
+        self.assertEqual(order.total_amount, Decimal('27.48'))
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock, 8)
 
