@@ -82,6 +82,17 @@
   box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.3);
 }
 
+.site-footer a {
+  color: #e5e7eb;
+}
+.site-footer a:hover {
+  color: #ffffff;
+}
+.site-footer .text-slate-500,
+.site-footer .text-slate-400 {
+  color: #cbd5e1;
+}
+
 /* Global base styles — keep the page light and readable.
    MUST live in @layer base: unlayered CSS outranks Tailwind's
    layered utilities, so an unlayered `img { height: auto }` would

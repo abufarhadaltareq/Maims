@@ -330,13 +330,16 @@ class HeroSlideList(APIView):
 
 class CategoryShowcase(APIView):
     """
-    Homepage "Shop by Category" payload: each homepage-flagged category
-    with up to 8 preview products (child products included).
+    Homepage "Shop by Category" payload: homepage-enabled subcategories only,
+    each with up to 8 preview products (nested child products included).
     """
     permission_classes = [AllowAny]
 
     def get(self, request, format=None):
-        cats = Category.objects.filter(show_on_homepage=True).annotate(
+        cats = Category.objects.filter(
+            parent__isnull=False,
+            show_on_homepage=True,
+        ).annotate(
             product_count=Count(
                 'products',
                 filter=Q(products__is_visible=True),

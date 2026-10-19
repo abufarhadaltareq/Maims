@@ -1223,7 +1223,8 @@ class CategoryAdmin(MaimsModelAdmin):
             'description': 'Leave <b>parent</b> empty for a top-level category that can appear on the homepage.'}),
         ('Homepage showcase', {
             'fields': ('show_on_homepage', 'homepage_order', 'image', 'image_preview'),
-            'description': 'Tick <b>show on homepage</b> to add this category to the "Shop by Category" strip. '
+            'description': 'Tick <b>show on homepage</b> to show this category in the homepage tiles. '
+                           'Only subcategories are shown there; top-level categories group the menu. '
                            'Order 1 is shown first.'}),
     )
 

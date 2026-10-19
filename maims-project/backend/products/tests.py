@@ -406,12 +406,29 @@ class ProductVisibilityTests(TestCase):
         self.assertEqual(category.status_code, 200)
         self.assertEqual([p['slug'] for p in category.data], ['visible-coat'])
         self.assertEqual(showcase.status_code, 200)
-        self.assertEqual(
-            [p['slug'] for p in showcase.data[0]['products']],
-            ['visible-coat'],
-        )
+        self.assertEqual(showcase.data, [])
         self.assertEqual(social_feed.status_code, 200)
         self.assertEqual(social_feed.data, [])
+
+    def test_homepage_showcase_lists_subcategories_without_parent_categories(self):
+        subcategory = Category.objects.create(
+            name='Coats', slug='coats', parent=self.category,
+        )
+        subcategory_product = Product.objects.create(
+            category=subcategory, name='Wool Coat', slug='wool-coat', stock=2,
+        )
+        CurrencyPrice.objects.create(
+            product=subcategory_product, currency='EUR', price=Decimal('25.00'),
+        )
+
+        response = self.client.get('/api/v1/category-showcase/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([entry['category']['slug'] for entry in response.data], ['coats'])
+        self.assertEqual(
+            [product['slug'] for product in response.data[0]['products']],
+            ['wool-coat'],
+        )
 
     def test_hidden_product_detail_is_not_found(self):
         response = self.client.get('/api/v1/products/secret-coat/')

@@ -47,23 +47,23 @@
 
     <section v-if="isHomePage && showcase.length" v-reveal class="mx-auto max-w-[1500px] px-4 py-7 sm:px-7 sm:py-10">
       <h2 class="mb-4 border-b border-black pb-3 text-xl font-semibold tracking-tight sm:mb-6 sm:text-2xl">Shop by Category</h2>
-      <div class="grid grid-cols-2 gap-px border border-black/10 bg-black/10 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <router-link
           v-for="(entry, i) in showcase"
           :key="'category-' + entry.category.id"
           :to="`/category/${entry.category.slug}`"
           v-reveal="i * 70"
-          class="group flex min-w-0 flex-col bg-white"
+          class="group flex min-w-0 flex-col"
         >
           <div class="relative aspect-[4/5] w-full overflow-hidden bg-gray-100">
             <img
-              :src="entry.category.image_url || entry.products[0]?.get_thumbnail || entry.products[0]?.get_image || 'https://placehold.co/400'"
+              :src="entry.category.image_url || entry.products[0]?.get_thumbnail || entry.products[0]?.get_image || 'https://placehold.co/600x750?text=Category'"
               :alt="entry.category.name"
               class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
               loading="lazy"
             />
           </div>
-          <div class="flex items-center justify-between gap-2 px-3 py-3">
+          <div class="flex items-center justify-between gap-2 pt-3">
             <h3 class="truncate text-sm font-medium text-black">{{ entry.category.name }}</h3>
             <span aria-hidden="true" class="text-base transition-transform group-hover:translate-x-1">→</span>
           </div>

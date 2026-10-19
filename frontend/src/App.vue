@@ -14,13 +14,13 @@
           </span>
         </div>
       </div>
-      <div class="max-w-[1600px] mx-auto px-3 sm:px-6 grid grid-cols-[1fr_auto_1fr] items-center gap-1 sm:gap-3 h-16 md:h-[72px]">
-        <div class="flex items-center min-w-0">
+      <div class="relative mx-auto flex h-14 max-w-[1600px] items-center justify-between px-2 sm:h-16 sm:px-6 md:h-[72px]">
+        <div class="flex min-w-0 items-center gap-1 sm:gap-2">
           <button
             @click.stop="toggleCategoryMenu"
             @mouseenter="openCategoryMenu"
             @mouseleave="scheduleCategoryMenuClose"
-            class="flex items-center justify-center w-10 h-10 border border-black/15 text-black hover:bg-black hover:text-white transition-colors"
+            class="flex h-8 w-8 shrink-0 items-center justify-center border border-black/15 text-black transition-colors hover:bg-black hover:text-white sm:h-10 sm:w-10"
             :aria-expanded="isCatMenuOpen"
             aria-label="Open category menu"
             aria-controls="category-menu"
@@ -29,14 +29,50 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
               </svg>
           </button>
+          <router-link
+            to="/search"
+            class="flex h-8 w-8 shrink-0 items-center justify-center border border-transparent transition-colors hover:border-black/15 sm:h-10 sm:w-10"
+            aria-label="Search products"
+          >
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="m21 21-4.35-4.35M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z"></path>
+            </svg>
+          </router-link>
+
+          <div class="relative shrink-0 select-none">
+            <button
+              @click.stop="isCurrencyOpen = !isCurrencyOpen"
+              class="flex h-8 items-center gap-0.5 border border-transparent px-1 transition-colors hover:border-black/15 sm:h-10 sm:gap-1 sm:px-2"
+              :aria-label="`Change currency, currently ${cartStore.currentCurrency}`"
+              :aria-expanded="isCurrencyOpen"
+            >
+              <span class="text-xs leading-none sm:text-sm">{{ countryFlag }}</span>
+              <span class="text-[9px] font-semibold sm:text-[11px]">{{ cartStore.currentCurrency }}</span>
+              <svg class="hidden h-3 w-3 text-gray-500 sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"></path>
+              </svg>
+            </button>
+            <div v-if="isCurrencyOpen" class="absolute left-0 mt-2 z-50 w-40 border border-black/15 bg-white py-1 shadow-xl">
+              <p class="border-b border-black/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">Currency</p>
+              <button
+                v-for="c in currencies"
+                :key="c.code"
+                @click.stop="setCurrency(c.code)"
+                class="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100"
+              >
+                <span>{{ currencyFlag(c) }} {{ c.code }} ({{ c.symbol }})</span>
+                <span v-if="c.code === cartStore.currentCurrency" class="font-bold">✓</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <router-link to="/" aria-label="Maims — go to homepage" class="flex items-center justify-center min-w-0">
+        <router-link to="/" aria-label="Maims — go to homepage" class="absolute left-1/2 flex -translate-x-1/2 items-center justify-center">
           <img
             v-if="site.logoUrl"
             :src="site.logoUrl"
             :alt="site.storeName + ' logo'"
-            class="block h-12 sm:h-14 md:h-16 max-w-[9rem] sm:max-w-[12rem] md:max-w-[16rem] w-auto object-contain"
+            class="block h-12 w-[min(7rem,calc(100vw-220px))] object-contain sm:h-14 sm:w-auto sm:max-w-[15rem] md:h-16 md:max-w-[18rem]"
           />
           <svg v-else class="block h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14" viewBox="0 0 40 40" fill="none" aria-hidden="true">
             <defs>
@@ -49,45 +85,8 @@
             <path d="M13 27.5V12.5L20 22.5L27 12.5V27.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </router-link>
-        <div class="flex items-center justify-end gap-1 sm:gap-2 min-w-0">
-          <router-link
-            to="/search"
-            class="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 border border-transparent hover:border-black/15 transition-colors"
-            aria-label="Search products"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="m21 21-4.35-4.35M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z"></path>
-            </svg>
-          </router-link>
-
-          <div class="relative select-none">
-            <button
-              @click.stop="isCurrencyOpen = !isCurrencyOpen"
-              class="flex items-center gap-1 h-9 px-1.5 sm:px-2 border border-transparent hover:border-black/15 transition-colors"
-              :aria-label="`Change currency, currently ${cartStore.currentCurrency}`"
-              :aria-expanded="isCurrencyOpen"
-            >
-              <span class="text-sm leading-none">{{ countryFlag }}</span>
-              <span class="text-[10px] sm:text-[11px] font-semibold">{{ cartStore.currentCurrency }}</span>
-              <svg class="hidden sm:block w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"></path>
-              </svg>
-            </button>
-            <div v-if="isCurrencyOpen" class="absolute right-0 mt-2 bg-white border border-black/15 shadow-xl w-40 z-50 py-1">
-              <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500 border-b border-black/10">Currency</p>
-              <button
-                v-for="c in currencies"
-                :key="c.code"
-                @click.stop="setCurrency(c.code)"
-                class="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm transition-colors flex items-center justify-between"
-              >
-                <span>{{ currencyFlag(c) }} {{ c.code }} ({{ c.symbol }})</span>
-                <span v-if="c.code === cartStore.currentCurrency" class="font-bold">✓</span>
-              </button>
-            </div>
-          </div>
-
-          <router-link to="/wishlist" class="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 border border-transparent hover:border-black/15 transition-colors" aria-label="Wishlist">
+        <div class="flex shrink-0 items-center justify-end gap-0 sm:gap-2">
+          <router-link to="/wishlist" class="relative flex h-7 w-7 items-center justify-center sm:h-10 sm:w-10 border border-transparent hover:border-black/15 transition-colors" aria-label="Wishlist">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20.8 8.8c0 5.2-8.8 10.1-8.8 10.1S3.2 14 3.2 8.8A4.3 4.3 0 0 1 12 6.9a4.3 4.3 0 0 1 8.8 1.9Z"></path>
             </svg>
@@ -96,7 +95,7 @@
             </span>
           </router-link>
 
-          <router-link to="/cart" class="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 border border-transparent hover:border-black/15 transition-colors" aria-label="View cart">
+          <router-link to="/cart" class="relative flex h-7 w-7 items-center justify-center sm:h-10 sm:w-10 border border-transparent hover:border-black/15 transition-colors" aria-label="View cart">
             <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
               <path d="M3 6h18" stroke-width="2" stroke-linecap="round"></path>
@@ -109,7 +108,7 @@
 
           <!-- Account menu -->
           <div class="relative">
-            <button @click.stop="isAccountOpen = !isAccountOpen" class="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 border border-transparent hover:border-black/15 transition-colors" aria-label="Account menu" :aria-expanded="isAccountOpen">
+            <button @click.stop="isAccountOpen = !isAccountOpen" class="flex h-7 w-7 items-center justify-center sm:h-10 sm:w-10 border border-transparent hover:border-black/15 transition-colors" aria-label="Account menu" :aria-expanded="isAccountOpen">
               <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
               </svg>
@@ -194,20 +193,20 @@
     </div>
 
     <!-- Footer -->
-    <footer class="bg-black text-slate-300 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
+    <footer class="site-footer bg-black text-slate-200 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
       <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 pb-8 border-b border-white/10">
         <div class="col-span-2 lg:col-span-2">
           <BrandLogo size="sm" />
           <!-- About line: Admin → Site settings → Brand & header → Footer about -->
-          <p class="text-slate-400 text-[13px] leading-relaxed mt-3 max-w-xs">{{ site.footerAbout }}</p>
+          <p class="text-slate-200 text-[13px] leading-relaxed mt-3 max-w-xs">{{ site.footerAbout }}</p>
           <!-- Newsletter (shown only when Admin → Customer notification settings allow it) -->
           <form v-if="site.newsletterSignupEnabled" @submit.prevent="subscribeNewsletter" class="mt-4 max-w-xs">
-            <label class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-400">Get 10% off your first order</label>
+            <label class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-200">Get 10% off your first order</label>
             <div class="flex gap-2 mt-2">
               <input
                 v-model="newsletterEmail"
                 type="email" required placeholder="Email address"
-                class="flex-1 min-w-0 bg-white/10 border border-white/15 rounded-full px-4 py-2.5 text-white placeholder:text-slate-500 outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/30 transition"
+                class="flex-1 min-w-0 bg-white/10 border border-white/30 rounded-full px-4 py-2.5 text-white placeholder:text-slate-300 outline-none focus:border-white focus:ring-2 focus:ring-white/30 transition"
               />
               <button class="shrink-0 bg-gradient-brand text-white text-xs font-extrabold uppercase tracking-wider px-4 py-2.5 rounded-full hover:brightness-110 transition active:scale-95">
                 {{ newsletterDone ? '✓ Joined' : 'Join' }}
@@ -218,7 +217,7 @@
           </form>
         </div>
         <nav aria-label="Shop">
-          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-500 mb-3">Shop</p>
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-300 mb-3">Shop</p>
           <ul class="space-y-2 font-medium">
             <li><router-link to="/" class="hover:text-white transition">All products</router-link></li>
             <li><router-link to="/new-arrivals" class="hover:text-white transition">New arrivals</router-link></li>
@@ -227,28 +226,28 @@
           </ul>
         </nav>
         <nav aria-label="Support">
-          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-500 mb-3">Support</p>
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-300 mb-3">Support</p>
           <ul class="space-y-2 font-medium">
             <li v-for="legal in LEGAL_LINKS" :key="legal.hash">
               <router-link :to="`/legal#${legal.hash}`" class="hover:text-white transition">{{ legal.label }}</router-link>
             </li>
             <li v-if="brand.supportEmail"><a :href="`mailto:${brand.supportEmail}`" class="hover:text-white transition">{{ brand.supportEmail }}</a></li>
-            <li class="text-slate-500 text-xs pt-1">{{ site.storeName }} · {{ brand.domain }}</li>
+            <li class="text-slate-300 text-xs pt-1">{{ site.storeName }} · {{ brand.domain }}</li>
           </ul>
         </nav>
         <div>
-          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-500 mb-3">Follow</p>
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-300 mb-3">Follow</p>
           <div class="flex flex-wrap gap-2">
             <!-- Social links — styled like header cart/wishlist/account icons -->
             <a v-for="link in site.socialLinks" :key="link.key" :href="link.url" target="_blank" rel="noopener" :title="link.label" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"><SocialIcon :name="link.key" class="w-4 h-4 text-white" /></a>
             <a v-if="site.whatsappEnabled" :href="site.whatsappBaseLink" target="_blank" rel="noopener" title="WhatsApp Chat" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"><SocialIcon name="whatsapp" class="w-4 h-4 text-white" /></a>
           </div>
-          <p class="text-slate-500 text-xs mt-4 leading-relaxed">Secure checkout<br/><span v-if="site.stripeEnabled">Stripe</span><span v-if="site.stripeEnabled && (site.paypalEnabled || site.whatsappEnabled)"> · </span><span v-if="site.paypalEnabled">PayPal</span><span v-if="site.paypalEnabled && site.whatsappEnabled"> · </span><span v-if="site.whatsappEnabled">WhatsApp</span><span v-if="!site.stripeEnabled && !site.paypalEnabled && !site.whatsappEnabled">Contact us to order</span></p>
+          <p class="text-slate-300 text-xs mt-4 leading-relaxed">Secure checkout<br/><span v-if="site.stripeEnabled">Stripe</span><span v-if="site.stripeEnabled && (site.paypalEnabled || site.whatsappEnabled)"> · </span><span v-if="site.paypalEnabled">PayPal</span><span v-if="site.paypalEnabled && site.whatsappEnabled"> · </span><span v-if="site.whatsappEnabled">WhatsApp</span><span v-if="!site.stripeEnabled && !site.paypalEnabled && !site.whatsappEnabled">Contact us to order</span></p>
         </div>
       </div>
-      <div class="max-w-7xl mx-auto pt-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+      <div class="max-w-7xl mx-auto pt-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-300">
         <span class="font-semibold">© {{ new Date().getFullYear() }} {{ site.storeName }} · All rights reserved</span>
-        <span class="text-slate-500">{{ site.footerBottomNote }}</span>
+        <span class="text-slate-300">{{ site.footerBottomNote }}</span>
       </div>
     </footer>
 
