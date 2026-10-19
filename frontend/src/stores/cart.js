@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
-import { getProductDisplayPrice } from '../utils/pricing.js'
+import { getProductDisplayPrice, getDeliveryFee } from '../utils/pricing.js'
 
 export const CURRENCIES = [
-  { code: 'EUR', symbol: '€', country: 'PT' },
+  { code: 'EUR', symbol: '€', country: 'EU' },
   { code: 'PKR', symbol: 'Rs', country: 'PK' },
   { code: 'USD', symbol: '$', country: 'US' },
   { code: 'SEK', symbol: 'kr', country: 'SE' },
@@ -155,7 +155,8 @@ export const useCartStore = defineStore('cart', {
         count += qty
         return { key: `${item.product?.id}-${item.size || ''}`, unit, qty, line }
       })
-      return { currency, subtotal, count, lines }
+      const deliveryFee = getDeliveryFee(currency)
+      return { currency, subtotal, deliveryFee, total: subtotal + deliveryFee, count, lines }
     },
   }
 })

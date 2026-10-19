@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen flex flex-col font-brand text-gray-900 bg-white">
     <!-- Header Block -->
-    <header class="sticky top-0 z-50 bg-white border-b border-purple-100 shadow-lg shadow-purple-500/5">
+    <header ref="headerRef" class="sticky top-0 z-50 bg-white border-b border-black/10">
       <!-- Scrolling admin ticker: Admin → Store settings → Top scrolling messages.
            One message per line, loops seamlessly; hidden when disabled or empty. -->
       <div v-if="site.tickerEnabled && site.tickerMessages.length" class="bg-gradient-brand text-white overflow-hidden" role="marquee" aria-label="Store announcements">
@@ -14,56 +14,21 @@
           </span>
         </div>
       </div>
-      <div class="max-w-[1600px] mx-auto px-3 sm:px-6 grid grid-cols-[1fr_auto_1fr] items-center gap-1 sm:gap-3 h-16 md:h-20">
-        <div class="flex items-center gap-1 sm:gap-2 min-w-0">
-          <div class="relative" @click.stop="isCatMenuOpen = !isCatMenuOpen">
-            <button class="flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl border border-gray-200 text-gray-700 hover:border-purple-200 hover:bg-purple-50 transition-colors" aria-label="Open category menu">
+      <div class="max-w-[1600px] mx-auto px-3 sm:px-6 grid grid-cols-[1fr_auto_1fr] items-center gap-1 sm:gap-3 h-16 md:h-[72px]">
+        <div class="flex items-center min-w-0">
+          <button
+            @click.stop="toggleCategoryMenu"
+            @mouseenter="openCategoryMenu"
+            @mouseleave="scheduleCategoryMenuClose"
+            class="flex items-center justify-center w-10 h-10 border border-black/15 text-black hover:bg-black hover:text-white transition-colors"
+            :aria-expanded="isCatMenuOpen"
+            aria-label="Open category menu"
+            aria-controls="category-menu"
+          >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
               </svg>
-            </button>
-            <div v-if="isCatMenuOpen" class="absolute left-0 mt-2 bg-white border border-gray-100 shadow-xl rounded-2xl w-56 z-50 py-1.5 overflow-hidden max-h-[70vh] overflow-y-auto">
-              <p class="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50">Categories</p>
-              <router-link to="/" class="block px-4 py-2 hover:bg-purple-50 text-[#7C3AED] font-semibold transition-colors">All Products</router-link>
-              <router-link to="/new-arrivals" class="block px-4 py-2 hover:bg-purple-50 text-[#7C3AED] font-semibold transition-colors">New Arrivals</router-link>
-              <template v-if="navCats.length">
-                <router-link
-                  v-for="c in navCats"
-                  :key="c.slug || c.name"
-                  :to="c.slug ? `/category/${c.slug}` : '/'"
-                  class="block px-4 py-2 hover:bg-purple-50 hover:text-white text-[#7C3AED] font-semibold transition-colors"
-                >{{ c.name }}</router-link>
-              </template>
-              <span v-else class="block px-4 py-2 text-sm text-gray-400">Loading…</span>
-            </div>
-          </div>
-
-          <!-- Currency selector stays beside the category menu on every screen. -->
-          <div class="relative select-none" @click.stop="isCurrencyOpen = !isCurrencyOpen">
-            <button
-              class="flex items-center gap-1.5 h-10 md:h-11 px-2 sm:px-2.5 rounded-xl border border-gray-200 hover:border-purple-200 hover:bg-purple-50 transition-colors"
-              :aria-label="`Change currency, currently ${cartStore.currentCurrency}`"
-              :aria-expanded="isCurrencyOpen"
-            >
-              <span class="text-base leading-none">{{ countryFlag }}</span>
-              <span class="text-[11px] sm:text-xs font-bold text-gray-700">{{ cartStore.currentCurrency }}</span>
-              <svg class="hidden sm:block w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
-              </svg>
-            </button>
-            <div v-if="isCurrencyOpen" class="absolute left-0 mt-2 bg-white border border-gray-100 shadow-xl rounded-2xl w-40 z-50 py-1.5 overflow-hidden">
-              <p class="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50">Currency</p>
-              <button
-                v-for="c in currencies"
-                :key="c.code"
-                @click.stop="setCurrency(c.code)"
-                class="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm transition-colors flex items-center justify-between"
-              >
-                <span>{{ c.code }} ({{ c.symbol }})</span>
-                <span v-if="c.code === cartStore.currentCurrency" class="text-emerald-600 font-black">✓</span>
-              </button>
-            </div>
-          </div>
+          </button>
         </div>
 
         <router-link to="/" aria-label="Maims — go to homepage" class="flex items-center justify-center min-w-0">
@@ -71,95 +36,165 @@
             v-if="site.logoUrl"
             :src="site.logoUrl"
             :alt="site.storeName + ' logo'"
-            class="block h-14 sm:h-16 md:h-20 max-w-[10rem] sm:max-w-[14rem] md:max-w-[18rem] w-auto object-contain"
+            class="block h-12 sm:h-14 md:h-16 max-w-[9rem] sm:max-w-[12rem] md:max-w-[16rem] w-auto object-contain"
           />
-          <svg v-else class="block h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <svg v-else class="block h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14" viewBox="0 0 40 40" fill="none" aria-hidden="true">
             <defs>
               <linearGradient id="maimsLogoGradMobile" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#1e293b" />
-                <stop offset="0.55" stop-color="#0ea5e9" />
-                <stop offset="1" stop-color="#38bdf8" />
+                <stop offset="0" stop-color="#111111" />
+                <stop offset="1" stop-color="#555555" />
               </linearGradient>
             </defs>
-            <rect width="40" height="40" rx="12" fill="url(#maimsLogoGradMobile)" />
+            <rect width="40" height="40" fill="url(#maimsLogoGradMobile)" />
             <path d="M13 27.5V12.5L20 22.5L27 12.5V27.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </router-link>
         <div class="flex items-center justify-end gap-1 sm:gap-2 min-w-0">
-          <router-link to="/cart" class="relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-white border border-gray-200 rounded-xl transition-colors hover:border-purple-200 hover:bg-purple-50" aria-label="View cart">
-            <svg class="w-5 h-5 md:w-6 md:h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-              <path d="M3 6h18" stroke-width="2" stroke-linecap="round"></path>
-              <path d="M16 10a4 4 0 0 1-8 0" stroke-width="2" stroke-linecap="round"></path>
+          <router-link
+            to="/search"
+            class="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 border border-transparent hover:border-black/15 transition-colors"
+            aria-label="Search products"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="m21 21-4.35-4.35M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z"></path>
             </svg>
-            <span v-if="cartStore.cartTotalLength > 0" class="absolute -top-0.5 -right-0.5 bg-gradient-brand text-white text-[10px] min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full font-bold ring-2 ring-white">
-              {{ cartStore.cartTotalLength }}
-            </span>
           </router-link>
 
-          <!-- Wishlist -->
-          <router-link
-            to="/wishlist"
-            class="relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-white border border-gray-200 rounded-xl transition-colors hover:border-rose-200 hover:bg-rose-50" aria-label="Wishlist"
-          >
-            <span class="text-lg md:text-xl leading-none">❤️</span>
-            <span v-if="wishlistStore.count" class="absolute -top-0.5 -right-0.5 bg-gradient-brand text-white text-[10px] min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full font-bold ring-2 ring-white">
+          <div class="relative select-none">
+            <button
+              @click.stop="isCurrencyOpen = !isCurrencyOpen"
+              class="flex items-center gap-1 h-9 px-1.5 sm:px-2 border border-transparent hover:border-black/15 transition-colors"
+              :aria-label="`Change currency, currently ${cartStore.currentCurrency}`"
+              :aria-expanded="isCurrencyOpen"
+            >
+              <span class="text-sm leading-none">{{ countryFlag }}</span>
+              <span class="text-[10px] sm:text-[11px] font-semibold">{{ cartStore.currentCurrency }}</span>
+              <svg class="hidden sm:block w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"></path>
+              </svg>
+            </button>
+            <div v-if="isCurrencyOpen" class="absolute right-0 mt-2 bg-white border border-black/15 shadow-xl w-40 z-50 py-1">
+              <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500 border-b border-black/10">Currency</p>
+              <button
+                v-for="c in currencies"
+                :key="c.code"
+                @click.stop="setCurrency(c.code)"
+                class="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm transition-colors flex items-center justify-between"
+              >
+                <span>{{ currencyFlag(c) }} {{ c.code }} ({{ c.symbol }})</span>
+                <span v-if="c.code === cartStore.currentCurrency" class="font-bold">✓</span>
+              </button>
+            </div>
+          </div>
+
+          <router-link to="/wishlist" class="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 border border-transparent hover:border-black/15 transition-colors" aria-label="Wishlist">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20.8 8.8c0 5.2-8.8 10.1-8.8 10.1S3.2 14 3.2 8.8A4.3 4.3 0 0 1 12 6.9a4.3 4.3 0 0 1 8.8 1.9Z"></path>
+            </svg>
+            <span v-if="wishlistStore.count" class="absolute -top-0.5 -right-0.5 bg-black text-white text-[9px] min-w-4 h-4 px-1 flex items-center justify-center font-semibold">
               {{ wishlistStore.count }}
             </span>
           </router-link>
 
+          <router-link to="/cart" class="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 border border-transparent hover:border-black/15 transition-colors" aria-label="View cart">
+            <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M3 6h18" stroke-width="2" stroke-linecap="round"></path>
+              <path d="M16 10a4 4 0 0 1-8 0" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+            <span v-if="cartStore.cartTotalLength > 0" class="absolute -top-0.5 -right-0.5 bg-black text-white text-[9px] min-w-4 h-4 px-1 flex items-center justify-center font-semibold">
+              {{ cartStore.cartTotalLength }}
+            </span>
+          </router-link>
+
           <!-- Account menu -->
-          <div class="relative" @click.stop="isAccountOpen = !isAccountOpen">
-            <button class="flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-white border border-gray-200 rounded-xl transition-colors hover:border-purple-200 hover:bg-purple-50 font-semibold" aria-label="Account menu" :aria-expanded="isAccountOpen">
-              <svg class="w-5 h-5 md:w-6 md:h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="relative">
+            <button @click.stop="isAccountOpen = !isAccountOpen" class="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 border border-transparent hover:border-black/15 transition-colors" aria-label="Account menu" :aria-expanded="isAccountOpen">
+              <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
               </svg>
             </button>
-            <div v-if="isAccountOpen" class="absolute right-0 mt-2 bg-white border border-gray-100 shadow-xl rounded-2xl w-48 z-50 py-1.5 overflow-hidden">
+            <div v-if="isAccountOpen" class="absolute right-0 mt-2 bg-white border border-black/15 shadow-xl w-48 z-50 py-1.5 overflow-hidden">
               <template v-if="auth.isAuthenticated">
                 <p class="px-4 py-2 text-xs text-gray-400 font-bold uppercase tracking-wider border-b border-gray-50">Hi, {{ auth.username }}</p>
-                <router-link to="/profile" class="block px-4 py-2 hover:bg-gray-50 text-sm">Profile</router-link>
-                <router-link to="/order-history" class="block px-4 py-2 hover:bg-gray-50 text-sm">Orders</router-link>
+                  <router-link to="/profile" class="block px-4 py-2 hover:bg-gray-100 text-sm">Profile</router-link>
+                  <router-link to="/order-history" class="block px-4 py-2 hover:bg-gray-100 text-sm">Orders</router-link>
                 <button @click.stop="logout" class="block w-full text-left px-4 py-2 hover:bg-gray-50 text-sm text-red-600 font-semibold">Log Out</button>
               </template>
               <template v-else>
-                <router-link to="/log-in" class="block px-4 py-2 hover:bg-gray-50 text-sm font-semibold">Log In</router-link>
-                <router-link to="/sign-up" class="block px-4 py-2 hover:bg-gray-50 text-sm">Sign Up</router-link>
+                <router-link to="/log-in" class="block px-4 py-2 hover:bg-gray-100 text-sm font-semibold">Log In</router-link>
+                <router-link to="/sign-up" class="block px-4 py-2 hover:bg-gray-100 text-sm">Sign Up</router-link>
               </template>
             </div>
           </div>
         </div>
       </div>
-      <!-- Second navbar row: full-width search bar (all screens) — category menus removed -->
-      <div class="border-t border-gray-100">
-        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-2">
-          <div class="group relative w-full max-w-2xl mx-auto">
-            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-accent transition-colors">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"></path>
-              </svg>
-            </span>
-            <input
-              v-model="searchQuery"
-              @keyup.enter="performSearch()"
-              placeholder="Search for products..."
-              class="w-full bg-gray-50 border border-gray-200 rounded-full py-2 md:py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand-accent focus:bg-white focus:ring-4 focus:ring-brand-accent/10 transition"
-            >
-          </div>
-        </div>
-      </div>
     </header>
+
+    <div
+      v-if="isCatMenuOpen"
+      class="fixed inset-x-0 bottom-0 z-[60] bg-black/30"
+      :style="{ top: `${headerHeight}px` }"
+      @click.self="closeCategoryMenu"
+      @mouseenter="clearCategoryMenuClose"
+      @mouseleave="scheduleCategoryMenuClose"
+    >
+      <aside id="category-menu" class="h-full w-full max-w-md overflow-y-auto border-r border-black/15 bg-white px-5 py-5 sm:px-8" aria-label="Shop categories">
+        <div class="flex items-center justify-between border-b border-black/10 pb-3">
+          <h2 class="font-semibold uppercase tracking-[0.16em] text-sm">Shop</h2>
+          <button class="flex h-9 w-9 items-center justify-center border border-black/15 text-xl" @click="closeCategoryMenu" aria-label="Close category menu">×</button>
+        </div>
+        <nav class="py-3">
+          <router-link to="/" class="block border-b border-black/10 py-3 text-sm font-medium" @click="closeCategoryMenu">All Products</router-link>
+          <router-link to="/new-arrivals" class="block border-b border-black/10 py-3 text-sm font-medium" @click="closeCategoryMenu">New Arrivals</router-link>
+          <div v-for="category in navCats" :key="category.slug" class="border-b border-black/10">
+            <div class="flex items-center justify-between gap-3 py-3">
+              <router-link :to="`/category/${category.slug}`" class="text-sm font-semibold uppercase tracking-wide" @click="closeCategoryMenu">{{ category.name }}</router-link>
+              <button
+                v-if="category.children?.length"
+                @click="toggleSubcategory(category.slug)"
+                class="flex h-8 w-8 items-center justify-center border border-black/15 text-lg"
+                :aria-expanded="expandedCategory === category.slug"
+                :aria-label="`${expandedCategory === category.slug ? 'Hide' : 'Show'} ${category.name} subcategories`"
+              >{{ expandedCategory === category.slug ? '−' : '+' }}</button>
+            </div>
+            <div v-if="category.children?.length && expandedCategory === category.slug" class="grid grid-cols-2 gap-x-3 border-t border-black/10 py-2">
+              <router-link
+                v-for="subcategory in category.children"
+                :key="subcategory.slug"
+                :to="`/category/${subcategory.slug}`"
+                class="py-2 text-sm text-gray-600 hover:text-black"
+                @click="closeCategoryMenu"
+              >{{ subcategory.name }}</router-link>
+            </div>
+          </div>
+        </nav>
+        <div class="mt-3 border-t border-black/15 pt-4">
+          <p class="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Account</p>
+          <template v-if="auth.isAuthenticated">
+            <p class="mb-2 text-sm">Signed in as {{ auth.username }}</p>
+            <router-link to="/profile" class="block py-2 text-sm" @click="closeCategoryMenu">Profile</router-link>
+            <router-link to="/order-history" class="block py-2 text-sm" @click="closeCategoryMenu">Orders</router-link>
+            <button @click="logout" class="py-2 text-sm font-medium underline">Log Out</button>
+          </template>
+          <template v-else>
+            <router-link to="/log-in" class="mr-5 py-2 text-sm font-medium underline" @click="closeCategoryMenu">Log In</router-link>
+            <router-link to="/sign-up" class="py-2 text-sm underline" @click="closeCategoryMenu">Sign Up</router-link>
+          </template>
+        </div>
+      </aside>
+    </div>
 
     <!-- Full-width content (no sidebar gutter) -->
     <div class="flex-1 w-full max-w-[1600px] mx-auto">
       <!-- Main Display Route Target Space Slot -->
-      <main class="w-full px-4 sm:px-6 py-6 min-w-0 bg-white">
+      <main class="w-full min-w-0 bg-white" :class="route.path === '/' ? '' : 'px-4 sm:px-6 py-6'">
         <router-view />
       </main>
     </div>
 
-    <!-- Footer: 3D purple glass — transparent purple shading with depth -->
-    <footer class="bg-slate-950 text-slate-300 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
+    <!-- Footer -->
+    <footer class="bg-black text-slate-300 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
       <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 pb-8 border-b border-white/10">
         <div class="col-span-2 lg:col-span-2">
           <BrandLogo size="sm" />
@@ -226,7 +261,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import axios from 'axios'
 import { useRouter, useRoute } from 'vue-router'
 import { useCartStore, CURRENCIES } from './stores/cart'
@@ -255,19 +290,22 @@ const LEGAL_LINKS = [
   { label: 'Licence', hash: 'legal-licence' },
 ]
 
-const FLAGS = { PT: '🇵🇹', PK: '🇵🇰', US: '🇺🇸', SE: '🇸🇪', BD: '🇧🇩' }
+const FLAGS = { EU: '🇪🇺', PT: '🇪🇺', PK: '🇵🇰', US: '🇺🇸', SE: '🇸🇪', BD: '🇧🇩' }
 const activeRegion = computed(() => CURRENCIES.find((c) => c.code === cartStore.currentCurrency) || CURRENCIES[0])
-const countryCode = computed(() => activeRegion.value.country)
 const countryFlag = computed(() => FLAGS[activeRegion.value.country] || '🌍')
 
-const searchQuery = ref('')
 const isCurrencyOpen = ref(false)
 const isAccountOpen = ref(false)
 const isCatMenuOpen = ref(false)
+const expandedCategory = ref('')
 const navCats = ref([])
+const headerRef = ref(null)
+const headerHeight = ref(0)
 const newsletterEmail = ref('')
 const newsletterDone = ref(false)
 const newsletterError = ref('')
+let categoryMenuCloseTimer = null
+let headerResizeObserver = null
 
 // Hand the address to the backend (POST /api/v1/newsletter/subscribe/), which
 // re-checks the admin consent row and forwards it to the shop mailbox. The old
@@ -285,17 +323,52 @@ const subscribeNewsletter = async () => {
   }
 }
 
-// Close mobile layout menus automatically when navigating paths
+const currencyFlag = (currency) => FLAGS[currency.country] || '🌍'
+const clearCategoryMenuClose = () => clearTimeout(categoryMenuCloseTimer)
+const openCategoryMenu = () => {
+  clearCategoryMenuClose()
+  isCatMenuOpen.value = true
+}
+const scheduleCategoryMenuClose = () => {
+  clearCategoryMenuClose()
+  categoryMenuCloseTimer = setTimeout(() => {
+    isCatMenuOpen.value = false
+  }, 250)
+}
+const closeCategoryMenu = () => {
+  clearCategoryMenuClose()
+  isCatMenuOpen.value = false
+}
+const toggleCategoryMenu = () => {
+  if (isCatMenuOpen.value) closeCategoryMenu()
+  else openCategoryMenu()
+}
+const toggleSubcategory = (slug) => {
+  expandedCategory.value = expandedCategory.value === slug ? '' : slug
+}
+const updateHeaderHeight = () => {
+  headerHeight.value = headerRef.value?.getBoundingClientRect().bottom || 0
+}
+const onDocumentClick = (event) => {
+  if (!headerRef.value?.contains(event.target)) {
+    isCurrencyOpen.value = false
+    isAccountOpen.value = false
+  }
+}
+const onKeydown = (event) => {
+  if (event.key === 'Escape') {
+    isCurrencyOpen.value = false
+    isAccountOpen.value = false
+    closeCategoryMenu()
+  }
+}
+
+// Close menus automatically when navigating paths
 watch(() => route.path, () => {
   isCurrencyOpen.value = false
   isAccountOpen.value = false
-  isCatMenuOpen.value = false
+  closeCategoryMenu()
 })
-
-const performSearch = () => {
-  if (!searchQuery.value || searchQuery.value.trim() === '') return
-  router.push({ path: '/search', query: { q: searchQuery.value.trim() } })
-}
 
 const setCurrency = (curr) => {
   cartStore.setCurrency(curr)
@@ -319,13 +392,25 @@ onMounted(async () => {
   try {
     const res = await axios.get('/api/v1/categories/')
     navCats.value = Array.isArray(res.data) ? res.data : []
-  } catch { navCats.value = [] }
-  // Closes open popups gracefully on outside view space mouse clicks
-  window.addEventListener('click', () => {
-    isCurrencyOpen.value = false
-    isAccountOpen.value = false
-    isCatMenuOpen.value = false
-  })
+  } catch (error) {
+    console.error('Category menu could not load:', error)
+  }
+  updateHeaderHeight()
+  if (headerRef.value && typeof ResizeObserver !== 'undefined') {
+    headerResizeObserver = new ResizeObserver(updateHeaderHeight)
+    headerResizeObserver.observe(headerRef.value)
+  }
+  window.addEventListener('resize', updateHeaderHeight)
+  document.addEventListener('click', onDocumentClick)
+  document.addEventListener('keydown', onKeydown)
+})
+
+onBeforeUnmount(() => {
+  clearCategoryMenuClose()
+  headerResizeObserver?.disconnect()
+  window.removeEventListener('resize', updateHeaderHeight)
+  document.removeEventListener('click', onDocumentClick)
+  document.removeEventListener('keydown', onKeydown)
 })
 
 // Hydrate wishlist whenever the user logs in mid-session (token appears).

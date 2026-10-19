@@ -14,6 +14,12 @@ export const CURRENCY_SYMBOLS = {
   BDT: '৳',
 }
 
+export function getDeliveryFee(currency = 'EUR') {
+  const target = (currency || 'EUR').toUpperCase()
+  const converted = (85 * RATES_TO_USD.SEK) / (RATES_TO_USD[target] || 1)
+  return Math.round(converted * 100 + 1e-8) / 100
+}
+
 /**
  * Resolve a display price for a product (or nested cart item product)
  * Priority: exact currency in prices[] -> convert from first prices[] entry -> product.price fallback.

@@ -66,7 +66,7 @@ const form = ref({
 const itemPrice = (item) =>
   getProductDisplayPrice(item.product || {}, cartStore.currentCurrency).numeric
 
-const totalCartCost = computed(() => cartStore.cartPricing.subtotal)
+const totalCartCost = computed(() => cartStore.cartPricing.total)
 const supportedCurrencies = computed(() =>
   CURRENCIES.filter(({ code }) =>
     cartStore.items.length > 0 && cartStore.items.every((item) =>
@@ -453,8 +453,12 @@ const submitCheckoutForm = async () => {
             </div>
             <span>{{ (itemPrice(item) * (item.quantity || 0)).toFixed(2) }} {{ cartStore.currentCurrency }}</span>
           </div>
+          <div class="flex justify-between text-sm pt-2">
+            <span>Delivery (85 SEK)</span>
+            <span>{{ cartStore.cartPricing.deliveryFee.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
+          </div>
           <div class="flex justify-between font-bold text-xl pt-4">
-            <span>Total:</span>
+            <span>Total including delivery:</span>
             <span>{{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
           </div>
         </div>

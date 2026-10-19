@@ -1,45 +1,41 @@
 @import "tailwindcss";
 
 /* ============================================================================
-   Maims — Light & Clean Theme (Tailwind v4)
-   A neutral, airy palette. Edit the tokens below to re-skin the store.
+   Maims — monochrome storefront theme (Tailwind v4)
    ============================================================================ */
 @theme {
-  /* Core brand tokens — soft, professional, high-contrast for readability */
-  --color-brand-primary: #1e293b;    /* Slate 800 — headings, primary actions */
-  --color-brand-accent: #0ea5e9;     /* Sky 500 — links, buttons, accents */
-  --color-brand-muted: #f8fafc;      /* Slate 50 — subtle section backgrounds */
-  --color-brand-text: #334155;       /* Slate 700 — body copy */
+  /* Core monochrome tokens */
+  --color-brand-primary: #111111;
+  --color-brand-accent: #111111;
+  --color-brand-muted: #f5f5f5;
+  --color-brand-text: #262626;
 
   /* Brand color (customizable from Admin → Site settings → Brand) */
-  --color-brand: #7C3AED;            /* Purple — primary brand color */
-  --color-content: #1F2937;          /* Content text color */
-  --color-content-secondary: #4B5563; /* Secondary content text */
-  --color-heading: #7C3AED;          /* Heading text color */
+  --color-brand: #111111;
+  --color-content: #171717;
+  --color-content-secondary: #666666;
+  --color-heading: #111111;
 
-  --font-brand: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-brand: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
-/* ---------------------------------------------------------------------------
-   Gradient — subtle, never overwhelming.
-   Used only for the hero bar and a few decorative accents.
-   --------------------------------------------------------------------------- */
+/* Monochrome accents for existing shared utilities. */
 :root {
-  --grad-from: #9c0aa1;   /* Clean violet start */
-  --grad-via: #be30d1;    /* Bright violet mid */
-  --grad-to: #ce5ceb;     /* Airy lavender finish */
+  --grad-from: #111111;
+  --grad-via: #222222;
+  --grad-to: #333333;
   --grad-angle: 110deg;
-  --brand-glow: 0 8px 24px -12px rgba(14, 165, 233, 0.35);
+  --brand-glow: 0 8px 24px -12px rgba(0, 0, 0, 0.2);
 }
 
 /* Custom utilities (Tailwind v4) — @utility so variants (hover:, group-hover:) work. */
 
-/* Subtle gradient bar — top hero strip, button accents. */
+/* Monochrome bar and button accent. */
 @utility bg-gradient-brand {
   background-image: linear-gradient(var(--grad-angle), var(--grad-from), var(--grad-via) 50%, var(--grad-to));
 }
 
-/* Gradient text for the hero headline only. */
+/* Gradient text utility used by legacy views. */
 @utility text-gradient-brand {
   background-image: linear-gradient(var(--grad-angle), var(--grad-from), var(--grad-via) 45%, var(--grad-to));
   -webkit-background-clip: text;
@@ -58,7 +54,7 @@
   border-image: linear-gradient(var(--grad-angle), var(--grad-from), var(--grad-via), var(--grad-to)) 1;
 }
 
-/* 3D purple glass footer — transparent purple shading with depth */
+/* Legacy footer utility, retained for components that still use it. */
 @utility bg-footer-purple-glass {
   background:
     linear-gradient(rgba(22, 9, 62, 0.28), rgba(70, 11, 78, 0.28)),
@@ -78,10 +74,12 @@
 /* Product card hover — subtle lift, no heavy shadows. */
 .product-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 0 !important;
+  box-shadow: none;
 }
 .product-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 28px -10px rgba(14, 165, 233, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.3);
 }
 
 /* Global base styles — keep the page light and readable.
@@ -113,7 +111,7 @@
 
   /* Focus visible for keyboard users. */
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-sky-500;
+    @apply outline-2 outline-offset-2 outline-black;
   }
 }
 

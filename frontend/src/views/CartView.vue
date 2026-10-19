@@ -184,10 +184,15 @@
           <span>{{ cartStore.cartTotalLength }} items</span>
         </div>
 
+        <div class="flex justify-between text-sm text-gray-600 font-medium">
+          <span>Delivery (85 SEK):</span>
+          <span>{{ cartStore.cartPricing.deliveryFee.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
+        </div>
+
         <hr class="border-gray-200" />
 
         <div class="flex justify-between items-baseline">
-          <span class="font-bold text-base">Estimated Total:</span>
+          <span class="font-bold text-base">Total including delivery:</span>
           <span class="font-black text-2xl text-brand">{{ cartTotalDisplayPrice }}</span>
         </div>
 
@@ -245,8 +250,8 @@ const getItemDisplayPrice = (item) =>
 
 // Single source: store getter keeps cart + checkout totals identical.
 const cartTotalDisplayPrice = computed(() => {
-  const { subtotal, currency } = cartStore.cartPricing
-  return `${subtotal.toFixed(2)} ${currency}`
+  const { total, currency } = cartStore.cartPricing
+  return `${total.toFixed(2)} ${currency}`
 })
 
 const productLink = (item) => `/products/${item.product?.slug || ''}`

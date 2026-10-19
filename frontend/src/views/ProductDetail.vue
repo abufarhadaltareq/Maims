@@ -1,21 +1,21 @@
 <template>
-  <div class="py-10 px-8 max-w-7xl mx-auto font-brand text-brand-text">
-    <router-link to="/" class="inline-block mb-8 text-sm font-semibold underline hover:text-gray-600">
+  <div class="mx-auto max-w-7xl px-4 py-6 font-brand text-brand-text sm:px-6">
+    <router-link to="/" class="mb-5 inline-block text-sm font-medium underline hover:text-gray-600">
       ← Back to New Arrivals
     </router-link>
 
-    <div v-if="product" class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-12 items-start">
-      <div class="space-y-8">
-        <div class="relative rounded-[2rem] overflow-hidden shadow-2xl shadow-slate-300/40 transform-gpu hover:-translate-y-1 transition-all duration-500 bg-white">
+    <div v-if="product" class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:gap-8">
+      <div class="space-y-5">
+        <div class="relative overflow-hidden border border-black/10 bg-white">
           <div class="absolute top-4 right-4 z-10">
             <WishlistHeart
               :product="product"
               tip-below
-              className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-white !bg-white shadow-lg shadow-slate-900/25 hover:!bg-white/90 hover:!scale-110 transition-all duration-200"
+              className="w-9 h-9 border border-black/15 !bg-white shadow-sm hover:!bg-gray-100 transition-all duration-200"
             />
           </div>
           
-          <div class="h-[640px] sm:h-[760px] lg:h-[880px] bg-[var(--color-brand)]/5 flex items-center justify-center overflow-hidden cursor-zoom-in group" @click="openLightbox">
+          <div class="h-[min(78svh,760px)] min-h-[360px] bg-gray-50 flex items-center justify-center overflow-hidden cursor-zoom-in group" @click="openLightbox">
             <template v-if="activeMedia">
               <video v-if="activeMedia.media_type === 'video'" :key="'v-' + activeMediaIndex" :src="activeMedia.url" controls class="w-full h-full object-cover animate-media-switch" @click.stop></video>
               <img v-else :key="'i-' + activeMediaIndex" :src="activeMedia.url" :alt="product.name" class="w-full h-full object-cover animate-media-switch transition-transform duration-700 group-hover:scale-105" />
@@ -32,7 +32,7 @@
               @click.stop="setActiveMedia(index)"
               type="button"
               :class="index === activeMediaIndex ? 'border-black scale-95 shadow-inner' : 'border-white/80'"
-              class="min-w-[96px] h-24 rounded-3xl border-2 bg-white/90 shadow-lg overflow-hidden transition-all duration-300 hover:-translate-y-1"
+              class="min-w-[72px] h-[76px] border bg-white/90 shadow-sm overflow-hidden transition-all duration-200"
             >
               <video v-if="media.media_type === 'video'" :src="media.url" muted class="w-full h-full object-cover"></video>
               <img v-else :src="media.url" class="w-full h-full object-cover" />
@@ -40,32 +40,26 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="rounded-3xl border border-gray-100 p-4 bg-white shadow-sm">
-            <h3 class="text-sm uppercase tracking-[0.3em] text-gray-400 mb-3">Availability</h3>
-            <p class="text-lg font-bold text-purple-900">{{ product.in_stock ? 'In Stock' : 'Out of Stock' }}</p>
-            <p class="text-sm text-gray-500 mt-1">{{ product.stock }} unit{{ product.stock === 1 ? '' : 's' }} available</p>
-          </div>
-
-          <div class="rounded-3xl border border-gray-100 p-4 bg-white shadow-sm">
-            <h3 class="text-sm uppercase tracking-[0.3em] text-gray-400 mb-3">Select Size</h3>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="border border-black/10 p-4 bg-white">
+            <h3 class="text-xs uppercase tracking-[0.16em] text-gray-500 mb-3">Select Size</h3>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="size in (product.size_options || [])"
                 :key="size"
                 type="button"
                 @click="selectedSize = size"
-                :class="size === selectedSize ? 'bg-gradient-brand text-white border-transparent' : 'bg-white text-purple-700 border-purple-200 hover:border-purple-400'"
-                class="border rounded px-3.5 py-2 text-sm font-semibold transition"
+                :class="size === selectedSize ? 'bg-black text-white border-black' : 'bg-white text-black border-black/20 hover:border-black'"
+                class="border border-black/20 rounded-none px-3 py-1.5 text-sm font-medium transition"
               >
                 {{ size }}
               </button>
             </div>
-            <p v-if="!product.size_options || product.size_options.length === 0" class="text-sm text-gray-500 mt-3">One size / no size options for this item.</p>
+            <p v-if="!product.size_options || product.size_options.length === 0" class="text-sm text-gray-500 mt-3">One size</p>
           </div>
 
-          <div v-if="product.color_options && product.color_options.length" class="rounded-3xl border border-gray-100 p-4 bg-white shadow-sm">
-            <h3 class="text-sm uppercase tracking-[0.3em] text-gray-400 mb-3">Select Color{{ selectedColor ? `: ${selectedColor}` : '' }}</h3>
+          <div v-if="product.color_options && product.color_options.length" class="border border-black/10 p-4 bg-white">
+            <h3 class="text-xs uppercase tracking-[0.16em] text-gray-500 mb-3">Select Color{{ selectedColor ? `: ${selectedColor}` : '' }}</h3>
             <div class="flex flex-wrap gap-2.5">
               <button
                 v-for="color in product.color_options"
@@ -81,16 +75,16 @@
             </div>
           </div>
 
-          <div v-if="product.length_options && product.length_options.length" class="rounded-3xl border border-gray-100 p-4 bg-white shadow-sm">
-            <h3 class="text-sm uppercase tracking-[0.3em] text-gray-400 mb-3">Select Length</h3>
+          <div v-if="product.length_options && product.length_options.length" class="border border-black/10 p-4 bg-white">
+            <h3 class="text-xs uppercase tracking-[0.16em] text-gray-500 mb-3">Select Length</h3>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="len in product.length_options"
                 :key="len"
                 type="button"
                 @click="selectedLength = len"
-                :class="len === selectedLength ? 'bg-gradient-brand text-white border-transparent' : 'bg-white text-purple-700 border-purple-200 hover:border-purple-400'"
-                class="border rounded px-3.5 py-2 text-sm font-semibold transition"
+                :class="len === selectedLength ? 'bg-black text-white border-black' : 'bg-white text-black border-black/20 hover:border-black'"
+                class="border border-black/20 rounded-none px-3 py-1.5 text-sm font-medium transition"
               >
                 {{ len }}
               </button>
@@ -99,10 +93,10 @@
         </div>
       </div>
 
-      <div class="product-meta-details space-y-6">
-        <div class="rounded-[2rem] border border-gray-100 bg-white p-8 shadow-lg shadow-slate-200/50">
-          <div class="mb-6">
-            <h1 class="text-5xl font-extrabold tracking-tight mb-3">{{ product.name }}</h1>
+      <div class="product-meta-details space-y-4">
+        <div class="border border-black/10 bg-white p-5 sm:p-6">
+          <div class="mb-4">
+            <h1 class="mb-2 text-2xl font-semibold tracking-tight sm:text-3xl">{{ product.name }}</h1>
             <!-- Star rating summary. Jumps to the reviews section below. -->
             <a
               v-if="product.review_count"
@@ -120,32 +114,20 @@
               <span>{{ Number(product.average_rating).toFixed(1) }} ({{ product.review_count }})</span>
             </a>
             <div class="flex items-center gap-3">
-              <span class="text-4xl font-black text-brand-accent">{{ formatDisplayPrice }}</span>
-              <span class="inline-flex rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
+              <span class="text-xl font-semibold text-black sm:text-2xl">{{ formatDisplayPrice }}</span>
+              <span class="inline-flex border border-black/15 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-gray-600">
                 {{ product.in_stock ? 'Ready to ship' : 'Sold out' }}
               </span>
             </div>
           </div>
 
-          <div class="space-y-4 mb-6">
-            <p class="text-slate-600 leading-relaxed">{{ product.description || 'A refined product with premium design and visuals.' }}</p>
-            <div class="grid grid-cols-2 gap-3 text-sm text-slate-500">
-              <div class="rounded-3xl bg-slate-50 p-4">
-                <span class="block uppercase tracking-[0.22em] font-semibold">Category</span>
-                <span class="block mt-2 text-slate-800">{{ product.category?.name || 'Unassigned' }}</span>
-              </div>
-              <div class="rounded-3xl bg-slate-50 p-4">
-                <span class="block uppercase tracking-[0.22em] font-semibold">Added</span>
-                <span class="block mt-2 text-slate-800">{{ product.date_added ? new Date(product.date_added).toLocaleDateString() : 'N/A' }}</span>
-              </div>
-            </div>
-          </div>
+          <p v-if="product.description" class="mb-5 text-sm leading-relaxed text-gray-600">{{ product.description }}</p>
 
-          <div class="space-y-4">
+          <div class="space-y-3">
             <button
               @click="addToCart"
               :disabled="!product.in_stock || (product.size_options && product.size_options.length > 0 && !selectedSize)"
-              class="w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-gradient-brand hover:brightness-105 disabled:cursor-not-allowed disabled:bg-gray-300"
+              class="w-full border border-black bg-black py-3 text-sm font-semibold text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-300"
             >
               {{ product.in_stock ? 'Add to Cart' : 'Out of Stock' }}
             </button>
@@ -156,7 +138,7 @@
               :href="whatsappProductLink"
               target="_blank"
               rel="noopener"
-              class="flex items-center justify-center gap-2 w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-gradient-brand hover:brightness-95"
+              class="flex w-full items-center justify-center gap-2 border border-black py-3 text-sm font-semibold text-black transition hover:bg-black hover:text-white"
             >
               <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.4 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.9-4.3-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5s.8 1.9.8 2c.1.1.1.3 0 .5-.3.6-.6.8-.4 1.1.6 1.1 1.4 1.8 2.4 2.4.3.2.5.1.7-.1l.8-.9c.2-.3.4-.2.7-.1l2 1c.3.1.5.2.6.4 0 .1 0 .6-.5 1.5z"/></svg>
               Order via WhatsApp
@@ -168,7 +150,7 @@
               :href="site.messengerUrl"
               target="_blank"
               rel="noopener"
-              class="flex items-center justify-center gap-2 w-full rounded-full py-4 text-lg font-bold transition shadow-lg text-white bg-gradient-brand hover:brightness-95"
+              class="flex w-full items-center justify-center gap-2 border border-black py-3 text-sm font-semibold text-black transition hover:bg-black hover:text-white"
             >
               <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
               Message us on Messenger
@@ -191,7 +173,17 @@
          component keys its requests off the slug. -->
     <ProductReviews v-if="product" :product-slug="product.slug" />
 
-    <div v-if="site.whatsappEnabled" class="mt-10 text-center">
+    <section v-if="relatedProducts.length" class="mt-8 border-t border-black/15 pt-6">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 class="text-xl font-semibold tracking-tight">Related Products</h2>
+        <router-link v-if="product?.category?.slug" :to="`/category/${product.category.slug}`" class="text-sm underline">View category</router-link>
+      </div>
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <ProductCard v-for="related in relatedProducts" :key="related.id" :product="related" />
+      </div>
+    </section>
+
+    <div v-if="site.whatsappEnabled" class="mt-6 text-center">
       <a :href="whatsappProductLink" target="_blank" rel="noopener noreferrer"
          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-emerald-600 text-emerald-700 text-sm font-medium hover:bg-emerald-50 transition">
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.4 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.9-4.3-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5s.8 1.9.8 2c.1.1.1.3 0 .5-.3.6-.6.8-.4 1.1.6 1.1 1.4 1.8 2.4 2.4.3.2.5.1.7-.1l.8-.9c.2-.3.4-.2.7-.1l2 1c.3.1.5.2.6.4 0 .1 0 .6-.5 1.5z"/></svg>
@@ -262,9 +254,12 @@ import { useCartStore } from '../stores/cart'
 import { useSiteStore } from '../stores/site'
 import ProductReviews from '../components/ProductReviews.vue'
 import WishlistHeart from '../components/WishlistHeart.vue'
+import ProductCard from '../components/ProductCard.vue'
+import { formatProductPrice } from '../utils/pricing.js'
 
 // 1. Core States defined first
 const product = ref(null)
+const relatedProducts = ref([])
 const selectedSize = ref('')
 const selectedColor = ref('')
 const selectedLength = ref('')
@@ -320,8 +315,10 @@ const fetchProductData = async () => {
     
     if (response.data && typeof response.data === 'object') {
       product.value = response.data
+      fetchRelatedProducts(response.data.category?.slug, response.data.id)
     } else {
       product.value = null
+      relatedProducts.value = []
       console.warn("API returned invalid payload format")
     }
   } catch (error) {
@@ -331,6 +328,22 @@ const fetchProductData = async () => {
       message: error.message
     })
     product.value = null
+    relatedProducts.value = []
+  }
+}
+
+const fetchRelatedProducts = async (categorySlug, productId) => {
+  if (!categorySlug) {
+    relatedProducts.value = []
+    return
+  }
+  try {
+    const response = await axios.get(`/api/v1/products/?category=${encodeURIComponent(categorySlug)}`)
+    const items = Array.isArray(response.data) ? response.data : (response.data.results || response.data.products || [])
+    relatedProducts.value = items.filter((item) => item.id !== productId).slice(0, 4)
+  } catch (error) {
+    console.error('Related products could not be loaded:', error)
+    relatedProducts.value = []
   }
 }
 
@@ -405,39 +418,7 @@ function handleKeyDown(e) {
 
 // 4. Reactive Price Formatter with Cross-Currency Conversion Fallback
 const formatDisplayPrice = computed(() => {
-  if (!product.value) return '0.00'
-  
-  const selectedCurrency = cartStore.currentCurrency
-  
-  // Try exact database record match for the chosen currency
-  const regionalPrice = product.value.prices?.find(p => p.currency === selectedCurrency)
-  if (regionalPrice) {
-    return `${Number(regionalPrice.price).toFixed(2)} ${selectedCurrency}`
-  }
-  
-  // Conversion Fallback Strategy if exact currency node is missing
-  const backupPriceObj = product.value.prices?.[0]
-  if (backupPriceObj) {
-    const basePrice = Number(backupPriceObj.price)
-    const baseCurrency = backupPriceObj.currency
-    
-    // Core currency index conversion rates
-    const ratesToUSD = {
-      'SEK': 0.095,
-      'PKR': 0.0036,
-      'EUR': 1.08,
-      'BDT': 0.0085,
-      'USD': 1.0
-    }
-    
-    const rateInUSD = ratesToUSD[baseCurrency] || 1.0
-    const targetRateFromUSD = ratesToUSD[selectedCurrency] || 1.0
-    
-    const convertedPrice = (basePrice * rateInUSD) / targetRateFromUSD
-    return `${convertedPrice.toFixed(2)} ${selectedCurrency}`
-  }
-  
-  return `${Number(product.value.price || 0).toFixed(2)} ${selectedCurrency}`
+  return product.value ? formatProductPrice(product.value, cartStore.currentCurrency) : '0.00'
 })
 
 const hasSizeSelection = computed(() => {
