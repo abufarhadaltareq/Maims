@@ -429,6 +429,7 @@ LOGGING = {
 }
 
 # --- CORS Configuration --------------------------------------------------------
+# --- CORS Configuration --------------------------------------------------------
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False').lower() in ('true', '1', 'yes')
 
 _cors_allowed = os.environ.get('CORS_ALLOWED_ORIGINS')
@@ -442,6 +443,11 @@ else:
         'http://localhost:5173',
         'http://127.0.0.1:5173',
     ]
+
+# Automatically allow any subdomain on maims.eu to avoid mismatch issues
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://([a-zA-Z0-9-]+\.)*maims\.eu$",
+]
 
 CORS_ALLOW_CREDENTIALS = False
 
