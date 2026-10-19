@@ -48,15 +48,25 @@
     <nav
       v-if="isHomePage && mainCategories.length"
       aria-label="Main categories"
-      class="mx-auto flex max-w-[1500px] flex-wrap items-center justify-center gap-2 px-4 py-4 sm:gap-3 sm:px-7 sm:py-5"
+      class="mx-auto flex max-w-[1500px] flex-wrap items-start justify-center gap-x-5 gap-y-4 px-4 py-5 sm:gap-x-8 sm:gap-y-5 sm:px-7 sm:py-6"
     >
       <router-link
         v-for="category in mainCategories"
         :key="'main-category-' + category.id"
         :to="`/category/${category.slug}`"
-        class="rounded-full border border-black px-5 py-2 text-center text-xs font-semibold uppercase tracking-wider text-black transition-colors hover:bg-black hover:text-white sm:px-7 sm:py-2.5 sm:text-sm"
+        class="group flex w-20 flex-col items-center gap-2 text-center sm:w-24"
       >
-        {{ category.name }}
+        <span class="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-black/15 bg-gray-100 transition group-hover:border-black group-hover:ring-2 group-hover:ring-black/10 sm:h-20 sm:w-20">
+          <img
+            v-if="category.image_url || category.children?.find((child) => child.image_url)?.image_url"
+            :src="category.image_url || category.children.find((child) => child.image_url).image_url"
+            :alt="category.name"
+            class="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+          <span v-else class="text-xl font-medium text-gray-500">{{ category.name.slice(0, 1) }}</span>
+        </span>
+        <span class="text-xs font-semibold uppercase tracking-wide text-black sm:text-sm">{{ category.name }}</span>
       </router-link>
     </nav>
 
