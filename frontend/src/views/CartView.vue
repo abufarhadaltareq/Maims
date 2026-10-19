@@ -184,11 +184,6 @@
           <span>{{ cartStore.cartTotalLength }} items</span>
         </div>
 
-        <div class="flex justify-between text-sm text-gray-600 font-medium">
-          <span>Shipping:</span>
-          <span class="text-emerald-600 font-semibold">Free</span>
-        </div>
-
         <hr class="border-gray-200" />
 
         <div class="flex justify-between items-baseline">

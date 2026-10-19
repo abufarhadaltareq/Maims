@@ -14,12 +14,11 @@
           </span>
         </div>
       </div>
-      <div class="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 sm:gap-3 md:gap-8 h-16 md:h-20">
-        <!-- Left: hamburger category menu (dropdown) -->
-        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <div class="max-w-[1600px] mx-auto px-3 sm:px-6 grid grid-cols-[1fr_auto_1fr] items-center gap-1 sm:gap-3 h-16 md:h-20">
+        <div class="flex items-center gap-1 sm:gap-2 min-w-0">
           <div class="relative" @click.stop="isCatMenuOpen = !isCatMenuOpen">
-            <button class="icon-3d flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-full hover:bg-gray-100 transition-colors" aria-label="Open category menu">
-              <svg class="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button class="flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl border border-gray-200 text-gray-700 hover:border-purple-200 hover:bg-purple-50 transition-colors" aria-label="Open category menu">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
               </svg>
             </button>
@@ -38,54 +37,21 @@
               <span v-else class="block px-4 py-2 text-sm text-gray-400">Loading…</span>
             </div>
           </div>
-        </div>
 
-        <!-- Center: bigger logo + brand name alongside, centered on ALL screens -->
-        <div class="flex-1 flex items-center justify-center min-w-0">
-          <router-link to="/" aria-label="Maims — go to homepage" class="inline-flex items-center justify-center select-none group">
-            <div class="brand-pack">
-              <div class="brand-wrap">
-                <img
-                  v-if="site.logoUrl"
-                  :src="site.logoUrl"
-                  :alt="site.storeName + ' logo'"
-                  class="h-16 md:h-20 max-w-[14rem] md:max-w-[18rem] shrink-0 object-contain brand-logo"
-                />
-                <svg v-else class="h-16 w-16 md:h-20 md:w-20 shrink-0 drop-shadow-md brand-logo" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-                  <defs>
-                    <linearGradient id="maimsLogoGradMobile" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0" stop-color="#1e293b" />
-                      <stop offset="0.55" stop-color="#0ea5e9" />
-                      <stop offset="1" stop-color="#38bdf8" />
-                    </linearGradient>
-                  </defs>
-                  <rect width="40" height="40" rx="12" fill="url(#maimsLogoGradMobile)" />
-                  <path d="M13 27.5V12.5L20 22.5L27 12.5V27.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-
-                <!-- Brand name beside the logo -->
-                <span class="brand-wordmark">{{ site.storeName }}</span>
-              </div>
-            </div>
-          </router-link>
-        </div>
-        
-        <!-- Right Utility Actions -->
-        <div class="flex items-center gap-0.5 sm:gap-1.5 shrink-0">
-          <!-- Currency Picker -->
+          <!-- Currency selector stays beside the category menu on every screen. -->
           <div class="relative select-none" @click.stop="isCurrencyOpen = !isCurrencyOpen">
-            <button class="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-full hover:bg-gray-100 transition-colors" aria-label="Change currency">
-              <span class="text-lg leading-none">{{ countryFlag }}</span>
-              <span class="hidden sm:flex flex-col items-start leading-tight">
-                <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Deliver to</span>
-                <span class="text-xs font-semibold text-gray-800">{{ countryCode }} · {{ cartStore.currentCurrency }}</span>
-              </span>
+            <button
+              class="flex items-center gap-1.5 h-10 md:h-11 px-2 sm:px-2.5 rounded-xl border border-gray-200 hover:border-purple-200 hover:bg-purple-50 transition-colors"
+              :aria-label="`Change currency, currently ${cartStore.currentCurrency}`"
+              :aria-expanded="isCurrencyOpen"
+            >
+              <span class="text-base leading-none">{{ countryFlag }}</span>
+              <span class="text-[11px] sm:text-xs font-bold text-gray-700">{{ cartStore.currentCurrency }}</span>
               <svg class="hidden sm:block w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
               </svg>
             </button>
-
-            <div v-if="isCurrencyOpen" class="absolute right-0 mt-2 bg-white border border-gray-100 shadow-xl rounded-2xl w-40 z-50 py-1.5 overflow-hidden">
+            <div v-if="isCurrencyOpen" class="absolute left-0 mt-2 bg-white border border-gray-100 shadow-xl rounded-2xl w-40 z-50 py-1.5 overflow-hidden">
               <p class="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-50">Currency</p>
               <button
                 v-for="c in currencies"
@@ -98,9 +64,29 @@
               </button>
             </div>
           </div>
+        </div>
 
-          <!-- Cart -->
-          <router-link to="/cart" class="icon-3d relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-gradient-to-b from-white to-purple-50 border border-purple-100 rounded-full shadow-md shadow-purple-500/20 transition-all duration-200 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/30 active:scale-95" aria-label="View cart">
+        <router-link to="/" aria-label="Maims — go to homepage" class="flex items-center justify-center min-w-0">
+          <img
+            v-if="site.logoUrl"
+            :src="site.logoUrl"
+            :alt="site.storeName + ' logo'"
+            class="block h-14 sm:h-16 md:h-20 max-w-[10rem] sm:max-w-[14rem] md:max-w-[18rem] w-auto object-contain"
+          />
+          <svg v-else class="block h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="maimsLogoGradMobile" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#1e293b" />
+                <stop offset="0.55" stop-color="#0ea5e9" />
+                <stop offset="1" stop-color="#38bdf8" />
+              </linearGradient>
+            </defs>
+            <rect width="40" height="40" rx="12" fill="url(#maimsLogoGradMobile)" />
+            <path d="M13 27.5V12.5L20 22.5L27 12.5V27.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </router-link>
+        <div class="flex items-center justify-end gap-1 sm:gap-2 min-w-0">
+          <router-link to="/cart" class="relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-white border border-gray-200 rounded-xl transition-colors hover:border-purple-200 hover:bg-purple-50" aria-label="View cart">
             <svg class="w-5 h-5 md:w-6 md:h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
               <path d="M3 6h18" stroke-width="2" stroke-linecap="round"></path>
@@ -114,9 +100,9 @@
           <!-- Wishlist -->
           <router-link
             to="/wishlist"
-            class="icon-3d relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-gradient-to-b from-white to-rose-50 border border-rose-100 rounded-full shadow-md shadow-rose-500/20 transition-all duration-200 hover:scale-110 hover:shadow-lg hover:shadow-rose-500/30 active:scale-95" aria-label="Wishlist"
+            class="relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-white border border-gray-200 rounded-xl transition-colors hover:border-rose-200 hover:bg-rose-50" aria-label="Wishlist"
           >
-            <span class="text-lg md:text-xl leading-none icon-wishlist-beat">❤️</span>
+            <span class="text-lg md:text-xl leading-none">❤️</span>
             <span v-if="wishlistStore.count" class="absolute -top-0.5 -right-0.5 bg-gradient-brand text-white text-[10px] min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full font-bold ring-2 ring-white">
               {{ wishlistStore.count }}
             </span>
@@ -124,7 +110,7 @@
 
           <!-- Account menu -->
           <div class="relative" @click.stop="isAccountOpen = !isAccountOpen">
-            <button class="icon-3d flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-gradient-to-b from-white to-purple-50 border border-purple-100 rounded-full shadow-md shadow-purple-500/20 transition-all duration-200 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/30 active:scale-95 font-semibold" aria-label="Account menu">
+            <button class="flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-white border border-gray-200 rounded-xl transition-colors hover:border-purple-200 hover:bg-purple-50 font-semibold" aria-label="Account menu" :aria-expanded="isAccountOpen">
               <svg class="w-5 h-5 md:w-6 md:h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
               </svg>
@@ -351,71 +337,3 @@ watch(
   }
 )
 </script>
-<style scoped>
-/* ============================================================================
-   Header brand unit — logo + brand name, 3D animated
-   ============================================================================ */
-
-:root {
-  --color-brand-deep: #4C1D95; /* Purple 900 — 3D extrusion layers */
-  --color-brand-darker: #371266;
-}
-
-/* Outer unit — lifts and tilts in 3D on hover */
-.brand-pack {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
-}
-
-/* Inner unit — the gentle floating float */
-.brand-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  animation: brand-float 3.2s ease-in-out infinite;
-}
-
-@keyframes brand-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-.brand-logo { display: block; }
-
-/* Brand wordmark — serif with an extruded 3D letterpress look */
-.brand-wordmark {
-  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-  font-weight: 700;
-  font-size: 1.05rem;
-  line-height: 1;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-brand);
-  text-shadow:
-    0 2px 0 var(--color-brand-deep),
-    0 4px 0 var(--color-brand-deep),
-    0 6px 0 var(--color-brand-deep),
-    0 8px 6px rgba(76, 29, 149, 0.28);
-  transition: text-shadow 0.2s ease;
-}
-
-/* Hover: lift the unit in 3D + deepen the wordmark */
-.brand-pack:hover {
-  transform: translateY(-4px) rotateX(3deg);
-  transform-origin: center bottom;
-  box-shadow:
-    0 28px 48px -18px rgba(124, 58, 237, 0.4),
-    0 0 0 2px rgba(124, 58, 237, 0.12);
-}
-
-.brand-wordmark:hover {
-  text-shadow:
-    0 2px 0 var(--color-brand-deep),
-    0 4px 0 var(--color-brand-deep),
-    0 6px 0 var(--color-brand-deep),
-    0 12px 10px rgba(76, 29, 149, 0.36);
-}
-</style>

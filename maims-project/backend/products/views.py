@@ -98,7 +98,12 @@ def product_queryset():
         'media',
         Prefetch(
             'category',
-            queryset=Category.objects.annotate(product_count=Count('products')).prefetch_related('children'),
+            queryset=Category.objects.annotate(
+                product_count=Count(
+                    'products',
+                    filter=Q(products__is_visible=True),
+                )
+            ).prefetch_related('children'),
         ),
     )
 
@@ -260,6 +265,7 @@ class SocialFeedList(APIView):
         limit = max(1, min(limit, 50))
         products = (product_queryset()
                     .filter(facebook_post_id__isnull=False)
+                    .filter(is_visible=True)
                     .exclude(facebook_post_id='')
                     .order_by('-date_added')[:limit])
         serializer = ProductSerializer(products, many=True, context={'request': request})
@@ -273,7 +279,7 @@ class ProductDetail(APIView):
 
     def get(self, request, slug, format=None):
         try:
-            product = product_queryset().get(slug=slug)
+            product = product_queryset().get(slug=slug, is_visible=True)
             serializer = ProductSerializer(product, context={'request': request})
             return Response(serializer.data)
         except Product.DoesNotExist:
@@ -291,7 +297,13 @@ class CategoryList(APIView):
     def get(self, request, format=None):
         qs = Category.objects.filter(parent__isnull=True).prefetch_related(
             'children', 'children__children'
-        ).annotate(product_count=Count('products', distinct=True))
+        ).annotate(
+            product_count=Count(
+                'products',
+                filter=Q(products__is_visible=True),
+                distinct=True,
+            )
+        )
         if request.query_params.get('homepage') == 'true':
             qs = qs.filter(show_on_homepage=True)
         serializer = CategorySerializer(qs, many=True)
@@ -316,15 +328,21 @@ class CategoryShowcase(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, format=None):
-        from .models import Product as ProductModel
         cats = Category.objects.filter(
             parent__isnull=True, show_on_homepage=True
+        ).annotate(
+            product_count=Count(
+                'products',
+                filter=Q(products__is_visible=True),
+                distinct=True,
+            )
         ).prefetch_related('children').order_by('homepage_order', 'name')
         payload = []
         for cat in cats:
             child_ids = list(cat.children.values_list('id', flat=True))
             products = product_queryset().filter(
-                Q(category=cat) | Q(category_id__in=child_ids)
+                Q(category=cat) | Q(category_id__in=child_ids),
+                is_visible=True,
             )[:8]
             payload.append({
                 'category': CategorySerializer(cat).data,
@@ -342,6 +360,8 @@ class ProductSearch(APIView):
         if not query:
             return Response([])
         products = product_queryset().filter(
+            is_visible=True,
+        ).filter(
             Q(name__icontains=query)
             | Q(brand_name__icontains=query)
             | Q(description__icontains=query)
@@ -367,7 +387,8 @@ class CategoryProducts(APIView):
 
         child_ids = list(category.children.values_list('id', flat=True))
         products = product_queryset().filter(
-            Q(category=category) | Q(category_id__in=child_ids)
+            Q(category=category) | Q(category_id__in=child_ids),
+            is_visible=True,
         )
         serializer = ProductSerializer(products, many=True, context={'request': request})
         return Response(serializer.data)
@@ -1356,7 +1377,7 @@ class ProductReviewList(APIView):
 
     def get_object(self, slug):
         # Slugs are unique now, so .get() cannot raise MultipleObjectsReturned.
-        return Product.objects.get(slug=slug)
+        return Product.objects.get(slug=slug, is_visible=True)
 
     def get(self, request, slug):
         try:
@@ -1597,5 +1618,3 @@ class ChatbotSuggestionsView(APIView):
                 "Chat on WhatsApp",
             ]
         })
-
-

@@ -126,9 +126,10 @@ Railway auto-deploys on every push to `main` branch!
 2. Connect your GitHub repository
 3. Configure:
    - **Name**: `maims-backend`
-   - **Environment**: Python 3.11
-   - **Build Command**: `pip install -r requirements.txt && python manage.py collectstatic --noinput`
-   - **Start Command**: `gunicorn core.wsgi`
+   - **Environment**: Python 3.12.11 (Django 6 requires Python 3.12 or later)
+   - **Build Command**: `pip install --upgrade pip && pip install -r requirements.txt && SECRET_KEY=build-time-only-not-a-real-secret python manage.py collectstatic --noinput`
+   - **Pre-Deploy Command**: `python manage.py migrate --noinput`
+   - **Start Command**: `gunicorn core.wsgi --bind 0.0.0.0:$PORT --workers 3 --timeout 60 --access-logfile - --error-logfile -`
    - **Region**: Choose closest to you
 
 #### Step 3: Add PostgreSQL Database
@@ -144,11 +145,20 @@ In the Web Service settings → **Environment**:
 ```
 DEBUG=False
 SECRET_KEY=your-secret-key
+FRONTEND_BASE_URL=https://your-frontend-domain.com
+BACKEND_BASE_URL=https://your-render-domain.onrender.com
+BREVO_API_KEY=your-brevo-api-key
 STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
 ALLOWED_HOSTS=your-render-domain.onrender.com
 CORS_ALLOWED_ORIGINS=https://your-vercel-frontend.vercel.app
 ```
+
+`BREVO_API_KEY` is required for production email delivery. `FRONTEND_BASE_URL`
+and `BACKEND_BASE_URL` are used to build password-reset and order-management
+links. The checked-in `maims-project/backend/render.yaml` blueprint contains
+the matching runtime, migration, health-check, and environment configuration.
 
 #### Step 5: Deploy
 

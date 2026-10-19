@@ -374,6 +374,58 @@ class EndpointPermissionTests(TestCase):
         self.assertIn(res.status_code, (401, 403))
 
 
+class ProductVisibilityTests(TestCase):
+    """Products hidden in the admin must not leak through public catalogue routes."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.category = Category.objects.create(name='Hidden Test', slug='hidden-test')
+        self.visible = Product.objects.create(
+            category=self.category, name='Visible Coat', slug='visible-coat', stock=2,
+        )
+        self.hidden = Product.objects.create(
+            category=self.category, name='Secret Coat', slug='secret-coat',
+            stock=2, is_visible=False, facebook_post_id='hidden-post',
+        )
+        CurrencyPrice.objects.create(
+            product=self.visible, currency='EUR', price=Decimal('10.00'),
+        )
+        CurrencyPrice.objects.create(
+            product=self.hidden, currency='EUR', price=Decimal('15.00'),
+        )
+
+    def test_hidden_product_is_excluded_from_search_and_category_routes(self):
+        search = self.client.get('/api/v1/products/search/?q=Secret')
+        category = self.client.get('/api/v1/products/category/hidden-test/')
+        showcase = self.client.get('/api/v1/category-showcase/')
+        social_feed = self.client.get('/api/v1/social-feed/')
+
+        self.assertEqual(search.status_code, 200)
+        self.assertEqual(search.data, [])
+        self.assertEqual(category.status_code, 200)
+        self.assertEqual([p['slug'] for p in category.data], ['visible-coat'])
+        self.assertEqual(showcase.status_code, 200)
+        self.assertEqual(
+            [p['slug'] for p in showcase.data[0]['products']],
+            ['visible-coat'],
+        )
+        self.assertEqual(social_feed.status_code, 200)
+        self.assertEqual(social_feed.data, [])
+
+    def test_hidden_product_detail_is_not_found(self):
+        response = self.client.get('/api/v1/products/secret-coat/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_hidden_product_reviews_are_not_found(self):
+        response = self.client.get('/api/v1/products/secret-coat/reviews/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_category_product_count_excludes_hidden_products(self):
+        response = self.client.get('/api/v1/categories/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]['product_count'], 1)
+
+
 class CurrencyPricingTests(TestCase):
     """A currency with no stored price must be rejected, never substituted."""
 

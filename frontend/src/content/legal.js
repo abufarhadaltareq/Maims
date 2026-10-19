@@ -79,7 +79,7 @@ export const LEGAL_DOCS = [
         body: [
           'We accept the payment methods shown at checkout: card payment (Stripe), PayPal, or a WhatsApp order where available.',
           'Card payments are handled by our payment provider. We never see or store your full card number; payment details are collected on a secure, provider-hosted page.',
-          'PayPal orders are reserved when you place them; we email you a secure PayPal link to complete the payment. The order is confirmed once the payment is received.',
+          'PayPal orders are reserved when you place them. Payment is arranged manually after we contact you; no automatic PayPal payment link is sent. The order is confirmed once the payment is received.',
           'Orders placed through WhatsApp are confirmed by us before they are treated as accepted.',
         ],
       },

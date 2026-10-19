@@ -70,6 +70,12 @@ services:
         sync: false
       - key: ADMIN_RECEIVER_EMAIL
         sync: false
+      - key: FRONTEND_BASE_URL
+        value: https://maims.eu
+      - key: BACKEND_BASE_URL
+        value: https://maims-backend-nhq3.onrender.com
+      - key: BREVO_API_KEY
+        sync: false
 
 databases:
   - name: maims-db

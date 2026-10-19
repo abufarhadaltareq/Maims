@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useCartStore } from '../stores/cart'
+import { CURRENCIES, useCartStore } from '../stores/cart'
 import { useSiteStore } from '../stores/site'
 import axios from 'axios'
 import { loadStripe } from '@stripe/stripe-js'
@@ -15,6 +15,7 @@ const successOrderId = ref(null)
 const successWhatsappLink = ref('')
 const isProcessing = ref(false)
 const serverError = ref('')
+const currencyAutoAdjusted = ref(false)
 const orderId = ref(null)
 const stripe = ref(null)
 const cardElement = ref(null)
@@ -66,6 +67,16 @@ const itemPrice = (item) =>
   getProductDisplayPrice(item.product || {}, cartStore.currentCurrency).numeric
 
 const totalCartCost = computed(() => cartStore.cartPricing.subtotal)
+const supportedCurrencies = computed(() =>
+  CURRENCIES.filter(({ code }) =>
+    cartStore.items.length > 0 && cartStore.items.every((item) =>
+      item.product?.prices?.some((price) => String(price.currency).toUpperCase() === code)
+    )
+  )
+)
+const currencySupported = computed(() =>
+  supportedCurrencies.value.some(({ code }) => code === cartStore.currentCurrency)
+)
 
 const formattedItems = computed(() => {
   return cartStore.items.map(item => ({
@@ -128,6 +139,10 @@ const initializeStripe = async () => {
 onMounted(async () => {
   idempotencyKey.value = newIdempotencyKey()
   await site.fetchSettings()
+  if (!currencySupported.value && supportedCurrencies.value.length) {
+    cartStore.setCurrency(supportedCurrencies.value[0].code)
+    currencyAutoAdjusted.value = true
+  }
   // Checkout consent box default: ticked only for the opt-out strategy, and
   // only if the admin is showing the box at all.
   if (site.newsletterCheckoutEnabled && site.newsletterBoxTicked) {
@@ -154,6 +169,14 @@ const submitCheckoutForm = async () => {
 
   if (!cartStore.items.length) {
     serverError.value = 'Your bag is empty.'
+    isProcessing.value = false
+    return
+  }
+
+  if (!currencySupported.value) {
+    serverError.value = supportedCurrencies.value.length
+      ? `Some items are not available in ${cartStore.currentCurrency}. Choose ${supportedCurrencies.value.map(({ code }) => code).join(', ')} to continue.`
+      : 'These items do not have a common checkout currency. Please review your bag or contact the store.'
     isProcessing.value = false
     return
   }
@@ -247,7 +270,7 @@ const submitCheckoutForm = async () => {
       <p v-if="successOrderId" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Order #{{ successOrderId }}</p>
       <p class="text-gray-500 text-sm max-w-sm mx-auto">
         <span v-if="successMethod === 'stripe'">Your payment has been successfully completed. We are preparing your packages for shipment.</span>
-        <span v-else-if="successMethod === 'paypal'">Your order is reserved — we'll email you a secure PayPal link to complete the payment, then we start packing.</span>
+        <span v-else-if="successMethod === 'paypal'">Your order is reserved. The shop will contact you to arrange PayPal payment; payment is not processed automatically.</span>
         <span v-else>Your order is saved. Tap below to send it to us on WhatsApp and confirm.</span>
       </p>
       <a
@@ -390,9 +413,24 @@ const submitCheckoutForm = async () => {
             <p v-if="serverError" class="text-sm text-red-500">{{ serverError }}</p>
           </div>
           <div v-else class="bg-purple-50 border border-blue-100 rounded-xl p-5 text-sm text-blue-900">
-            <p v-if="paymentMethod === 'paypal'" class="font-semibold">No card details needed here — once the order is placed we'll email you a secure PayPal payment link.</p>
+            <p v-if="paymentMethod === 'paypal'" class="font-semibold">Your order will be reserved while the shop contacts you to arrange PayPal payment. Payment is handled manually and no automatic PayPal link is sent yet.</p>
             <p v-else class="font-semibold">No card needed — your order is saved, then sent to our WhatsApp Business number with one tap.</p>
             <p v-if="serverError" class="text-sm text-red-500 mt-2">{{ serverError }}</p>
+          </div>
+
+          <div v-if="!currencySupported" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p v-if="supportedCurrencies.length">
+              This cart can be checked out in
+              <button
+                v-for="currency in supportedCurrencies"
+                :key="currency.code"
+                type="button"
+                class="mx-1 font-bold underline"
+                @click="cartStore.setCurrency(currency.code)"
+              >{{ currency.code }}</button>
+              only. Choose an available currency to continue.
+            </p>
+            <p v-else>These items have no currency in common for checkout. Remove an item or contact the store.</p>
           </div>
 
           <button type="submit" :disabled="isProcessing" class="w-full bg-gradient-brand text-white font-bold py-4 rounded-xl hover:brightness-110 transition disabled:opacity-70">
@@ -405,6 +443,9 @@ const submitCheckoutForm = async () => {
 
         <div class="lg:col-span-5 bg-gray-50 border border-gray-100 rounded-xl p-6 space-y-4 text-left">
           <h2 class="font-bold text-lg tracking-tight mb-4">Review Your Bag</h2>
+          <p v-if="currencyAutoAdjusted" class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            Checkout currency changed to {{ cartStore.currentCurrency }} because that is the available price currency for every item in your bag.
+          </p>
           <div v-for="item in cartStore.items" :key="`${item.product.id}-${item.variant || item.size || 'default'}`" class="flex justify-between py-2 border-b">
             <div>
               <span class="font-semibold">{{ item.product.name }}</span>
