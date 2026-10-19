@@ -45,6 +45,21 @@
       </div>
     </div>
 
+    <nav
+      v-if="isHomePage && mainCategories.length"
+      aria-label="Main categories"
+      class="mx-auto flex max-w-[1500px] flex-wrap items-center justify-center gap-2 px-4 py-4 sm:gap-3 sm:px-7 sm:py-5"
+    >
+      <router-link
+        v-for="category in mainCategories"
+        :key="'main-category-' + category.id"
+        :to="`/category/${category.slug}`"
+        class="rounded-full border border-black px-5 py-2 text-center text-xs font-semibold uppercase tracking-wider text-black transition-colors hover:bg-black hover:text-white sm:px-7 sm:py-2.5 sm:text-sm"
+      >
+        {{ category.name }}
+      </router-link>
+    </nav>
+
     <section v-if="isHomePage && showcase.length" v-reveal class="mx-auto max-w-[1500px] px-4 py-7 sm:px-7 sm:py-10">
       <h2 class="mb-4 border-b border-black pb-3 text-xl font-semibold tracking-tight sm:mb-6 sm:text-2xl">Shop by Category</h2>
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -59,7 +74,7 @@
             <img
               :src="entry.category.image_url || entry.products[0]?.get_thumbnail || entry.products[0]?.get_image || 'https://placehold.co/600x750?text=Category'"
               :alt="entry.category.name"
-              class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+              class="h-full w-full object-contain object-center"
               loading="lazy"
             />
           </div>
@@ -200,6 +215,7 @@ const categorySlug = ref(route.params.category_slug || '')
 const categoryTitle = ref('New Arrivals')
 const heroSlides = ref([])
 const showcase = ref([])
+const mainCategories = ref([])
 const newArrivalsTrack = ref(null)
 
 // Deshi-besh style filters (category pages).
@@ -293,6 +309,17 @@ const fetchShowcase = async () => {
   }
 }
 
+const fetchMainCategories = async () => {
+  if (!isHomePage.value) return
+  try {
+    const res = await axios.get('/api/v1/categories/?homepage=true')
+    mainCategories.value = Array.isArray(res.data) ? res.data : []
+  } catch (e) {
+    console.error('Error loading main categories:', e)
+    mainCategories.value = []
+  }
+}
+
 const fetchFacets = async () => {
   if (!categorySlug.value) { facets.value = { sizes: [], colors: [], lengths: [], fabrics: [] }; return }
   try {
@@ -363,6 +390,7 @@ onMounted(async () => {
   fetchFacets()
   fetchLatestProducts()
   fetchShowcase()
+  fetchMainCategories()
   startImageRotation()
 })
 
@@ -378,7 +406,10 @@ const clearFiltersSilent = () => {
 }
 
 watch(() => route.path, (p) => {
-  if (p === '/') { fetchShowcase() }
+  if (p === '/') {
+    fetchShowcase()
+    fetchMainCategories()
+  }
 })
 
 onBeforeUnmount(() => {
