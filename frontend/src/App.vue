@@ -251,9 +251,6 @@
       </div>
     </footer>
 
-    <!-- Floating WhatsApp / Facebook quick actions -->
-    <SocialButtons />
-
     <!-- AI chat assistant -->
     <ChatbotWidget />
   </div>
@@ -268,7 +265,6 @@ import { useAuthStore } from './stores/auth'
 import { useSiteStore } from './stores/site'
 import { useWishlistStore } from './stores/wishlist'
 import BrandLogo from './components/BrandLogo.vue'
-import SocialButtons from './components/SocialButtons.vue'
 import SocialIcon from './components/SocialIcon.vue'
 import ChatbotWidget from './components/ChatbotWidget.vue'
 import { BRAND_CONFIG } from './brand.config'
