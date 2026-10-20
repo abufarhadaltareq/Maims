@@ -48,15 +48,15 @@
     <nav
       v-if="isHomePage && mainCategories.length"
       aria-label="Main categories"
-      class="mx-auto flex max-w-[1500px] flex-wrap items-start justify-center gap-x-5 gap-y-4 px-4 py-5 sm:gap-x-8 sm:gap-y-5 sm:px-7 sm:py-6"
+      class="mx-auto mt-4 flex max-w-[1500px] flex-wrap items-start justify-center gap-x-5 gap-y-5 px-4 py-6 sm:mt-6 sm:gap-x-9 sm:gap-y-6 sm:px-7 sm:py-8"
     >
       <router-link
         v-for="category in mainCategories"
         :key="'main-category-' + category.id"
         :to="`/category/${category.slug}`"
-        class="group flex w-20 flex-col items-center gap-2 text-center sm:w-24"
+        class="group flex w-24 flex-col items-center gap-2.5 text-center sm:w-28 sm:gap-3"
       >
-        <span class="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-black/15 bg-gray-100 transition group-hover:border-black group-hover:ring-2 group-hover:ring-black/10 sm:h-20 sm:w-20">
+        <span class="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-black/15 bg-gray-100 transition group-hover:border-black group-hover:ring-2 group-hover:ring-black/10 sm:h-24 sm:w-24">
           <img
             v-if="category.image_url || category.children?.find((child) => child.image_url)?.image_url"
             :src="category.image_url || category.children.find((child) => child.image_url).image_url"
