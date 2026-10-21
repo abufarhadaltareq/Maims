@@ -7,12 +7,16 @@ from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
 
 logger = logging.getLogger(__name__)
 
 
 def redirect_root(request):
     return redirect('admin/')
+
+def health(request):
+    return JsonResponse({"status": "ok"})
 
 
 @never_cache

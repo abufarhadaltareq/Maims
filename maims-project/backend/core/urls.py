@@ -16,6 +16,7 @@ urlpatterns = [
     # Container/orchestrator probe: unauthenticated, cheap, DB-aware.
     path('health/', health, name='health'),
     path('ping/', ping, name='ping'),
+    path("health/", health),
 ]
 
 if settings.DEBUG:
