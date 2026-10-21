@@ -63,7 +63,10 @@
                 >
                   {{ item.product?.name }}
                 </router-link>
-                <p class="text-sm text-gray-500 font-medium">{{ getItemDisplayPrice(item).string }} each</p>
+                <div class="mt-1 flex flex-wrap items-center gap-2">
+                  <p class="text-sm text-gray-500 font-medium">{{ getItemDisplayPrice(item).string }} each</p>
+                  <ShareProductButton v-if="item.product?.slug" :product="item.product" />
+                </div>
                 <p v-if="item.variant || item.size" class="text-xs font-bold text-slate-700 mt-1">{{ item.variant || item.size }}</p>
 
                 <!-- Star rating (admin moderates reviews) -->
@@ -241,6 +244,7 @@ import { useCartStore } from '../stores/cart'
 import { useSiteStore } from '../stores/site'
 import { getProductDisplayPrice } from '../utils/pricing.js'
 import ExploreButton from '../components/ExploreButton.vue'
+import ShareProductButton from '../components/ShareProductButton.vue'
 
 const cartStore = useCartStore()
 const site = useSiteStore()

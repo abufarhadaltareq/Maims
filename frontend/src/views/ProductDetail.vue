@@ -113,8 +113,9 @@
               </span>
               <span>{{ Number(product.average_rating).toFixed(1) }} ({{ product.review_count }})</span>
             </a>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-3">
               <span class="text-xl font-semibold text-black sm:text-2xl">{{ formatDisplayPrice }}</span>
+              <ShareProductButton v-if="product" :product="product" class="ml-auto" />
               <span class="inline-flex border border-black/15 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-gray-600">
                 {{ product.in_stock ? 'Ready to ship' : 'Sold out' }}
               </span>
@@ -255,6 +256,7 @@ import { useSiteStore } from '../stores/site'
 import ProductReviews from '../components/ProductReviews.vue'
 import WishlistHeart from '../components/WishlistHeart.vue'
 import ProductCard from '../components/ProductCard.vue'
+import ShareProductButton from '../components/ShareProductButton.vue'
 import { formatProductPrice } from '../utils/pricing.js'
 
 // 1. Core States defined first

@@ -300,6 +300,28 @@ class CheckoutPricingSecurityTests(TestCase):
         self.assertEqual(order.delivery_fee, Decimal('7.48'))
         self.assertEqual(order.total_amount, Decimal('27.48'))
 
+    @override_settings(STRIPE_SECRET_KEY='sk_test_checkout')
+    def test_stripe_intent_charges_server_total_including_delivery(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        with mock.patch('products.views.stripe.PaymentIntent.create') as create_intent:
+            create_intent.return_value = SimpleNamespace(
+                id='pi_delivery_test',
+                client_secret='pi_delivery_test_secret',
+            )
+            response = self.client.post(
+                '/api/v1/checkout/',
+                self._payload(payment_method='stripe', total_amount='0.01'),
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(create_intent.call_args.kwargs['amount'], 2748)
+        self.assertEqual(create_intent.call_args.kwargs['currency'], 'eur')
+        order = Order.objects.get(pk=response.data['order_id'])
+        self.assertEqual(order.total_amount, Decimal('27.48'))
+
     def test_missing_required_fields_rejected(self):
         res = self.client.post('/api/v1/checkout/',
                                self._payload(email=''), format='json')
@@ -637,6 +659,20 @@ class PaymentConfirmationIdempotencyTests(TestCase):
         self.product.refresh_from_db()
         self.assertTrue(order.is_paid)
         self.assertEqual(self.product.stock, 3)            # 5 - 2, decremented only once
+
+    def test_paid_transition_sends_one_payment_confirmation(self):
+        order = self._paid_ready_order()
+        with mock.patch('products.notifications._send_email') as send_email:
+            send_email.return_value = (True, '')
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertTrue(_mark_paid_and_reserve(order))
+
+        receipt = order.notifications.get(
+            channel='email', audience='customer', event='paid'
+        )
+        self.assertEqual(receipt.status, 'sent')
+        self.assertIn('was successful', receipt.body)
+        send_email.assert_called_once()
 
     def test_confirm_checkout_is_idempotent(self):
         order = self._paid_ready_order()
@@ -1291,6 +1327,26 @@ class OrderNotificationTests(TestCase):
             for name, value in fields.items():
                 setattr(self.order, name, value)
             self.order.save()
+
+    def test_unpaid_stripe_order_does_not_send_customer_confirmation(self):
+        with mock.patch('products.notifications._send_email') as send_email:
+            send_email.return_value = (True, '')
+            with self.captureOnCommitCallbacks(execute=True):
+                order = Order.objects.create(
+                    first_name='Stripe', last_name='Customer',
+                    email='stripe@example.com', phone='+351 912345678',
+                    address='1 Main St', zipcode='1000', place='Lisbon',
+                    total_amount=Decimal('25.00'), currency='EUR',
+                    payment_method='stripe', is_paid=False,
+                )
+
+        self.assertFalse(order.notifications.filter(
+            channel='email', audience='customer', event='new'
+        ).exists())
+        self.assertTrue(order.notifications.filter(
+            channel='email', audience='admin', event='new'
+        ).exists())
+        send_email.assert_called_once()
 
     def test_status_change_emails_the_customer_once(self):
         self.clear_notifications()

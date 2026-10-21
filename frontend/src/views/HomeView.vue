@@ -48,27 +48,75 @@
     <nav
       v-if="isHomePage && mainCategories.length"
       aria-label="Main categories"
-      class="mx-auto mt-4 flex max-w-[1500px] flex-wrap items-start justify-center gap-x-5 gap-y-5 px-4 py-6 sm:mt-6 sm:gap-x-9 sm:gap-y-6 sm:px-7 sm:py-8"
+      class="mx-auto mt-4 max-w-[1500px] px-4 py-6 sm:mt-6 sm:px-7 sm:py-8"
     >
-      <router-link
-        v-for="category in mainCategories"
-        :key="'main-category-' + category.id"
-        :to="`/category/${category.slug}`"
-        class="group flex w-24 flex-col items-center gap-2.5 text-center sm:w-28 sm:gap-3"
-      >
-        <span class="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-black/15 bg-gray-100 transition group-hover:border-black group-hover:ring-2 group-hover:ring-black/10 sm:h-24 sm:w-24">
-          <img
-            v-if="category.image_url || category.children?.find((child) => child.image_url)?.image_url"
-            :src="category.image_url || category.children.find((child) => child.image_url).image_url"
-            :alt="category.name"
-            class="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
-          />
-          <span v-else class="text-xl font-medium text-gray-500">{{ category.name.slice(0, 1) }}</span>
-        </span>
-        <span class="text-xs font-semibold uppercase tracking-wide text-black sm:text-sm">{{ category.name }}</span>
-      </router-link>
+      <div class="relative mx-auto" :class="mainCategories.length >= 5 ? 'sm:max-w-[700px]' : ''">
+        <button
+          v-if="mainCategories.length > 1"
+          @click="scrollMainCategories(-1)"
+          aria-label="Previous main categories"
+          class="absolute left-1 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center border border-black/20 bg-white hover:bg-black hover:text-white sm:left-2"
+          :class="mainCategories.length >= 5 ? 'sm:flex' : 'sm:hidden'"
+        >
+          ←
+        </button>
+        <div
+          ref="mainCategoriesTrack"
+          class="no-scrollbar flex snap-x snap-mandatory gap-x-5 overflow-x-auto scroll-smooth px-8 sm:gap-x-9 sm:px-0"
+          :class="mainCategories.length >= 5 ? 'sm:flex-nowrap sm:justify-start sm:px-12' : 'sm:flex-wrap sm:justify-center sm:overflow-visible'"
+        >
+          <router-link
+            v-for="category in mainCategories"
+            :key="'main-category-' + category.id"
+            :to="`/category/${category.slug}`"
+            class="group flex w-24 flex-none snap-start flex-col items-center gap-2.5 text-center sm:w-28 sm:gap-3"
+          >
+            <span class="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-black/15 bg-gray-100 transition group-hover:border-black group-hover:ring-2 group-hover:ring-black/10 sm:h-24 sm:w-24">
+              <img
+                v-if="category.image_url || category.children?.find((child) => child.image_url)?.image_url"
+                :src="category.image_url || category.children.find((child) => child.image_url).image_url"
+                :alt="category.name"
+                class="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+              />
+              <span v-else class="text-xl font-medium text-gray-500">{{ category.name.slice(0, 1) }}</span>
+            </span>
+            <span class="text-xs font-semibold uppercase tracking-wide text-black sm:text-sm">{{ category.name }}</span>
+          </router-link>
+        </div>
+        <button
+          v-if="mainCategories.length > 1"
+          @click="scrollMainCategories(1)"
+          aria-label="Next main categories"
+          class="absolute right-1 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center border border-black/20 bg-white hover:bg-black hover:text-white sm:right-2"
+          :class="mainCategories.length >= 5 ? 'sm:flex' : 'sm:hidden'"
+        >
+          →
+        </button>
+      </div>
     </nav>
+
+    <section v-if="isHomePage" id="latest-products" class="mx-auto max-w-[1500px] px-4 pb-7 sm:px-7 sm:pb-10">
+      <div class="mb-4 flex items-center justify-between border-b border-black pb-3 sm:mb-6">
+        <h2 class="text-xl font-semibold tracking-tight sm:text-2xl">New Arrivals</h2>
+        <div class="flex items-center gap-2">
+          <button @click="scrollNewArrivals(-1)" class="flex h-9 w-9 items-center justify-center border border-black/20 hover:bg-black hover:text-white" aria-label="Previous new arrivals">←</button>
+          <button @click="scrollNewArrivals(1)" class="flex h-9 w-9 items-center justify-center border border-black/20 hover:bg-black hover:text-white" aria-label="Next new arrivals">→</button>
+        </div>
+      </div>
+      <div v-if="isLoading" class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+        <div v-for="i in 5" :key="i" class="aspect-[3/4] animate-pulse bg-gray-100"></div>
+      </div>
+      <div v-else-if="products.length" ref="newArrivalsTrack" class="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
+        <ProductCard
+          v-for="product in products.slice(0, 12)"
+          :key="product.id"
+          :product="product"
+          class="w-[calc(50%-6px)] shrink-0 snap-start sm:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] xl:w-[calc(20%-10px)]"
+        />
+      </div>
+      <p v-else class="py-8 text-sm text-gray-500">No new arrivals yet.</p>
+    </section>
 
     <section v-if="isHomePage && showcase.length" v-reveal class="mx-auto max-w-[1500px] px-4 py-7 sm:px-7 sm:py-10">
       <h2 class="mb-4 border-b border-black pb-3 text-xl font-semibold tracking-tight sm:mb-6 sm:text-2xl">Shop by Category</h2>
@@ -94,28 +142,6 @@
           </div>
         </router-link>
       </div>
-    </section>
-
-    <section v-if="isHomePage" id="latest-products" class="mx-auto max-w-[1500px] px-4 pb-10 sm:px-7 sm:pb-14">
-      <div class="mb-4 flex items-center justify-between border-b border-black pb-3 sm:mb-6">
-        <h2 class="text-xl font-semibold tracking-tight sm:text-2xl">New Arrivals</h2>
-        <div class="flex items-center gap-2">
-          <button @click="scrollNewArrivals(-1)" class="flex h-9 w-9 items-center justify-center border border-black/20 hover:bg-black hover:text-white" aria-label="Previous new arrivals">←</button>
-          <button @click="scrollNewArrivals(1)" class="flex h-9 w-9 items-center justify-center border border-black/20 hover:bg-black hover:text-white" aria-label="Next new arrivals">→</button>
-        </div>
-      </div>
-      <div v-if="isLoading" class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-        <div v-for="i in 5" :key="i" class="aspect-[3/4] animate-pulse bg-gray-100"></div>
-      </div>
-      <div v-else-if="products.length" ref="newArrivalsTrack" class="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 no-scrollbar">
-        <ProductCard
-          v-for="product in products.slice(0, 12)"
-          :key="product.id"
-          :product="product"
-          class="w-[calc(50%-6px)] shrink-0 snap-start sm:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] xl:w-[calc(20%-10px)]"
-        />
-      </div>
-      <p v-else class="py-8 text-sm text-gray-500">No new arrivals yet.</p>
     </section>
 
     <!-- Category and collection browsing -->
@@ -226,6 +252,7 @@ const categoryTitle = ref('New Arrivals')
 const heroSlides = ref([])
 const showcase = ref([])
 const mainCategories = ref([])
+const mainCategoriesTrack = ref(null)
 const newArrivalsTrack = ref(null)
 
 // Deshi-besh style filters (category pages).
@@ -362,6 +389,13 @@ const heroHeightStyle = computed(() => {
 const scrollNewArrivals = (direction) => {
   newArrivalsTrack.value?.scrollBy({
     left: direction * newArrivalsTrack.value.clientWidth * 0.8,
+    behavior: 'smooth',
+  })
+}
+
+const scrollMainCategories = (direction) => {
+  mainCategoriesTrack.value?.scrollBy({
+    left: direction * mainCategoriesTrack.value.clientWidth * 0.8,
     behavior: 'smooth',
   })
 }

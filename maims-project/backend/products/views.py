@@ -24,6 +24,7 @@ from django.db.models import Avg, Count, F, Prefetch, Q
 from rest_framework.authtoken.models import Token
 from .models import Category, CurrencyPrice, CustomerNotificationSettings, HeroBannerSettings, HeroSlide, Order, OrderItem, Product, Review, SiteSettings, UserProfile, WishlistItem
 from . import facebook
+from . import notifications
 from .serializers import (
     CategorySerializer, CustomerNotificationSettingsSerializer, HeroBannerSettingsSerializer, HeroSlideSerializer, OrderSerializer,
     ProductSerializer, ReviewCreateSerializer,
@@ -577,7 +578,17 @@ def _mark_paid_and_reserve(order):
             # The order stays paid (the customer was charged) so the merchant can
             # refund/backorder; logged for manual follow-up rather than oversold.
             logger.error('Oversold at payment capture (order id %s): %s', order.pk, exc.message)
+        transaction.on_commit(lambda order_id=order.pk: _notify_paid_customer(order_id))
         return True
+
+
+def _notify_paid_customer(order_id):
+    """Send the paid-order receipt after payment state and stock commit."""
+    try:
+        order = Order.objects.get(pk=order_id)
+        notifications.notify_customer(order, event='paid')
+    except Exception:
+        logger.exception('Paid receipt dispatch failed for order %s', order_id)
 
 
 @api_view(['GET', 'POST'])
@@ -890,9 +901,9 @@ def checkout(request):
 
             order.save(update_fields=['total_amount', 'delivery_fee'])
 
-        # 2. Stripe: charge the SERVER-computed subtotal (converted to cents).
+        # 2. Stripe: charge the SERVER-computed total, including delivery.
         #    Run outside the DB transaction so a slow Stripe call never holds locks.
-        amount_in_cents = int((subtotal * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+        amount_in_cents = int((order.total_amount * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
         intent_kwargs = {
             'amount': amount_in_cents,
             'currency': stripe_currency,

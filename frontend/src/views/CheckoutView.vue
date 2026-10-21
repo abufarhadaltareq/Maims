@@ -4,7 +4,7 @@ import { CURRENCIES, useCartStore } from '../stores/cart'
 import { useSiteStore } from '../stores/site'
 import axios from 'axios'
 import { loadStripe } from '@stripe/stripe-js'
-import { getProductDisplayPrice } from '../utils/pricing.js'
+import { getDeliveryFee, getProductDisplayPrice } from '../utils/pricing.js'
 
 // --- State ---
 const cartStore = useCartStore()
@@ -15,7 +15,6 @@ const successOrderId = ref(null)
 const successWhatsappLink = ref('')
 const isProcessing = ref(false)
 const serverError = ref('')
-const currencyAutoAdjusted = ref(false)
 const orderId = ref(null)
 const stripe = ref(null)
 const cardElement = ref(null)
@@ -63,10 +62,6 @@ const form = ref({
 })
 
 // --- Computed ---
-const itemPrice = (item) =>
-  getProductDisplayPrice(item.product || {}, cartStore.currentCurrency).numeric
-
-const totalCartCost = computed(() => cartStore.cartPricing.total)
 const supportedCurrencies = computed(() =>
   CURRENCIES.filter(({ code }) =>
     cartStore.items.length > 0 && cartStore.items.every((item) =>
@@ -74,8 +69,34 @@ const supportedCurrencies = computed(() =>
     )
   )
 )
+const browserCurrency = (() => {
+  const region = navigator.language?.match(/-([A-Za-z]{2})(?:-|$)/)?.[1]?.toUpperCase() || ''
+  const euroRegions = new Set([
+    'AT', 'BE', 'CY', 'DE', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'IE', 'IT',
+    'LT', 'LU', 'LV', 'MT', 'NL', 'PT', 'SI', 'SK',
+  ])
+  if (euroRegions.has(region)) return 'EUR'
+  return { BD: 'BDT', PK: 'PKR', SE: 'SEK', US: 'USD' }[region] || 'EUR'
+})()
+const stripeCurrency = computed(() => {
+  const available = supportedCurrencies.value.map(({ code }) => code)
+  if (available.includes(browserCurrency)) return browserCurrency
+  if (available.includes('EUR')) return 'EUR'
+  return available[0] || 'EUR'
+})
+const checkoutCurrency = computed(() =>
+  paymentMethod.value === 'stripe' ? stripeCurrency.value : cartStore.currentCurrency
+)
+const itemPrice = (item) =>
+  getProductDisplayPrice(item.product || {}, checkoutCurrency.value).numeric
+const checkoutSubtotal = computed(() =>
+  cartStore.items.reduce((sum, item) => sum + itemPrice(item) * (Number(item.quantity) || 0), 0)
+)
+const totalCartCost = computed(() =>
+  checkoutSubtotal.value + getDeliveryFee(checkoutCurrency.value)
+)
 const currencySupported = computed(() =>
-  supportedCurrencies.value.some(({ code }) => code === cartStore.currentCurrency)
+  supportedCurrencies.value.some(({ code }) => code === checkoutCurrency.value)
 )
 
 const formattedItems = computed(() => {
@@ -97,7 +118,7 @@ const basePayload = computed(() => ({
   zipcode: form.value.zipcode,
   place: form.value.place,
   total_amount: totalCartCost.value.toFixed(2),
-  currency: cartStore.currentCurrency,
+  currency: checkoutCurrency.value,
   items: formattedItems.value,
   whatsapp_opt_in: form.value.whatsapp_opt_in,
   marketing_opt_in: form.value.marketing_opt_in,
@@ -139,10 +160,6 @@ const initializeStripe = async () => {
 onMounted(async () => {
   idempotencyKey.value = newIdempotencyKey()
   await site.fetchSettings()
-  if (!currencySupported.value && supportedCurrencies.value.length) {
-    cartStore.setCurrency(supportedCurrencies.value[0].code)
-    currencyAutoAdjusted.value = true
-  }
   // Checkout consent box default: ticked only for the opt-out strategy, and
   // only if the admin is showing the box at all.
   if (site.newsletterCheckoutEnabled && site.newsletterBoxTicked) {
@@ -175,7 +192,7 @@ const submitCheckoutForm = async () => {
 
   if (!currencySupported.value) {
     serverError.value = supportedCurrencies.value.length
-      ? `Some items are not available in ${cartStore.currentCurrency}. Choose ${supportedCurrencies.value.map(({ code }) => code).join(', ')} to continue.`
+      ? `Some items are not available in ${checkoutCurrency.value}. Choose ${supportedCurrencies.value.map(({ code }) => code).join(', ')} to continue.`
       : 'These items do not have a common checkout currency. Please review your bag or contact the store.'
     isProcessing.value = false
     return
@@ -435,31 +452,31 @@ const submitCheckoutForm = async () => {
 
           <button type="submit" :disabled="isProcessing" class="w-full bg-gradient-brand text-white font-bold py-4 rounded-xl hover:brightness-110 transition disabled:opacity-70">
             <span v-if="isProcessing">Processing...</span>
-            <span v-else-if="paymentMethod === 'stripe'">Pay {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
-            <span v-else-if="paymentMethod === 'paypal'">Place PayPal Order · {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
-            <span v-else>Place WhatsApp Order · {{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
+            <span v-else-if="paymentMethod === 'stripe'">Pay {{ totalCartCost.toFixed(2) }} {{ checkoutCurrency }}</span>
+            <span v-else-if="paymentMethod === 'paypal'">Place PayPal Order · {{ totalCartCost.toFixed(2) }} {{ checkoutCurrency }}</span>
+            <span v-else>Place WhatsApp Order · {{ totalCartCost.toFixed(2) }} {{ checkoutCurrency }}</span>
           </button>
         </form>
 
         <div class="lg:col-span-5 bg-gray-50 border border-gray-100 rounded-xl p-6 space-y-4 text-left">
           <h2 class="font-bold text-lg tracking-tight mb-4">Review Your Bag</h2>
-          <p v-if="currencyAutoAdjusted" class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-            Checkout currency changed to {{ cartStore.currentCurrency }} because that is the available price currency for every item in your bag.
+          <p v-if="paymentMethod === 'stripe'" class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            Stripe will charge in {{ checkoutCurrency }}, selected from your browser locale and available product prices. Your storefront display currency ({{ cartStore.currentCurrency }}) is unchanged.
           </p>
           <div v-for="item in cartStore.items" :key="`${item.product.id}-${item.variant || item.size || 'default'}`" class="flex justify-between py-2 border-b">
             <div>
               <span class="font-semibold">{{ item.product.name }}</span>
               <p v-if="item.variant || item.size" class="text-xs text-gray-500">{{ item.variant || `Size: ${item.size}` }}</p>
             </div>
-            <span>{{ (itemPrice(item) * (item.quantity || 0)).toFixed(2) }} {{ cartStore.currentCurrency }}</span>
+            <span>{{ (itemPrice(item) * (item.quantity || 0)).toFixed(2) }} {{ checkoutCurrency }}</span>
           </div>
           <div class="flex justify-between text-sm pt-2">
             <span>Delivery (85 SEK)</span>
-            <span>{{ cartStore.cartPricing.deliveryFee.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
+            <span>{{ getDeliveryFee(checkoutCurrency).toFixed(2) }} {{ checkoutCurrency }}</span>
           </div>
           <div class="flex justify-between font-bold text-xl pt-4">
             <span>Total including delivery:</span>
-            <span>{{ totalCartCost.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
+            <span>{{ totalCartCost.toFixed(2) }} {{ checkoutCurrency }}</span>
           </div>
         </div>
       </div>

@@ -46,9 +46,10 @@
         <span v-if="reviewCount" class="text-[11px] text-[var(--color-content-secondary)] font-medium">({{ reviewCount }})</span>
         <span v-else class="text-[11px] text-[var(--color-content-secondary)] font-medium">No reviews</span>
       </div>
-      <div class="flex items-baseline gap-2 mt-1.5">
+      <div class="flex flex-wrap items-center gap-2 mt-1.5">
         <p class="text-[var(--color-content)] font-extrabold text-[15px]">{{ priceString }}</p>
         <p v-if="compareAt" class="text-[var(--color-content-secondary)] text-xs line-through font-medium">{{ compareAt }}</p>
+        <ShareProductButton :product="product" class="ml-auto" />
       </div>
 
       <!-- Mobile / keyboard fallback add (hover bar is desktop-only) -->
@@ -96,10 +97,11 @@ import { computed, ref } from 'vue'
 import { useCartStore } from '../stores/cart'
 import { getProductDisplayPrice } from '../utils/pricing.js'
 import WishlistHeart from './WishlistHeart.vue'
+import ShareProductButton from './ShareProductButton.vue'
 
 const props = defineProps({
   product: { type: Object, required: true },
-  currency: { type: String, default: 'EUR' },
+  currency: { type: String, default: '' },
 })
 
 const cartStore = useCartStore()

@@ -29,7 +29,7 @@ export function getProductDisplayPrice(product = {}, currency = 'EUR') {
   const selected = (currency || 'EUR').toUpperCase()
 
   if (product.prices && Array.isArray(product.prices) && product.prices.length > 0) {
-    const exact = product.prices.find((p) => p.currency === selected)
+    const exact = product.prices.find((p) => String(p.currency).toUpperCase() === selected)
     if (exact) {
       const n = Number(exact.price)
       return { numeric: n, string: `${n.toFixed(2)} ${selected}` }
@@ -37,7 +37,7 @@ export function getProductDisplayPrice(product = {}, currency = 'EUR') {
     const backup = product.prices[0]
     if (backup) {
       const basePrice = Number(backup.price)
-      const baseCurrency = backup.currency
+      const baseCurrency = String(backup.currency || '').toUpperCase()
       const rateInUSD = RATES_TO_USD[baseCurrency] || 1.0
       const targetRate = RATES_TO_USD[selected] || 1.0
       // Same (inverted) formula used across views: convert via USD index.

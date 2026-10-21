@@ -170,7 +170,9 @@ def _template(store, template, order):
 
 # --- the customer-facing messages ----------------------------------------------------
 
-def customer_subject(order):
+def customer_subject(order, event=None):
+    if event == 'paid':
+        return f"[Maims] Order #{order.pk} — Payment received"
     return f"[Maims] Order #{order.pk} — {order.status_message_label}"
 
 
@@ -191,15 +193,22 @@ def facebook_is_configured(store=None):
     return bool(store.facebook_page_id and store.facebook_page_access_token)
 
 
-def customer_body(order):
+def customer_body(order, event=None):
     """One body used for both email and WhatsApp so the wording never diverges."""
     lines = [
         f"Hello {order.first_name},",
         "",
-        f"Your Maims order #{order.pk} is now: {order.status_message_label}.",
+        (
+            f"Your payment for Maims order #{order.pk} was successful."
+            if event == 'paid'
+            else f"Your Maims order #{order.pk} is now: {order.status_message_label}."
+        ),
         "",
     ]
-    if order.status == 'rejected':
+
+    if event == 'paid':
+        lines.append("The shop will now review and prepare your order.")
+    elif order.status == 'rejected':
         lines.append("We are sorry — we are not able to take this order.")
         if order.rejection_reason:
             lines += ["", f"Reason: {order.rejection_reason}"]
@@ -253,40 +262,47 @@ def _receipt_item_rows(order):
     return ''.join(rows)
 
 
-def order_receipt_html(order, store=None):
+def order_receipt_html(order, store=None, event=None):
     """Full, itemized HTML receipt: order ID, items, shipping address and the
     total breakdown, branded with the store's identity."""
     store = store or _store()
     lines = [
         f'<p>Hello {order.first_name},</p>',
-        '<p>Your order status is now: '
-        f'<strong>{order.status_message_label}</strong>.</p>',
     ]
 
-    if order.status == 'rejected':
-        lines += [
-            '<p>We are sorry — we are not able to take this order.</p>',
-            '<p>Nothing has been charged. If this looks wrong, reply to this message.</p>',
-        ]
-    elif order.status == 'accepted':
-        lines.append('<p>Good news — we have confirmed your order and will start packing it shortly.</p>')
-    elif order.status == 'packed':
-        lines.append('<p>Your order is packed and will be handed to the courier shortly.</p>')
-    elif order.status == 'shipped':
-        lines.append('<p>Your order is on its way!</p>')
-        if order.tracking_number:
-            lines.append(f'<p>Tracking number: {order.tracking_number}</p>')
-    elif order.status == 'delivered':
-        lines.append('<p>Your order has been delivered. We hope you love it!</p>')
-        review_hint = _first_product_url(order)
-        if review_hint:
-            lines.append(
-                f'<p>Tell us how it went: <a href="{review_hint}">{review_hint}</a></p>'
-            )
-    elif order.status == 'cancelled':
+    if event == 'paid':
+        lines.append('<p>Your payment was successful and your order is confirmed.</p>')
+    else:
         lines.append(
-            '<p>Your order has been cancelled. If this was unexpected, please contact us.</p>'
+            '<p>Your order status is now: '
+            f'<strong>{order.status_message_label}</strong>.</p>'
         )
+
+    if event != 'paid':
+        if order.status == 'rejected':
+            lines += [
+                '<p>We are sorry — we are not able to take this order.</p>',
+                '<p>Nothing has been charged. If this looks wrong, reply to this message.</p>',
+            ]
+        elif order.status == 'accepted':
+            lines.append('<p>Good news — we have confirmed your order and will start packing it shortly.</p>')
+        elif order.status == 'packed':
+            lines.append('<p>Your order is packed and will be handed to the courier shortly.</p>')
+        elif order.status == 'shipped':
+            lines.append('<p>Your order is on its way!</p>')
+            if order.tracking_number:
+                lines.append(f'<p>Tracking number: {order.tracking_number}</p>')
+        elif order.status == 'delivered':
+            lines.append('<p>Your order has been delivered. We hope you love it!</p>')
+            review_hint = _first_product_url(order)
+            if review_hint:
+                lines.append(
+                    f'<p>Tell us how it went: <a href="{review_hint}">{review_hint}</a></p>'
+                )
+        elif order.status == 'cancelled':
+            lines.append(
+                '<p>Your order has been cancelled. If this was unexpected, please contact us.</p>'
+            )
 
     if order.items.filter(product__isnull=False).exists():
         lines.append('<table class="receipt-items"><thead><tr>'
@@ -505,12 +521,12 @@ def notify_customer(order, event=None):
         return _record_skip(order, 'email', 'customer', event,
                             'Customer notifications are disabled in Store settings')
 
-    subject = customer_subject(order)
-    body = customer_body(order)
+    subject = customer_subject(order, event)
+    body = customer_body(order, event)
 
     # --- email
     if order.email and not _already_sent(order, 'email', 'customer', event):
-        html = order_receipt_html(order, store)
+        html = order_receipt_html(order, store, event)
         ok, error = _send_email(order.email, subject, body, html=html, store=store)
         _record(order, 'email', 'customer', event, ok, order.email, subject, body, error)
     elif not order.email:
@@ -628,10 +644,9 @@ def handle_order_status_change(order, previous_status=None):
         if order.status == 'new':
             # The alert about the order existing at all...
             notify_admin_new_order(order)
-            # ...and the customer's order confirmation. 'new' is the
-            # first status a customer hears about, so both audiences
-            # are told — the elif below would skip the customer.
-            notify_customer(order)
+            # Stripe sends its customer receipt only after successful payment.
+            if order.payment_method != 'stripe':
+                notify_customer(order)
         elif order.should_notify_customer:
             notify_customer(order)
         elif order.status == 'delivered':
