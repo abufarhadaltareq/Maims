@@ -427,8 +427,12 @@ class OrderAdmin(MaimsModelAdmin):
         if not items:
             return badge('NO ITEMS', ('#991b1b', '#fee2e2'))
         parts = [
-            format_html('{}x {}', item.quantity, item.product.name)
-            + (f" ({item.size})" if item.size else '')
+            format_html(
+                '{}x {}{}',
+                item.quantity,
+                item.product.name if item.product else item.product_name or 'Deleted product',
+                f' ({item.size})' if item.size else '',
+            )
             for item in items[:2]
         ]
         summary = mark_safe(', '.join(parts))
@@ -460,10 +464,16 @@ class OrderAdmin(MaimsModelAdmin):
         if not items:
             return mark_safe('<span class="maims-muted">This order has no items.</span>')
         rows = mark_safe(''.join(
-            format_html('<li>{} x <a href="{}">{}</a>{} — {}</li>',
+            format_html('<li>{} x {}{} — {}</li>',
                         item.quantity,
-                        reverse('admin:products_product_change', args=[item.product_id]),
-                        item.product.name,
+                        (
+                            format_html(
+                                '<a href="{}">{}</a>',
+                                reverse('admin:products_product_change', args=[item.product_id]),
+                                item.product.name,
+                            )
+                            if item.product_id else item.product_name or 'Deleted product'
+                        ),
                         f' ({item.size})' if item.size else '',
                         item.line_total)
             for item in items

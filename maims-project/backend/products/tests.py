@@ -49,7 +49,8 @@ class AdminPageTests(TestCase):
             address='1 Main St', zipcode='1000', place='Lisbon',
             total_amount=Decimal('25.00'), currency='EUR', payment_method='paypal', is_paid=False)
         OrderItem.objects.create(order=cls.order, product=cls.product, size='M',
-                                 price=Decimal('25.00'), quantity=1)
+                                 price=Decimal('25.00'), quantity=1,
+                                 product_name=cls.product.name)
 
     def setUp(self):
         self.client.force_login(self.admin)
@@ -63,6 +64,17 @@ class AdminPageTests(TestCase):
         res = self.client.get(f'/admin/products/order/{self.order.pk}/change/')
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'Silk Kurta')
+
+    def test_order_pages_render_after_product_is_deleted(self):
+        self.product.delete()
+
+        changelist = self.client.get('/admin/products/order/')
+        detail = self.client.get(f'/admin/products/order/{self.order.pk}/change/')
+
+        self.assertEqual(changelist.status_code, 200)
+        self.assertContains(changelist, 'Silk Kurta')
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, 'Silk Kurta')
 
     def test_product_change_page_shows_delivery_fee_control(self):
         response = self.client.get(f'/admin/products/product/{self.product.pk}/change/')
