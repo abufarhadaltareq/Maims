@@ -373,8 +373,11 @@ def _first_product_url(order):
     frontend = getattr(settings, 'FRONTEND_BASE_URL', '').rstrip('/')
     if not frontend:
         return ''
+    frontend_url = urllib.parse.urlsplit(frontend)
+    if frontend_url.hostname == 'shop.maims.eu':
+        frontend = urllib.parse.urlunsplit(frontend_url._replace(netloc='maims.eu'))
     item = order.items.select_related('product').first()
-    return f"{frontend}/products/{item.product.slug}" if item else ''
+    return f"{frontend}/products/{item.product.slug}#reviews" if item else ''
 
 
 # --- channel senders ------------------------------------------------------------------

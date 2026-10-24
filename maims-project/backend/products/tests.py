@@ -1675,6 +1675,18 @@ class OrderNotificationTests(TestCase):
         self.assertIn('Estimated delivery', html)
         self.assertIn('5-7 business days', html)
 
+    def test_delivery_review_link_uses_canonical_domain_and_reviews_section(self):
+        from products.notifications import customer_body, order_receipt_html
+
+        self.order.status = 'delivered'
+        with override_settings(FRONTEND_BASE_URL='https://shop.maims.eu'):
+            body = customer_body(self.order)
+            html = order_receipt_html(self.order, self.store)
+
+        review_url = f'https://maims.eu/products/{self.product.slug}#reviews'
+        self.assertIn(f'Tell us how it went: {review_url}', body)
+        self.assertIn(f'<a href="{review_url}">{review_url}</a>', html)
+
     def test_new_order_alerts_the_shop_once_only(self):
         alert_count = self.order.notifications.filter(
             channel='email', audience='admin', event='new').count()
