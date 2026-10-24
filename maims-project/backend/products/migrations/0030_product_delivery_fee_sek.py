@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             field=models.DecimalField(
                 blank=True,
                 decimal_places=2,
-                help_text='Leave blank to use the standard 85 SEK delivery fee. Set to 0 for free delivery.',
+                help_text='Leave blank to use the standard 85 SEK order fee. Set to 0 for free delivery.',
                 max_digits=10,
                 null=True,
                 validators=[django.core.validators.MinValueValidator(0)],

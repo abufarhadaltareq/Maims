@@ -819,7 +819,8 @@ class ProductAdmin(MaimsModelAdmin):
         ('Delivery', {
             'fields': ('delivery_fee_sek', 'delivery_time'),
             'description': 'Set a product-specific delivery fee in SEK. Leave blank to use the standard '
-                           '85 SEK fee, or enter 0 for free delivery. The fee applies once per cart line. '
+                           '85 SEK fee, or enter 0 for free delivery. Only one fee is charged per order; '
+                           'the highest applicable product fee is used. '
                            'Delivery time is shown at checkout and in customer confirmations.'}),
         ('Clothing attributes', {
             'fields': ('fabric_type', 'stitching_type', 'material_type', 'size_options',

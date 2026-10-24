@@ -27,11 +27,15 @@ export function getDeliveryFee(currency = 'EUR') {
 }
 
 export function getCartDeliveryFee(items = [], currency = 'EUR') {
-  return items.reduce((total, item) => {
+  if (!items.length) return 0
+
+  const amountSek = items.reduce((highest, item) => {
     const configuredFee = item.product?.delivery_fee_sek
-    const amountSek = configuredFee == null ? DEFAULT_DELIVERY_FEE_SEK : configuredFee
-    return total + convertDeliveryFee(amountSek, currency)
+    const fee = configuredFee == null ? DEFAULT_DELIVERY_FEE_SEK : Number(configuredFee)
+    return Math.max(highest, fee)
   }, 0)
+
+  return convertDeliveryFee(amountSek, currency)
 }
 
 /**

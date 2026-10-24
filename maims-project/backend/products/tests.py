@@ -68,6 +68,7 @@ class AdminPageTests(TestCase):
         response = self.client.get(f'/admin/products/product/{self.product.pk}/change/')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'delivery_fee_sek')
+        self.assertContains(response, 'highest applicable product fee')
         self.assertContains(response, 'Set to 0 for free delivery.')
         self.assertContains(response, 'delivery_time')
         self.assertContains(response, '20-25 days')
@@ -326,6 +327,41 @@ class CheckoutPricingSecurityTests(TestCase):
         order = Order.objects.get(pk=response.data['order_id'])
         self.assertEqual(order.delivery_fee, Decimal('1.76'))
         self.assertEqual(order.total_amount, Decimal('21.76'))
+
+    def test_default_delivery_fee_is_charged_once_for_multiple_products(self):
+        second = Product.objects.create(
+            category=self.category, name='Cotton Kurta', slug='cotton-kurta', stock=10)
+        CurrencyPrice.objects.create(product=second, currency='EUR', price=Decimal('5.00'))
+        payload = self._payload(items=[
+            {'product_id': self.product.id, 'quantity': 1},
+            {'product_id': second.id, 'quantity': 1},
+        ])
+
+        response = self.client.post('/api/v1/checkout/', payload, format='json')
+
+        self.assertEqual(response.status_code, 201, response.content)
+        order = Order.objects.get(pk=response.data['order_id'])
+        self.assertEqual(order.delivery_fee, Decimal('7.48'))
+        self.assertEqual(order.total_amount, Decimal('22.48'))
+
+    def test_highest_product_delivery_fee_is_charged_once_for_mixed_cart(self):
+        self.product.delivery_fee_sek = Decimal('20.00')
+        self.product.save(update_fields=['delivery_fee_sek'])
+        second = Product.objects.create(
+            category=self.category, name='Cotton Kurta', slug='cotton-kurta', stock=10,
+            delivery_fee_sek=Decimal('50.00'))
+        CurrencyPrice.objects.create(product=second, currency='EUR', price=Decimal('5.00'))
+        payload = self._payload(items=[
+            {'product_id': self.product.id, 'quantity': 1},
+            {'product_id': second.id, 'quantity': 1},
+        ])
+
+        response = self.client.post('/api/v1/checkout/', payload, format='json')
+
+        self.assertEqual(response.status_code, 201, response.content)
+        order = Order.objects.get(pk=response.data['order_id'])
+        self.assertEqual(order.delivery_fee, Decimal('4.40'))
+        self.assertEqual(order.total_amount, Decimal('19.40'))
 
     def test_zero_product_delivery_fee_is_free(self):
         self.product.delivery_fee_sek = Decimal('0.00')

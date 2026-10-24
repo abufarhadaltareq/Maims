@@ -507,16 +507,15 @@ def _delivery_fee(currency, amount_sek=DELIVERY_FEE_SEK):
 
 
 def _order_delivery_fee(order, currency):
-    """Charge each product line its override, or the standard fee when unset."""
-    fee = Decimal('0.00')
+    """Charge the highest effective product fee once for the entire order."""
+    fees = []
     for item in order.items.select_related('product'):
-        amount_sek = (
+        fees.append(
             item.product.delivery_fee_sek
             if item.product and item.product.delivery_fee_sek is not None
             else DELIVERY_FEE_SEK
         )
-        fee += _delivery_fee(currency, amount_sek)
-    return fee
+    return _delivery_fee(currency, max(fees)) if fees else Decimal('0.00')
 
 
 def _reserve_stock(order):

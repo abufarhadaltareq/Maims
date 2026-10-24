@@ -123,6 +123,10 @@
           </div>
 
           <p v-if="product.description" class="mb-5 text-sm leading-relaxed text-gray-600">{{ product.description }}</p>
+          <p class="mb-5 flex items-center gap-2 text-sm text-gray-600">
+            <span aria-hidden="true">📦</span>
+            <span>Estimated delivery: {{ product.delivery_time || '20-25 days' }}</span>
+          </p>
 
           <div class="space-y-3">
             <button
