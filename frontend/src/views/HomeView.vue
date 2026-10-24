@@ -132,7 +132,7 @@
             <img
               :src="entry.category.image_url || entry.products[0]?.get_thumbnail || entry.products[0]?.get_image || 'https://placehold.co/600x750?text=Category'"
               :alt="entry.category.name"
-              class="h-full w-full object-cover object-center"
+              class="absolute inset-0 h-full w-full object-cover object-center"
               loading="lazy"
             />
           </div>
