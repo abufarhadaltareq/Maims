@@ -75,6 +75,18 @@ const browserCurrency = (() => {
     'AT', 'BE', 'CY', 'DE', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'IE', 'IT',
     'LT', 'LU', 'LV', 'MT', 'NL', 'PT', 'SI', 'SK',
   ])
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+  const euroTimezones = [
+    'Europe/Andorra', 'Europe/Athens', 'Europe/Belgrade', 'Europe/Berlin',
+    'Europe/Bratislava', 'Europe/Brussels', 'Europe/Budapest', 'Europe/Busingen',
+    'Europe/Chisinau', 'Europe/Copenhagen', 'Europe/Gibraltar', 'Europe/Ljubljana',
+    'Europe/Luxembourg', 'Europe/Madrid', 'Europe/Malta', 'Europe/Monaco',
+    'Europe/Oslo', 'Europe/Paris', 'Europe/Podgorica', 'Europe/Prague',
+    'Europe/Rome', 'Europe/San_Marino', 'Europe/Sarajevo', 'Europe/Skopje',
+    'Europe/Tirane', 'Europe/Vaduz', 'Europe/Vatican', 'Europe/Vienna',
+    'Europe/Warsaw', 'Europe/Zagreb', 'Europe/Zurich', 'Atlantic/Canary',
+  ]
+  if (euroTimezones.includes(timezone)) return 'EUR'
   if (euroRegions.has(region)) return 'EUR'
   return { BD: 'BDT', PK: 'PKR', SE: 'SEK', US: 'USD' }[region] || 'EUR'
 })()
@@ -89,11 +101,18 @@ const checkoutCurrency = computed(() =>
 )
 const itemPrice = (item) =>
   getProductDisplayPrice(item.product || {}, checkoutCurrency.value).numeric
+const displayItemPrice = (item) =>
+  getProductDisplayPrice(item.product || {}, cartStore.currentCurrency).numeric
 const checkoutSubtotal = computed(() =>
   cartStore.items.reduce((sum, item) => sum + itemPrice(item) * (Number(item.quantity) || 0), 0)
 )
 const totalCartCost = computed(() =>
   checkoutSubtotal.value + getCartDeliveryFee(cartStore.items, checkoutCurrency.value)
+)
+const displayTotal = computed(() =>
+  cartStore.items.reduce((sum, item) =>
+    sum + displayItemPrice(item) * (Number(item.quantity) || 0), 0
+  ) + getCartDeliveryFee(cartStore.items, cartStore.currentCurrency)
 )
 const currencySupported = computed(() =>
   supportedCurrencies.value.some(({ code }) => code === checkoutCurrency.value)
@@ -468,14 +487,18 @@ const submitCheckoutForm = async () => {
               <span class="font-semibold">{{ item.product.name }}</span>
               <p v-if="item.variant || item.size" class="text-xs text-gray-500">{{ item.variant || `Size: ${item.size}` }}</p>
             </div>
-            <span>{{ (itemPrice(item) * (item.quantity || 0)).toFixed(2) }} {{ checkoutCurrency }}</span>
+            <span>{{ (displayItemPrice(item) * (item.quantity || 0)).toFixed(2) }} {{ cartStore.currentCurrency }}</span>
           </div>
           <div class="flex justify-between text-sm pt-2">
             <span>Delivery</span>
-            <span>{{ getCartDeliveryFee(cartStore.items, checkoutCurrency).toFixed(2) }} {{ checkoutCurrency }}</span>
+            <span>{{ getCartDeliveryFee(cartStore.items, cartStore.currentCurrency).toFixed(2) }} {{ cartStore.currentCurrency }}</span>
           </div>
           <div class="flex justify-between font-bold text-xl pt-4">
-            <span>Total including delivery:</span>
+            <span>Estimated total including delivery:</span>
+            <span>{{ displayTotal.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
+          </div>
+          <div v-if="paymentMethod === 'stripe'" class="flex justify-between border-t border-gray-200 pt-3 text-sm font-semibold">
+            <span>Stripe charge:</span>
             <span>{{ totalCartCost.toFixed(2) }} {{ checkoutCurrency }}</span>
           </div>
         </div>
