@@ -14,10 +14,24 @@ export const CURRENCY_SYMBOLS = {
   BDT: '৳',
 }
 
-export function getDeliveryFee(currency = 'EUR') {
+export const DEFAULT_DELIVERY_FEE_SEK = 85
+
+export function convertDeliveryFee(amountSek, currency = 'EUR') {
   const target = (currency || 'EUR').toUpperCase()
-  const converted = (85 * RATES_TO_USD.SEK) / (RATES_TO_USD[target] || 1)
+  const converted = (Number(amountSek) * RATES_TO_USD.SEK) / (RATES_TO_USD[target] || 1)
   return Math.round(converted * 100 + 1e-8) / 100
+}
+
+export function getDeliveryFee(currency = 'EUR') {
+  return convertDeliveryFee(DEFAULT_DELIVERY_FEE_SEK, currency)
+}
+
+export function getCartDeliveryFee(items = [], currency = 'EUR') {
+  return items.reduce((total, item) => {
+    const configuredFee = item.product?.delivery_fee_sek
+    const amountSek = configuredFee == null ? DEFAULT_DELIVERY_FEE_SEK : configuredFee
+    return total + convertDeliveryFee(amountSek, currency)
+  }, 0)
 }
 
 /**

@@ -230,6 +230,14 @@ class Product(models.Model):
     slug = models.SlugField(unique=True)
     brand_name = models.CharField(max_length=100, blank=True, null=True, help_text="e.g., Sana Safinaz, Maria.B (Label used for frontend brand filtering)")
     description = models.TextField(blank=True, null=True)
+    delivery_fee_sek = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0)],
+        help_text='Leave blank to use the standard 85 SEK delivery fee. Set to 0 for free delivery.',
+    )
     
     # 🌟 OPTIONAL METADATA FIELDS: Left blank for non-clothing inventory like bags/jewelry
     fabric_type = models.CharField(max_length=50, choices=FABRIC_CHOICES, blank=True, null=True)

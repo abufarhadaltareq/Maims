@@ -497,13 +497,26 @@ def _build_order_items(order, items, currency):
     return subtotal
 
 
-def _delivery_fee(currency):
-    """Convert the fixed SEK delivery fee to the order's selected currency."""
+def _delivery_fee(currency, amount_sek=DELIVERY_FEE_SEK):
+    """Convert a SEK delivery fee to the order's selected currency."""
     target = (currency or 'EUR').upper()
     if target not in RATES_TO_USD:
         raise _CheckoutError('Unsupported delivery currency.')
-    amount = DELIVERY_FEE_SEK * RATES_TO_USD['SEK'] / RATES_TO_USD[target]
+    amount = Decimal(str(amount_sek)) * RATES_TO_USD['SEK'] / RATES_TO_USD[target]
     return amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _order_delivery_fee(order, currency):
+    """Charge each product line its override, or the standard fee when unset."""
+    fee = Decimal('0.00')
+    for item in order.items.select_related('product'):
+        amount_sek = (
+            item.product.delivery_fee_sek
+            if item.product and item.product.delivery_fee_sek is not None
+            else DELIVERY_FEE_SEK
+        )
+        fee += _delivery_fee(currency, amount_sek)
+    return fee
 
 
 def _reserve_stock(order):
@@ -884,7 +897,7 @@ def checkout(request):
             subtotal = _build_order_items(order, data.get('items', []), raw_currency)
             if subtotal <= 0:
                 raise _CheckoutError('Cart total must be greater than zero.')
-            order.delivery_fee = _delivery_fee(raw_currency)
+            order.delivery_fee = _order_delivery_fee(order, raw_currency)
             order.total_amount = subtotal + order.delivery_fee
 
             # PayPal / WhatsApp: no Stripe intent — the order is created unpaid

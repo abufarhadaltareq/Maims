@@ -4,7 +4,7 @@ import { CURRENCIES, useCartStore } from '../stores/cart'
 import { useSiteStore } from '../stores/site'
 import axios from 'axios'
 import { loadStripe } from '@stripe/stripe-js'
-import { getDeliveryFee, getProductDisplayPrice } from '../utils/pricing.js'
+import { getCartDeliveryFee, getProductDisplayPrice } from '../utils/pricing.js'
 
 // --- State ---
 const cartStore = useCartStore()
@@ -93,7 +93,7 @@ const checkoutSubtotal = computed(() =>
   cartStore.items.reduce((sum, item) => sum + itemPrice(item) * (Number(item.quantity) || 0), 0)
 )
 const totalCartCost = computed(() =>
-  checkoutSubtotal.value + getDeliveryFee(checkoutCurrency.value)
+  checkoutSubtotal.value + getCartDeliveryFee(cartStore.items, checkoutCurrency.value)
 )
 const currencySupported = computed(() =>
   supportedCurrencies.value.some(({ code }) => code === checkoutCurrency.value)
@@ -471,8 +471,8 @@ const submitCheckoutForm = async () => {
             <span>{{ (itemPrice(item) * (item.quantity || 0)).toFixed(2) }} {{ checkoutCurrency }}</span>
           </div>
           <div class="flex justify-between text-sm pt-2">
-            <span>Delivery (85 SEK)</span>
-            <span>{{ getDeliveryFee(checkoutCurrency).toFixed(2) }} {{ checkoutCurrency }}</span>
+            <span>Delivery</span>
+            <span>{{ getCartDeliveryFee(cartStore.items, checkoutCurrency).toFixed(2) }} {{ checkoutCurrency }}</span>
           </div>
           <div class="flex justify-between font-bold text-xl pt-4">
             <span>Total including delivery:</span>

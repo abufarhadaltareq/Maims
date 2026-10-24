@@ -102,6 +102,8 @@ class ProductSerializer(serializers.ModelSerializer):
     # product is fetched without those annotations (e.g. admin, signals).
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
+    delivery_fee_sek = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True, allow_null=True)
 
     class Meta:
         model = Product
@@ -111,6 +113,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "slug",
             "brand_name",
             "description",
+            "delivery_fee_sek",
             "get_image",
             "get_thumbnail",
             "stock",

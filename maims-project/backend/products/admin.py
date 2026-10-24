@@ -815,6 +815,10 @@ class ProductAdmin(MaimsModelAdmin):
             'fields': ('stock', 'image', 'thumbnail', 'date_added'),
             'description': 'Stock 0 removes the "add to cart" button. If the thumbnail is empty the '
                            'main image is used. Prices are set per currency in the table below.'}),
+        ('Delivery', {
+            'fields': ('delivery_fee_sek',),
+            'description': 'Set a product-specific delivery fee in SEK. Leave blank to use the standard '
+                           '85 SEK fee, or enter 0 for free delivery. The fee applies once per cart line.'}),
         ('Clothing attributes', {
             'fields': ('fabric_type', 'stitching_type', 'material_type', 'size_options',
                        'color_options', 'length_options'),

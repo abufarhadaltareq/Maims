@@ -64,6 +64,12 @@ class AdminPageTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'Silk Kurta')
 
+    def test_product_change_page_shows_delivery_fee_control(self):
+        response = self.client.get(f'/admin/products/product/{self.product.pk}/change/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'delivery_fee_sek')
+        self.assertContains(response, 'Set to 0 for free delivery.')
+
     def test_dashboard_renders(self):
         res = self.client.get('/admin/')
         self.assertEqual(res.status_code, 200)
@@ -299,6 +305,36 @@ class CheckoutPricingSecurityTests(TestCase):
         # 2 x 10.00 from the DB, NOT the forged 0.01, plus converted delivery.
         self.assertEqual(order.delivery_fee, Decimal('7.48'))
         self.assertEqual(order.total_amount, Decimal('27.48'))
+
+    def test_product_delivery_fee_override_is_charged_once_per_line(self):
+        self.product.delivery_fee_sek = Decimal('20.00')
+        self.product.save(update_fields=['delivery_fee_sek'])
+
+        response = self.client.post(
+            '/api/v1/checkout/',
+            self._payload(),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201, response.content)
+        order = Order.objects.get(pk=response.data['order_id'])
+        self.assertEqual(order.delivery_fee, Decimal('1.76'))
+        self.assertEqual(order.total_amount, Decimal('21.76'))
+
+    def test_zero_product_delivery_fee_is_free(self):
+        self.product.delivery_fee_sek = Decimal('0.00')
+        self.product.save(update_fields=['delivery_fee_sek'])
+
+        response = self.client.post(
+            '/api/v1/checkout/',
+            self._payload(),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201, response.content)
+        order = Order.objects.get(pk=response.data['order_id'])
+        self.assertEqual(order.delivery_fee, Decimal('0.00'))
+        self.assertEqual(order.total_amount, Decimal('20.00'))
 
     @override_settings(STRIPE_SECRET_KEY='sk_test_checkout')
     def test_stripe_intent_charges_server_total_including_delivery(self):

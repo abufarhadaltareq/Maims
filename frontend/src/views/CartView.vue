@@ -188,7 +188,7 @@
         </div>
 
         <div class="flex justify-between text-sm text-gray-600 font-medium">
-          <span>Delivery (85 SEK):</span>
+          <span>Delivery:</span>
           <span>{{ cartStore.cartPricing.deliveryFee.toFixed(2) }} {{ cartStore.currentCurrency }}</span>
         </div>
 
