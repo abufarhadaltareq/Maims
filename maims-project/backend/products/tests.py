@@ -69,6 +69,8 @@ class AdminPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'delivery_fee_sek')
         self.assertContains(response, 'Set to 0 for free delivery.')
+        self.assertContains(response, 'delivery_time')
+        self.assertContains(response, '20-25 days')
 
     def test_dashboard_renders(self):
         res = self.client.get('/admin/')
@@ -122,11 +124,15 @@ class AdminPageTests(TestCase):
 
     def test_site_settings_is_a_singleton(self):
         from .models import SiteSettings
-        SiteSettings.objects.get_or_create(pk=1)
+        settings_row, _ = SiteSettings.objects.get_or_create(pk=1)
         # Second row can never be added, and the list page jumps to the form.
         self.assertEqual(self.client.get('/admin/products/sitesettings/add/').status_code, 403)
         res = self.client.get('/admin/products/sitesettings/')
         self.assertEqual(res.status_code, 302)
+        settings_page = self.client.get(f'/admin/products/sitesettings/{settings_row.pk}/change/')
+        self.assertEqual(settings_page.status_code, 200)
+        self.assertContains(settings_page, 'whatsapp_phone_number_id')
+        self.assertContains(settings_page, 'whatsapp_template_name')
 
     def test_notification_settings_is_a_singleton_and_form_renders(self):
         from .models import CustomerNotificationSettings
@@ -1329,6 +1335,8 @@ class OrderNotificationTests(TestCase):
         self.store.notification_email = 'shop@example.com'
         self.store.customer_notifications_enabled = True
         self.store.customer_whatsapp_notifications = True
+        self.store.whatsapp_template_name = 'test_order_update'
+        self.store.whatsapp_template_language = 'en'
         self.store.save()
 
         # The order is created inside the commit-capture context: creating an order
@@ -1476,6 +1484,45 @@ class OrderNotificationTests(TestCase):
         self.assertEqual(send.call_args[0][0], '351912345678')
         self.assertEqual(self._sent(channel='whatsapp').count(), 1)
 
+    def test_whatsapp_sender_uses_configured_approved_template(self):
+        from products.notifications import _send_whatsapp
+
+        self.store.whatsapp_api_token = 'test-token'
+        self.store.whatsapp_phone_number_id = '123456789'
+        self.store.whatsapp_template_name = 'maims_order_update'
+        self.store.whatsapp_template_language = 'en_GB'
+        self.store.save()
+        with mock.patch('products.notifications._http_post_json') as post:
+            ok, error = _send_whatsapp('351912345678', 'Order #42. Delivery: 20-25 days.', self.store)
+
+        self.assertTrue(ok, error)
+        payload = post.call_args.args[1]
+        self.assertEqual(payload['type'], 'template')
+        self.assertEqual(payload['template']['name'], 'maims_order_update')
+        self.assertEqual(payload['template']['language']['code'], 'en_GB')
+        self.assertEqual(
+            payload['template']['components'][0]['parameters'][0]['text'],
+            'Order #42. Delivery: 20-25 days.',
+        )
+
+    def test_order_creation_sends_whatsapp_confirmation_after_opt_in(self):
+        self.store.whatsapp_api_token = 'test-token'
+        self.store.whatsapp_phone_number_id = '123456789'
+        self.store.save()
+        with mock.patch('products.notifications._send_email') as email_send, \
+                mock.patch('products.notifications._send_whatsapp') as whatsapp_send:
+            email_send.return_value = (True, '')
+            whatsapp_send.return_value = (True, '')
+            with self.captureOnCommitCallbacks(execute=True):
+                order, _product = _make_order(whatsapp_opt_in=True)
+
+        confirmation = order.notifications.filter(
+            channel='whatsapp', audience='customer', event='new').first()
+        self.assertIsNotNone(confirmation)
+        self.assertEqual(confirmation.status, 'sent')
+        whatsapp_send.assert_called_once()
+        self.assertIn('20-25 days', whatsapp_send.call_args.args[1])
+
     def test_unconfigured_whatsapp_is_a_skip_not_a_failure(self):
         self.clear_notifications()
         self.store.whatsapp_api_token = ''
@@ -1578,6 +1625,19 @@ class OrderNotificationTests(TestCase):
         self.assertEqual(confirmation.status, 'sent')
         self.assertEqual(confirmation.recipient, 'grace@example.com')
         self.assertIn('received your order', confirmation.body)
+
+    def test_order_confirmation_includes_product_delivery_time(self):
+        self.product.delivery_time = '5-7 business days'
+        self.product.save(update_fields=['delivery_time'])
+
+        from products.notifications import customer_body, order_receipt_html
+        body = customer_body(self.order, event='new')
+        html = order_receipt_html(self.order, self.store, event='new')
+
+        self.assertIn('Estimated delivery:', body)
+        self.assertIn('5-7 business days', body)
+        self.assertIn('Estimated delivery', html)
+        self.assertIn('5-7 business days', html)
 
     def test_new_order_alerts_the_shop_once_only(self):
         alert_count = self.order.notifications.filter(

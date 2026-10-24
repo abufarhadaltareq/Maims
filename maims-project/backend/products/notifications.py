@@ -31,6 +31,7 @@ from django.conf import settings
 from django.core.mail import get_connection, send_mail
 from django.core.mail.message import EmailMessage, EmailMultiAlternatives
 from django.db import transaction
+from django.utils.html import escape
 from django.template.loader import render_to_string
 from django.utils import timezone
 
@@ -140,6 +141,14 @@ def order_item_lines(order):
     ]
 
 
+def order_delivery_time_lines(order):
+    return [
+        f"{item.product.name if item.product else item.product_name}: "
+        f"{item.product.delivery_time if item.product else '20-25 days'}"
+        for item in order.items.select_related('product').all()
+    ]
+
+
 def _store():
     return SiteSettings.get()
 
@@ -185,7 +194,12 @@ def whatsapp_is_configured(store=None):
     that simply has not connected WhatsApp yet.
     """
     store = store or _store()
-    return bool(store.whatsapp_api_token and store.whatsapp_phone_number_id)
+    return bool(
+        store.whatsapp_api_token
+        and store.whatsapp_phone_number_id
+        and store.whatsapp_template_name
+        and store.whatsapp_template_language
+    )
 
 
 def facebook_is_configured(store=None):
@@ -233,6 +247,7 @@ def customer_body(order, event=None):
         lines.append(f"Total: {money(order.total_amount, order.currency)}")
 
     lines += ["", "Your items:", *[f"  - {line}" for line in order_item_lines(order)]]
+    lines += ["", "Estimated delivery:", *[f"  - {line}" for line in order_delivery_time_lines(order)]]
     lines += [
         "",
         f"Order total: {money(order.total_amount, order.currency)}",
@@ -250,13 +265,16 @@ def _receipt_item_rows(order):
     rows = []
     for item in order.items.select_related('product').all():
         qty = item.quantity or 1
-        label = item.product.name + (f' <span class="receipt-size">({item.size})</span>' if item.size else '')
+        label = escape(item.product.name) + (
+            f' <span class="receipt-size">({escape(item.size)})</span>' if item.size else '')
+        delivery_time = escape(item.product.delivery_time)
         rows.append(
             '<tr>'
             f'<td>{label}</td>'
             f'<td class="num">{qty}</td>'
             f'<td class="num">{money(item.price, order.currency)}</td>'
             f'<td class="num">{money(item.price * qty, order.currency)}</td>'
+            f'<td>{delivery_time}</td>'
             '</tr>'
         )
     return ''.join(rows)
@@ -306,7 +324,8 @@ def order_receipt_html(order, store=None, event=None):
 
     if order.items.filter(product__isnull=False).exists():
         lines.append('<table class="receipt-items"><thead><tr>'
-                     '<th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>')
+                     '<th>Item</th><th>Qty</th><th>Price</th><th>Total</th>'
+                     '<th>Estimated delivery</th></tr></thead><tbody>')
         lines.append(_receipt_item_rows(order))
         lines.append('</tbody>')
         lines.append(
@@ -434,16 +453,23 @@ def _send_email(recipient, subject, body, from_email=None, html='', store=None):
 
 def _send_whatsapp(to_digits, body, store=None):
     store = store or _store()
-    if not store.whatsapp_api_token or not store.whatsapp_phone_number_id:
-        return False, 'WhatsApp API not configured (missing token or Phone Number ID)'
+    if not whatsapp_is_configured(store):
+        return False, 'WhatsApp token, Phone Number ID, or approved template settings are missing'
 
     url = (f'https://graph.facebook.com/{GRAPH_VERSION}/{store.whatsapp_phone_number_id}/messages')
     payload = {
         'messaging_product': 'whatsapp',
         'recipient_type': 'individual',
         'to': to_digits,
-        'type': 'text',
-        'text': {'preview_url': False, 'body': body},
+        'type': 'template',
+        'template': {
+            'name': store.whatsapp_template_name,
+            'language': {'code': store.whatsapp_template_language},
+            'components': [{
+                'type': 'body',
+                'parameters': [{'type': 'text', 'text': body[:1024]}],
+            }],
+        },
     }
     try:
         _http_post_json(url, payload, {'Authorization': f'Bearer {store.whatsapp_api_token}'})
@@ -553,7 +579,7 @@ def notify_customer(order, event=None):
             # "failed notifications" alert would be permanently red for a shop
             # that has simply not connected WhatsApp.
             _record_skip(order, 'whatsapp', 'customer', event,
-                         'WhatsApp API not configured in Store settings')
+                         'WhatsApp token, Phone Number ID, or approved template not configured in Store settings')
         else:
             ok, error = _send_whatsapp(digits, body, store)
             _record(order, 'whatsapp', 'customer', event, ok, digits, subject, body, error)

@@ -34,6 +34,7 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
+from django.forms import PasswordInput
 from urllib.parse import quote
 
 from core.admin_site import maims_admin
@@ -816,9 +817,10 @@ class ProductAdmin(MaimsModelAdmin):
             'description': 'Stock 0 removes the "add to cart" button. If the thumbnail is empty the '
                            'main image is used. Prices are set per currency in the table below.'}),
         ('Delivery', {
-            'fields': ('delivery_fee_sek',),
+            'fields': ('delivery_fee_sek', 'delivery_time'),
             'description': 'Set a product-specific delivery fee in SEK. Leave blank to use the standard '
-                           '85 SEK fee, or enter 0 for free delivery. The fee applies once per cart line.'}),
+                           '85 SEK fee, or enter 0 for free delivery. The fee applies once per cart line. '
+                           'Delivery time is shown at checkout and in customer confirmations.'}),
         ('Clothing attributes', {
             'fields': ('fabric_type', 'stitching_type', 'material_type', 'size_options',
                        'color_options', 'length_options'),
@@ -1301,8 +1303,21 @@ class HeroSlideAdmin(MaimsModelAdmin):
         return 'No media yet — upload a file or paste an external URL.'
 
 
+class SiteSettingsAdminForm(forms.ModelForm):
+    class Meta:
+        model = SiteSettings
+        fields = '__all__'
+        widgets = {
+            'whatsapp_api_token': PasswordInput(render_value=False),
+        }
+
+    def clean_whatsapp_api_token(self):
+        return self.cleaned_data.get('whatsapp_api_token') or self.instance.whatsapp_api_token
+
+
 class SiteSettingsAdmin(MaimsModelAdmin):
     """One row controls every link and payment toggle — there is never more than one."""
+    form = SiteSettingsAdminForm
     list_display = ('singleton_label', 'logo_preview', 'store_name', 'whatsapp_number', 'stripe_enabled', 'paypal_enabled',
                     'whatsapp_enabled', 'updated_at')
     list_editable = ('stripe_enabled', 'paypal_enabled', 'whatsapp_enabled')
@@ -1326,6 +1341,14 @@ class SiteSettingsAdmin(MaimsModelAdmin):
             'fields': ('whatsapp_enabled', 'whatsapp_number', 'whatsapp_greeting'),
             'description': 'Digits only with the country code, e.g. 351912345678. This powers the '
                            'Order-via-WhatsApp button and the floating chat bubble.'}),
+        ('WhatsApp order updates', {
+            'fields': ('customer_notifications_enabled', 'customer_whatsapp_notifications',
+                       'whatsapp_api_token', 'whatsapp_phone_number_id',
+                       'whatsapp_template_name', 'whatsapp_template_language'),
+            'description': 'Customer updates require opt-in at checkout, a Meta Cloud API token and '
+                           'Phone Number ID, plus an approved template. Configure a template with one '
+                           'text placeholder in its body; the order summary and delivery estimates fill it. '
+                           'A blank token keeps the saved token unchanged.'}),
         ('Facebook', {
             'fields': ('facebook_page_url', 'facebook_shop_url'),
             'description': 'Shown as header and footer buttons on the storefront.'}),

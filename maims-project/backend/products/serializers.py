@@ -104,6 +104,7 @@ class ProductSerializer(serializers.ModelSerializer):
     review_count = serializers.SerializerMethodField()
     delivery_fee_sek = serializers.DecimalField(
         max_digits=10, decimal_places=2, read_only=True, allow_null=True)
+    delivery_time = serializers.CharField(read_only=True)
 
     class Meta:
         model = Product
@@ -114,6 +115,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "brand_name",
             "description",
             "delivery_fee_sek",
+            "delivery_time",
             "get_image",
             "get_thumbnail",
             "stock",

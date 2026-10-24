@@ -238,6 +238,11 @@ class Product(models.Model):
         validators=[MinValueValidator(0)],
         help_text='Leave blank to use the standard 85 SEK delivery fee. Set to 0 for free delivery.',
     )
+    delivery_time = models.CharField(
+        max_length=80,
+        default='20-25 days',
+        help_text='Estimated delivery time shown at checkout and in order notifications.',
+    )
     
     # 🌟 OPTIONAL METADATA FIELDS: Left blank for non-clothing inventory like bags/jewelry
     fabric_type = models.CharField(max_length=50, choices=FABRIC_CHOICES, blank=True, null=True)
@@ -559,6 +564,18 @@ class SiteSettings(models.Model):
         help_text="Permanent/system-user token from Meta for WhatsApp Cloud API")
     whatsapp_phone_number_id = models.CharField(max_length=64, blank=True, null=True,
         help_text="Phone Number ID from WhatsApp > API Setup (not the phone number itself)")
+    whatsapp_template_name = models.CharField(
+        max_length=128,
+        blank=True,
+        default='',
+        help_text='Exact name of the approved Meta template with one text placeholder in its body.',
+    )
+    whatsapp_template_language = models.CharField(
+        max_length=16,
+        blank=True,
+        default='',
+        help_text='Language code configured for the approved WhatsApp template, e.g. en.',
+    )
     whatsapp_business_account_id = models.CharField(max_length=64, blank=True, null=True,
         help_text="WhatsApp Business Account ID (WABA ID) from Meta Business Manager > Business Info")
     whatsapp_webhook_secret = models.CharField(max_length=128, blank=True, null=True,

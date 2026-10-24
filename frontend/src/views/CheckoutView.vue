@@ -385,9 +385,9 @@ const submitCheckoutForm = async () => {
                     class="mt-0.5 rounded border-gray-300 text-brand-accent focus:ring-brand-accent"
                   />
                   <span>
-                    Send me order updates on WhatsApp at this number
+                    Send my order confirmation and updates on WhatsApp at this number
                     <span class="block text-gray-500">
-                      We'll text you when your order is accepted, packed, shipped and delivered.
+                      We'll send your order confirmation and delivery status updates.
                       Opt out any time by replying STOP.
                     </span>
                   </span>
@@ -486,6 +486,7 @@ const submitCheckoutForm = async () => {
             <div>
               <span class="font-semibold">{{ item.product.name }}</span>
               <p v-if="item.variant || item.size" class="text-xs text-gray-500">{{ item.variant || `Size: ${item.size}` }}</p>
+              <p class="text-xs text-gray-500">Estimated delivery: {{ item.product.delivery_time || '20-25 days' }}</p>
             </div>
             <span>{{ (displayItemPrice(item) * (item.quantity || 0)).toFixed(2) }} {{ cartStore.currentCurrency }}</span>
           </div>
