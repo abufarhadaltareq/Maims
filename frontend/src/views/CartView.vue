@@ -54,12 +54,12 @@
           </router-link>
 
           <div class="flex-1 min-w-0">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div class="w-full min-w-0 sm:flex-1">
                 <!-- Clickable product name -->
                 <router-link
                   :to="productLink(item)"
-                  class="font-bold text-base leading-tight hover:text-brand-accent hover:underline"
+                  class="block break-words font-bold text-base leading-tight hover:text-brand-accent hover:underline"
                 >
                   {{ item.product?.name }}
                 </router-link>
@@ -90,7 +90,7 @@
               </div>
 
               <!-- Line total + remove -->
-              <div class="text-right flex-shrink-0">
+              <div class="self-end text-right flex-shrink-0 sm:self-start">
                 <p class="font-extrabold text-base whitespace-nowrap">{{ lineTotal(item) }}</p>
                 <button
                   @click="cartStore.removeItem(item.product?.id, item.size)"
