@@ -196,7 +196,7 @@
     <footer class="site-footer bg-black text-slate-200 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
       <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 pb-8 border-b border-white/10">
         <div class="col-span-2 lg:col-span-2">
-          <BrandLogo size="sm" />
+          <BrandLogo size="sm" gold />
           <!-- About line: Admin → Site settings → Brand & header → Footer about -->
           <p class="text-slate-200 text-[13px] leading-relaxed mt-3 max-w-xs">{{ site.footerAbout }}</p>
           <!-- Newsletter (shown only when Admin → Customer notification settings allow it) -->

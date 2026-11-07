@@ -41,15 +41,15 @@
     <!-- Wordmark + tagline -->
     <span class="flex flex-col leading-none">
       <span
-        class="brand-wordmark font-semibold uppercase text-[var(--color-brand)] transition-colors group-hover:[color:var(--color-brand)]"
-        :class="size === 'sm' ? 'text-base' : 'text-lg'"
+        class="brand-wordmark font-semibold uppercase transition-colors"
+        :class="[size === 'sm' ? 'text-base' : 'text-lg', gold ? 'text-amber-400 group-hover:text-amber-300' : 'text-[var(--color-brand)] group-hover:[color:var(--color-brand)]']"
       >
-        {{ wordmarkStart }}<span class="transition-colors group-hover:[color:var(--color-brand)]">{{ wordmarkAccent }}</span>{{ wordmarkEnd }}
+        {{ wordmarkStart }}<span class="transition-colors" :class="gold ? 'group-hover:text-amber-300' : 'group-hover:[color:var(--color-brand)]'">{{ wordmarkAccent }}</span>{{ wordmarkEnd }}
       </span>
       <span
         v-if="showTagline && tagline"
-        class="hidden sm:block mt-1 font-semibold uppercase text-[var(--color-brand)]/70"
-        :class="size === 'sm' ? 'text-[0.5rem] tracking-[0.3em]' : 'text-[0.55rem] tracking-[0.4em]'"
+        class="hidden sm:block mt-1 font-semibold uppercase"
+        :class="[size === 'sm' ? 'text-[0.5rem] tracking-[0.3em]' : 'text-[0.55rem] tracking-[0.4em]', gold ? 'text-amber-300' : 'text-[var(--color-brand)]/70']"
       >
         {{ tagline }}
       </span>
@@ -65,6 +65,7 @@ import { useSiteStore } from '../stores/site'
 defineProps({
   size: { type: String, default: 'md' }, // 'md' | 'sm'
   showTagline: { type: Boolean, default: true },
+  gold: { type: Boolean, default: false },
 })
 
 const site = useSiteStore()

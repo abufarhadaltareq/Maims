@@ -418,7 +418,7 @@ const fetchLatestProducts = async () => {
     const qs = params.toString() ? `?${params.toString()}` : ''
     const response = await axios.get(`/api/v1/products/${qs}`)
     products.value = response.data.results || response.data.products || (Array.isArray(response.data) ? response.data : [])
-    categoryTitle.value = categorySlug.value ? `Category: ${categorySlug.value.replace(/-/g, ' ')}` : 'New Arrivals'
+    categoryTitle.value = categorySlug.value ? categorySlug.value.replace(/-/g, ' ') : 'New Arrivals'
   } catch (error) {
     console.error('Error loading products:', error)
     products.value = []
