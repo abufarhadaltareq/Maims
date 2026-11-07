@@ -201,11 +201,10 @@
           <p class="text-slate-200 text-[13px] leading-relaxed mt-3 max-w-xs">{{ site.footerAbout }}</p>
           <!-- Newsletter (shown only when Admin → Customer notification settings allow it) -->
           <form v-if="site.newsletterSignupEnabled" @submit.prevent="subscribeNewsletter" class="mt-4 max-w-xs">
-            <label class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-200">Get 10% off your first order</label>
-            <div class="flex gap-2 mt-2">
+            <div class="flex gap-2">
               <input
                 v-model="newsletterEmail"
-                type="email" required placeholder="Email address"
+                type="email" required placeholder="Email address" aria-label="Email address"
                 class="flex-1 min-w-0 bg-white/10 border border-white/30 rounded-full px-4 py-2.5 text-white placeholder:text-slate-300 outline-none focus:border-white focus:ring-2 focus:ring-white/30 transition"
               />
               <button class="shrink-0 bg-gradient-brand text-white text-xs font-extrabold uppercase tracking-wider px-4 py-2.5 rounded-full hover:brightness-110 transition active:scale-95">
