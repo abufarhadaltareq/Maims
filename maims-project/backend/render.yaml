@@ -54,6 +54,8 @@ services:
       # get_random_secret_key as g; print(g())"`.
       - key: SECRET_KEY
         sync: false
+      - key: CLOUDINARY_URL
+        sync: false
       - key: DATABASE_URL
         fromDatabase:
           name: maims-db
@@ -76,6 +78,32 @@ services:
         value: https://maims-backend-nhq3.onrender.com
       - key: BREVO_API_KEY
         sync: false
+
+  - type: cron
+    name: maims-product-cleanup
+    runtime: python
+    rootDir: maims-project/backend
+    region: oregon
+    plan: starter
+    schedule: "0 3 * * *"
+    pythonVersion: 3.12.11
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python manage.py cleanup_old_products
+    envVars:
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: maims-db
+          property: connectionString
+      - key: FRONTEND_BASE_URL
+        value: https://maims.eu
+      - key: BACKEND_BASE_URL
+        value: https://maims-backend-nhq3.onrender.com
 
 databases:
   - name: maims-db

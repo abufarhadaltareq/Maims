@@ -374,9 +374,9 @@ const submitCheckoutForm = async () => {
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Phone Number</label>
-                <div class="flex gap-2">
+                <div class="flex min-w-0 gap-2">
                   <input type="text" v-model="form.country_code" required class="w-24 border border-gray-200 rounded-lg p-2.5 text-sm text-center focus:outline-brand" />
-                  <input type="tel" v-model="form.phone" required class="flex-1 border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand" />
+                  <input type="tel" v-model="form.phone" required class="min-w-0 flex-1 border border-gray-200 rounded-lg p-2.5 text-sm focus:outline-brand" />
                 </div>
                 <label class="mt-2 flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
                   <input

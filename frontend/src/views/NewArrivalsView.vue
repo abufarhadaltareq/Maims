@@ -8,9 +8,9 @@
         <p class="text-gray-500 text-sm mt-1">{{ totalCount }} fresh pieces{{ socialCount ? ` · ${socialCount} synced from Facebook` : '' }}</p>
       </div>
       <!-- Sort -->
-      <div class="flex items-center gap-2">
-        <label for="sort" class="text-xs font-bold uppercase tracking-wider text-gray-400">Sort</label>
-        <select id="sort" v-model="sortKey" class="text-sm font-semibold border border-gray-200 rounded-full px-4 py-2 bg-white outline-none focus:border-brand-accent cursor-pointer">
+      <div class="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+        <label for="sort" class="shrink-0 text-xs font-bold uppercase tracking-wider text-gray-400">Sort</label>
+        <select id="sort" v-model="sortKey" class="min-w-0 flex-1 text-sm font-semibold border border-gray-200 rounded-full px-4 py-2 bg-white outline-none focus:border-brand-accent cursor-pointer sm:flex-initial">
           <option value="newest">Newest first</option>
           <option value="price-asc">Price: low → high</option>
           <option value="price-desc">Price: high → low</option>
@@ -20,7 +20,7 @@
         <button
           @click="showSocialOnly = !showSocialOnly"
           :class="showSocialOnly ? 'bg-[#1877F2] text-white border-[#1877F2]' : 'bg-white text-gray-600 border-gray-200'"
-          class="text-xs font-bold border rounded-full px-4 py-2 transition hover:shadow flex items-center gap-1.5 whitespace-nowrap"
+          class="flex w-full items-center justify-center gap-1.5 whitespace-nowrap text-xs font-bold border rounded-full px-4 py-2 transition hover:shadow sm:w-auto"
         >
           <span class="w-1.5 h-1.5 rounded-full" :class="showSocialOnly ? 'bg-white animate-pulse' : 'bg-[#1877F2]'"></span>
           Facebook live

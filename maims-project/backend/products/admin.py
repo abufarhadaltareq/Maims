@@ -42,7 +42,7 @@ from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
 from .models import (
     RESTOCK_LEVEL, Category, Collection, CurrencyPrice, CustomerNotificationSettings,
-    HeroBannerSettings, HeroSlide, Order, OrderItem,
+    HeroBannerSettings, HeroSlide, Order, OrderItem, ProductRetentionSettings,
     OrderNotification, Product, ProductMedia, Review, SiteSettings, WishlistItem,
 )
 
@@ -1444,6 +1444,37 @@ class CustomerNotificationSettingsAdmin(MaimsModelAdmin):
         return super().changelist_view(request, extra_context)
 
 
+class ProductRetentionSettingsAdmin(MaimsModelAdmin):
+    list_display = ('singleton_label', 'enabled', 'retention_days', 'updated_at')
+    fieldsets = (
+        ('Automatic cleanup', {
+            'fields': ('enabled', 'retention_days', 'updated_at'),
+            'description': 'The daily scheduled job deletes products older than the chosen age. '
+                           'Order items keep their name and price snapshot; product reviews and '
+                           'wishlists are deleted with the product. Uploaded media is removed only '
+                           'when no remaining record references it.'}),
+    )
+    readonly_fields = ('updated_at',)
+
+    @admin.display(description='Settings')
+    def singleton_label(self, obj):
+        return 'Automatic product cleanup'
+
+    def has_add_permission(self, request):
+        return not ProductRetentionSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        if request.method == 'GET':
+            row = ProductRetentionSettings.objects.first()
+            if row:
+                return HttpResponseRedirect(
+                    reverse('admin:products_productretentionsettings_change', args=[row.pk]))
+        return super().changelist_view(request, extra_context)
+
+
 # --- registration -------------------------------------------------------------------
 # Registered as plain calls, not @decorators: Django 6's AdminSite.register()
 # returns None, so it cannot be used as a class decorator.
@@ -1455,6 +1486,7 @@ maims_admin.register(Collection, CollectionAdmin)
 maims_admin.register(HeroSlide, HeroSlideAdmin)
 maims_admin.register(SiteSettings, SiteSettingsAdmin)
 maims_admin.register(CustomerNotificationSettings, CustomerNotificationSettingsAdmin)
+maims_admin.register(ProductRetentionSettings, ProductRetentionSettingsAdmin)
 
 
 class ReviewAdmin(MaimsModelAdmin):

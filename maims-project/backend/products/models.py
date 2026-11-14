@@ -678,6 +678,32 @@ class SiteSettings(models.Model):
             raise ValidationError({'logo': 'Logo must be 2MB or smaller.'})
 
 
+# --- PRODUCT RETENTION (singleton, editable in Admin) ---
+
+class ProductRetentionSettings(models.Model):
+    """Admin-controlled age threshold for the scheduled product cleanup."""
+    enabled = models.BooleanField(
+        default=True,
+        help_text='Automatically delete products older than the retention period.')
+    retention_days = models.PositiveSmallIntegerField(
+        default=30,
+        validators=[MinValueValidator(1), MaxValueValidator(3650)],
+        help_text='Products older than this many days are deleted by the daily cleanup job.')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Product retention settings'
+        verbose_name_plural = 'Product retention settings'
+
+    def __str__(self):
+        return 'Product retention settings'
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 # --- EMAIL MARKETING OPT-IN (singleton, editable in Admin) ---
 
 class CustomerNotificationSettings(models.Model):
@@ -915,7 +941,8 @@ class OrderItem(models.Model):
 
     def __str__(self):
         size_text = f" ({self.size})" if self.size else ''
-        return f"{self.quantity} x {self.product.name}{size_text}"
+        product_name = self.product.name if self.product_id else (self.product_name or 'Deleted product')
+        return f"{self.quantity} x {product_name}{size_text}"
 
     @property
     def line_total(self):

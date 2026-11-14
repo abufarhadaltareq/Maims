@@ -354,6 +354,8 @@ UNFOLD = {
                      'link': reverse_lazy('admin:auth_group_changelist')},
                     {'title': _('Store settings'), 'icon': 'settings',
                      'link': reverse_lazy('admin:products_sitesettings_changelist')},
+                    {'title': _('Product retention'), 'icon': 'delete_sweep',
+                     'link': reverse_lazy('admin:products_productretentionsettings_changelist')},
                     {'title': _('Update prices & stock (CSV)'), 'icon': 'upload_file',
                      'link': reverse_lazy('admin:products_product_import_csv'),
                      'permission': lambda request: request.user.has_perm('products.change_product')},

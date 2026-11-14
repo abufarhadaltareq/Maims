@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import tempfile
 import threading
 from datetime import timedelta
 from decimal import Decimal
@@ -8,6 +9,7 @@ from unittest import mock, skipIf
 
 from django.contrib.auth.models import User
 from django.core import mail
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase, TransactionTestCase, override_settings
@@ -24,7 +26,7 @@ from . import facebook
 
 from .models import (
     Category, CurrencyPrice, CustomerNotificationSettings, HeroSlide, Order, OrderItem, Product,
-    Review, SiteSettings, UserProfile,
+    ProductMedia, ProductRetentionSettings, Review, SiteSettings, UserProfile,
 )
 from .views import _build_order_items, _CheckoutError, _delivery_fee, _mark_paid_and_reserve, _reserve_stock
 
@@ -76,6 +78,18 @@ class AdminPageTests(TestCase):
         self.assertEqual(detail.status_code, 200)
         self.assertContains(detail, 'Silk Kurta')
 
+    def test_order_can_be_deleted_after_its_product_was_deleted(self):
+        self.product.delete()
+        delete_url = f'/admin/products/order/{self.order.pk}/delete/'
+
+        confirmation = self.client.get(delete_url)
+        self.assertEqual(confirmation.status_code, 200)
+        self.assertContains(confirmation, 'Silk Kurta')
+
+        response = self.client.post(delete_url, {'post': 'yes'})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Order.objects.filter(pk=self.order.pk).exists())
+
     def test_product_change_page_shows_delivery_fee_control(self):
         response = self.client.get(f'/admin/products/product/{self.product.pk}/change/')
         self.assertEqual(response.status_code, 200)
@@ -116,13 +130,14 @@ class AdminPageTests(TestCase):
         for model in maims_admin._registry:
             meta = model._meta
             with self.subTest(model=meta.model_name):
-                res = self.client.get(f'/admin/{meta.app_label}/{meta.model_name}/')
+                res = self.client.get(f'/admin/{meta.app_label}/{meta.model_name}/', follow=True)
                 self.assertEqual(res.status_code, 200)
 
     def test_category_without_image_renders(self):
         """A category with no image used to raise on its 'none' thumbnail."""
         res = self.client.get('/admin/products/category/')
         self.assertEqual(res.status_code, 200)
+
 
     def test_duplicate_product_action_creates_a_unique_slug(self):
         res = self.client.post('/admin/products/product/', {
@@ -158,6 +173,81 @@ class AdminPageTests(TestCase):
         res = self.client.get(f'/admin/products/customernotificationsettings/{row.pk}/change/')
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'Email capture')
+
+    def test_product_retention_can_be_changed_in_admin(self):
+        row = ProductRetentionSettings.get()
+        page = self.client.get(f'/admin/products/productretentionsettings/{row.pk}/change/')
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'retention_days')
+
+        response = self.client.post(
+            f'/admin/products/productretentionsettings/{row.pk}/change/',
+            {'enabled': 'on', 'retention_days': '45'},
+        )
+        self.assertEqual(response.status_code, 302)
+        row.refresh_from_db()
+        self.assertEqual(row.retention_days, 45)
+
+
+class ProductCleanupTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name='Cleanup', slug='cleanup')
+
+    def test_cleanup_removes_old_products_and_only_unreferenced_media(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                expired = Product.objects.create(
+                    category=self.category, name='Expired', slug='expired',
+                    image=SimpleUploadedFile('shared.jpg', b'image'),
+                    thumbnail=SimpleUploadedFile('thumbnail.jpg', b'thumbnail'),
+                )
+                media = ProductMedia.objects.create(
+                    product=expired,
+                    file=SimpleUploadedFile('gallery.mp4', b'video', content_type='video/mp4'),
+                )
+                Product.objects.filter(pk=expired.pk).update(
+                    date_added=timezone.now() - timedelta(days=31))
+                retained = Product.objects.create(
+                    category=self.category, name='Retained', slug='retained')
+                retained.image.name = expired.image.name
+                retained.save(update_fields=['image'])
+                image_name, thumbnail_name, media_name = (
+                    expired.image.name, expired.thumbnail.name, media.file.name)
+
+                call_command('cleanup_old_products')
+
+                self.assertFalse(Product.objects.filter(pk=expired.pk).exists())
+                self.assertTrue(Product.objects.filter(pk=retained.pk).exists())
+                self.assertTrue(Product._meta.get_field('image').storage.exists(image_name))
+                self.assertFalse(Product._meta.get_field('thumbnail').storage.exists(thumbnail_name))
+                self.assertFalse(ProductMedia._meta.get_field('file').storage.exists(media_name))
+
+    def test_cleanup_obeys_admin_enable_setting_and_dry_run(self):
+        product = Product.objects.create(
+            category=self.category, name='Expired', slug='expired')
+        Product.objects.filter(pk=product.pk).update(
+            date_added=timezone.now() - timedelta(days=31))
+        settings_row = ProductRetentionSettings.get()
+        settings_row.enabled = False
+        settings_row.save()
+
+        call_command('cleanup_old_products')
+        self.assertTrue(Product.objects.filter(pk=product.pk).exists())
+
+        settings_row.enabled = True
+        settings_row.retention_days = 45
+        settings_row.save()
+        call_command('cleanup_old_products', dry_run=True)
+        self.assertTrue(Product.objects.filter(pk=product.pk).exists())
+        call_command('cleanup_old_products')
+        self.assertTrue(Product.objects.filter(pk=product.pk).exists())
+
+        older_product = Product.objects.create(
+            category=self.category, name='Older', slug='older')
+        Product.objects.filter(pk=older_product.pk).update(
+            date_added=timezone.now() - timedelta(days=46))
+        call_command('cleanup_old_products')
+        self.assertFalse(Product.objects.filter(pk=older_product.pk).exists())
 
 
 class AdminDailyWorkflowTests(AdminPageTests):

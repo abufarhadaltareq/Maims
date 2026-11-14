@@ -166,6 +166,13 @@ Click **Deploy** - Render will build and deploy!
 
 **Your backend will be live at:** `https://maims-backend.onrender.com`
 
+The backend blueprint also creates a daily 03:00 UTC product-cleanup cron job.
+Set its `SECRET_KEY` and `CLOUDINARY_URL` environment values to match the web
+service. In Django Admin → **Product retention**, you can pause cleanup or
+change the default 30-day age threshold. On Railway or another host, create a
+scheduled service using the backend environment and run
+`python manage.py cleanup_old_products` once daily.
+
 ---
 
 ## Database Setup
