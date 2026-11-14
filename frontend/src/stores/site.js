@@ -87,9 +87,13 @@ export const useSiteStore = defineStore('site', {
     },
     // --- Hero banner controls (Admin → Hero banner settings) ---
     heroEnabled: (s) => s.hero?.hero_enabled !== false,
+    heroEyebrow: (s) => s.hero?.hero_eyebrow ?? 'Curated for you',
+    heroShowNavigation: (s) => s.hero?.show_slide_navigation !== false,
+    heroShowProgress: (s) => s.hero?.show_progress_bar !== false,
+    heroShowCopy: (s) => s.hero?.show_hero_copy === true,
     heroHeight: (s) => s.hero?.height_preset || 'tall',
-    heroOverlay: (s) => Number(s.hero?.overlay_strength) || 45,
-    heroKenburns: (s) => Number(s.hero?.kenburns_intensity) || 12,
+    heroOverlay: (s) => Number.isFinite(Number(s.hero?.overlay_strength)) ? Number(s.hero.overlay_strength) : 45,
+    heroKenburns: (s) => Number.isFinite(Number(s.hero?.kenburns_intensity)) ? Number(s.hero.kenburns_intensity) : 12,
     hero3DEnabled: (s) => s.hero?.hero_3d_enabled !== false,
     hero3DOpacity: (s) => {
       const n = Number(s.hero?.hero_3d_opacity)
@@ -99,7 +103,9 @@ export const useSiteStore = defineStore('site', {
     heroRotation: (s) => Number(s.hero?.rotation_seconds) || 5,
     heroTransition: (s) => Number(s.hero?.transition_ms) || 1100,
     heroAutoplay: (s) => s.hero?.autoplay !== false,
-    heroAccent: (s) => s.hero?.accent_color || '#0ea5e9',
+    heroAccent: (s) => s.hero?.accent_color || '#ffffff',
+    heroTextShadow: (s) => s.hero?.text_shadow !== false,
+    heroGlassCards: (s) => s.hero?.glass_cards !== false,
   },
   actions: {
     async fetchSettings() {

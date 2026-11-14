@@ -102,6 +102,27 @@ class HeroBannerSettings(models.Model):
         verbose_name="Hero banner enabled",
         help_text="Untick to hide the entire homepage banner — the page then starts at the category strip.",
     )
+    hero_eyebrow = models.CharField(
+        max_length=100,
+        default="Curated for you",
+        blank=True,
+        help_text="Short text above the hero headline. Leave blank to hide it.",
+    )
+    show_slide_navigation = models.BooleanField(
+        default=True,
+        verbose_name="Show slide navigation",
+        help_text="Show numbered slide selectors and previous/next controls.",
+    )
+    show_hero_copy = models.BooleanField(
+        default=False,
+        verbose_name="Show hero text",
+        help_text="Show slide headings, badges, descriptions and call-to-action links over the images.",
+    )
+    show_progress_bar = models.BooleanField(
+        default=True,
+        verbose_name="Show slide progress",
+        help_text="Show the current slide number and progress bar.",
+    )
 
     # --- Layout --------------------------------------------------------------
     HEIGHT_CHOICES = [
@@ -159,8 +180,8 @@ class HeroBannerSettings(models.Model):
     # --- Design tokens -------------------------------------------------------
     # These re-skin the banner without touching the stylesheet.
     accent_color = models.CharField(
-        max_length=7, default='#0ea5e9',
-        help_text="Highlight colour used by the badge, progress bars and buttons. Hex, e.g. #0ea5e9.",
+        max_length=7, default='#ffffff',
+        help_text="Highlight colour used by the badge, progress bars and buttons. Hex, e.g. #ffffff.",
     )
     text_shadow = models.BooleanField(
         default=True,
@@ -464,7 +485,7 @@ class SiteSettings(models.Model):
     #   New drop every Friday
     #   Easy 14-day returns
     # Blank = the header ticker hides itself.
-    announcement_enabled = models.BooleanField(default=True,
+    announcement_enabled = models.BooleanField(default=False,
         help_text="Show the scrolling message bar above the header.")
     announcement_messages = models.TextField(blank=True, null=True,
         default="Free EU shipping on orders over €40",

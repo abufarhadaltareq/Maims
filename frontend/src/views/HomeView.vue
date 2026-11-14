@@ -1,49 +1,121 @@
 <template>
   <div class="home-page font-brand text-brand-text">
 
-    <!-- ===== Hero — compact stylish gallery with sliding dots ===== -->
-    <div
+    <!-- ===== Immersive, responsive hero gallery ===== -->
+    <section
       v-if="isHomePage && siteStore.heroEnabled && heroSlides.length"
-      class="hero-section relative w-full overflow-hidden"
-      :style="{ minHeight: heroHeightStyle }"
+      class="hero-gallery relative isolate w-full overflow-hidden bg-[#10100f] text-white"
+      :class="`hero-height-${siteStore.heroHeight}`"
+      :style="{
+        minHeight: heroHeightStyle,
+        '--hero-accent': siteStore.heroAccent,
+        '--hero-transition': `${siteStore.heroTransition}ms`,
+        '--hero-zoom-scale': siteStore.heroKenburns ? 1.03 + siteStore.heroKenburns / 100 : 1,
+      }"
+      aria-label="Featured collections"
     >
-      <div class="absolute inset-x-0 top-0 bottom-0 overflow-hidden border-y border-black/10 bg-black sm:inset-x-5 sm:border">
-      <template v-for="(slide, index) in heroSlides" :key="slide.id || index">
-        <video
-          v-if="slide.media_type === 'video' && slide.video_url"
-          :src="slide.video_url"
-          :poster="slide.image_url || undefined"
-          class="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
-          :class="index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'"
-          :autoplay="index === currentSlide"
-          muted loop playsinline preload="metadata"
-          :aria-label="slide.title || `Hero video ${index + 1}`"
-        ></video>
-        <img
-          v-else
-          :src="slide.image_url"
-          :alt="slide.title || `Hero image ${index + 1}`"
-          class="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
-          :class="index === currentSlide ? 'opacity-100 z-10 animate-kenburns' : 'opacity-0 z-0'"
-          :style="{ animationDuration: (siteStore.heroKenburns / 12) + 's' }"
-        />
-      </template>
+      <div class="hero-gallery-backdrop absolute inset-0" aria-hidden="true">
+        <template v-for="(slide, index) in heroSlides" :key="slide.id || index">
+          <video
+            v-if="slide.media_type === 'video' && slide.video_url"
+            :src="slide.video_url"
+            :poster="slide.image_url || undefined"
+            class="hero-gallery-media absolute inset-0 h-full w-full object-cover"
+            :class="{
+              'hero-gallery-media-active': index === currentSlide,
+              'hero-gallery-media-static': !siteStore.heroKenburns,
+            }"
+            :autoplay="index === currentSlide"
+            muted loop playsinline preload="metadata"
+            :aria-label="slide.title || `Hero video ${index + 1}`"
+          ></video>
+          <img
+            v-else
+            :src="slide.image_url"
+            :alt="slide.title || `Hero image ${index + 1}`"
+            class="hero-gallery-media absolute inset-0 h-full w-full object-cover"
+            :class="{
+              'hero-gallery-media-active': index === currentSlide,
+              'hero-gallery-media-static': !siteStore.heroKenburns,
+            }"
+          />
+        </template>
+      </div>
 
-      <!-- Sliding dots — one per image -->
-      <div v-if="heroSlides.length > 1" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2 border border-white/40 bg-black/60 px-3 py-2">
-        <button
-          v-for="(item, index) in heroSlides"
-          :key="item.id || index"
-          @click="goToSlide(index)"
-          class="h-2 rounded-full transition-all duration-300 overflow-hidden"
-          :class="index === currentSlide ? 'w-8' : 'w-2 hover:bg-white/70'"
-          :style="index === currentSlide ? { background: '#fff' } : { background: 'rgba(255,255,255,0.55)' }"
-          :aria-label="`Go to slide ${index + 1}`"
+      <Hero3D v-if="siteStore.hero3DEnabled" />
+      <div class="hero-gallery-shade absolute inset-0" :style="{ opacity: siteStore.heroOverlay / 100 }" aria-hidden="true"></div>
+      <div class="hero-gallery-grain absolute inset-0" aria-hidden="true"></div>
+      <div v-if="siteStore.hero3DEnabled" class="hero-gallery-orbit absolute" aria-hidden="true"><span></span></div>
+
+      <div class="hero-gallery-inner relative z-10 mx-auto flex h-full min-h-[inherit] max-w-[1600px] flex-col justify-end px-5 pb-6 pt-16 sm:px-10 sm:pb-9 lg:px-16 lg:pb-12">
+        <div
+          v-if="siteStore.heroShowCopy"
+          class="hero-gallery-copy max-w-3xl"
+          :class="{
+            'hero-gallery-copy-shadow': siteStore.heroTextShadow,
+            'hero-gallery-copy-glass': siteStore.heroGlassCards,
+          }"
+          aria-live="polite"
         >
-        </button>
+          <p v-if="siteStore.heroEyebrow" class="mb-4 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-white/80 sm:text-xs">
+            <span class="h-px w-8 bg-[var(--hero-accent)]"></span>
+            {{ siteStore.storeName }} <span class="text-[var(--hero-accent)]">/</span> {{ siteStore.heroEyebrow }}
+          </p>
+          <Transition name="hero-copy" mode="out-in">
+            <div :key="currentSlide">
+              <p v-if="currentHeroSlide.badge_text" class="mt-4 inline-flex border border-white/35 bg-black/20 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/90 backdrop-blur-sm sm:text-xs">
+                {{ currentHeroSlide.badge_text }}
+              </p>
+              <h1 class="max-w-3xl font-brand text-4xl font-medium leading-[1.03] tracking-[-0.045em] text-white sm:text-6xl lg:text-7xl xl:text-[5.5rem]">
+                {{ currentHeroSlide.title || config.heroBannerTitle }}
+              </h1>
+              <p v-if="currentHeroSlide.subtitle || config.heroBannerSubtitle" class="mt-4 max-w-xl text-sm leading-relaxed text-white/80 sm:mt-6 sm:text-base lg:text-lg">
+                {{ currentHeroSlide.subtitle || config.heroBannerSubtitle }}
+              </p>
+              <a
+                v-if="currentHeroSlide.button_text"
+                :href="currentHeroSlide.button_link || '#latest-products'"
+                class="group mt-6 inline-flex min-h-12 items-center gap-5 border border-white/70 bg-white px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-black transition hover:border-[var(--hero-accent)] hover:bg-[var(--hero-accent)] sm:mt-8 sm:px-7"
+              >
+                {{ currentHeroSlide.button_text }}
+                <span class="text-lg leading-none transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
+              </a>
+            </div>
+          </Transition>
+        </div>
+
+        <div v-if="siteStore.heroShowProgress || (siteStore.heroShowNavigation && heroSlides.length > 1)" class="hero-gallery-footer mt-9 flex items-end justify-between gap-5 sm:mt-12">
+          <div v-if="siteStore.heroShowProgress" class="flex min-w-0 flex-1 items-center gap-4 sm:gap-6">
+            <div class="hero-gallery-progress h-px max-w-48 flex-1 bg-white/50 sm:max-w-64" aria-hidden="true">
+              <span :style="{ width: `${((currentSlide + 1) / heroSlides.length) * 100}%` }"></span>
+            </div>
+          </div>
+
+          <div v-if="siteStore.heroShowNavigation && heroSlides.length > 1" class="flex max-w-[68vw] shrink-0 items-center gap-2 overflow-x-auto sm:max-w-none sm:gap-3">
+            <button
+              v-for="(item, index) in heroSlides"
+              :key="item.id || index"
+              @click="goToSlide(index)"
+              class="hero-gallery-dot flex h-9 w-9 items-center justify-center rounded-full transition sm:h-10 sm:w-10"
+              :class="index === currentSlide ? 'border border-white bg-white' : 'border border-white/50 bg-black/15 hover:border-white hover:bg-white/25'"
+              :aria-label="`Show slide ${index + 1}: ${item.title || 'Featured collection'}`"
+              :aria-current="index === currentSlide ? 'true' : undefined"
+            ></button>
+            <span class="mx-1 hidden h-7 w-px bg-white/30 sm:block" aria-hidden="true"></span>
+            <button
+              @click="previousSlide"
+              class="hero-gallery-arrow hidden h-10 w-10 items-center justify-center rounded-full border border-white/40 text-xl transition hover:border-[var(--hero-accent)] hover:bg-[var(--hero-accent)] hover:text-black sm:flex"
+              aria-label="Previous hero slide"
+            >←</button>
+            <button
+              @click="nextSlide"
+              class="hero-gallery-arrow flex h-10 w-10 items-center justify-center rounded-full border border-white/70 text-xl transition hover:border-[var(--hero-accent)] hover:bg-[var(--hero-accent)] hover:text-black sm:h-12 sm:w-12"
+              aria-label="Next hero slide"
+            >→</button>
+          </div>
+        </div>
       </div>
-      </div>
-    </div>
+    </section>
 
     <nav
       v-if="isHomePage && mainCategories.length"
@@ -239,6 +311,7 @@ import { useRoute } from 'vue-router'
 import axios from 'axios'
 import ProductCard from '../components/ProductCard.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
+import Hero3D from '../components/Hero3D.vue'
 import { BRAND_CONFIG } from '../brand.config.js'
 import { useSiteStore } from '../stores/site'
 
@@ -282,6 +355,7 @@ const clearFilters = () => {
 const isHomePage = computed(() => route.path === '/')
 
 const currentSlide = ref(0)
+const currentHeroSlide = computed(() => heroSlides.value[currentSlide.value] || {})
 let sliderInterval = null
 
 // Scroll-reveal directive: elements start hidden and lift in
@@ -401,9 +475,12 @@ const scrollMainCategories = (direction) => {
 }
 
 const goToSlide = (index) => {
-  currentSlide.value = index
+  currentSlide.value = (index + heroSlides.value.length) % heroSlides.value.length
   startImageRotation() // reset timer on manual click
 }
+
+const nextSlide = () => goToSlide(currentSlide.value + 1)
+const previousSlide = () => goToSlide(currentSlide.value - 1)
 
 const fetchLatestProducts = async () => {
   isLoading.value = true
@@ -445,6 +522,8 @@ watch(() => route.params.category_slug, (newSlug) => {
   fetchLatestProducts()
 })
 
+watch(() => siteStore.heroRotation, startImageRotation)
+
 const clearFiltersSilent = () => {
   filters.value = { sizes: [], colors: [], lengths: [], fabrics: [] }
 }
@@ -460,3 +539,201 @@ onBeforeUnmount(() => {
   if (sliderInterval) clearInterval(sliderInterval)
 })
 </script>
+
+<style scoped>
+.hero-gallery {
+  perspective: 1400px;
+}
+
+.hero-gallery-backdrop {
+  z-index: 0;
+  transform-style: preserve-3d;
+}
+
+.hero-gallery-media {
+  opacity: 0;
+  transform: scale(1.03);
+  transition: opacity var(--hero-transition, 1100ms) ease;
+}
+
+.hero-gallery-media-active {
+  opacity: 1;
+  animation: hero-gallery-zoom 16s ease-out both;
+}
+
+.hero-gallery-media-static.hero-gallery-media-active {
+  animation: none;
+  transform: none;
+}
+
+.hero-gallery-shade {
+  z-index: 2;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.48) 43%, rgba(0, 0, 0, 0.08) 100%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.58) 0%, transparent 52%);
+  transition: opacity 400ms ease;
+}
+
+.hero-gallery-grain {
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0.14;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.45) 0.5px, transparent 0.7px);
+  background-size: 4px 4px;
+  mix-blend-mode: soft-light;
+}
+
+.hero-gallery-orbit {
+  z-index: 4;
+  top: -34%;
+  right: -9%;
+  width: min(57vw, 880px);
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--hero-accent) 42%, transparent);
+  border-radius: 50%;
+  transform: rotateX(68deg) rotateZ(-24deg);
+  animation: hero-orbit-drift 18s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.hero-gallery-orbit::before,
+.hero-gallery-orbit::after,
+.hero-gallery-orbit span {
+  position: absolute;
+  inset: 9%;
+  border: 1px solid color-mix(in srgb, var(--hero-accent) 20%, transparent);
+  border-radius: 50%;
+  content: "";
+}
+
+.hero-gallery-orbit::before {
+  inset: 20%;
+  transform: rotateY(62deg);
+}
+
+.hero-gallery-orbit::after {
+  inset: 31%;
+  transform: rotateY(-62deg);
+}
+
+.hero-gallery-orbit span {
+  inset: 4%;
+  transform: rotateX(90deg);
+}
+
+.hero-gallery-inner {
+  min-height: inherit;
+}
+
+.hero-gallery-copy-shadow h1 {
+  text-shadow: 0 3px 30px rgba(0, 0, 0, 0.38);
+}
+
+.hero-gallery-copy-glass {
+  padding: clamp(0rem, 2vw, 1.75rem);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(115deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.04));
+  backdrop-filter: blur(2px);
+}
+
+.hero-gallery-progress {
+  overflow: hidden;
+}
+
+.hero-gallery-progress span {
+  display: block;
+  height: 100%;
+  background: #fff;
+  transition: width 450ms ease;
+}
+
+.hero-gallery-dot::before {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background: #fff;
+  content: "";
+}
+
+.hero-gallery-dot[aria-current="true"]::before {
+  background: #111;
+}
+
+.hero-copy-enter-active,
+.hero-copy-leave-active {
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.hero-copy-enter-from {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.hero-copy-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+@keyframes hero-gallery-zoom {
+  from {
+    transform: scale(1.03);
+  }
+  to {
+    transform: scale(var(--hero-zoom-scale, 1.15)) translate3d(-1%, -0.5%, 0);
+  }
+}
+
+@keyframes hero-orbit-drift {
+  from {
+    transform: rotateX(68deg) rotateZ(-24deg) translate3d(0, 0, 0);
+  }
+  to {
+    transform: rotateX(68deg) rotateZ(-9deg) translate3d(-1%, 2%, 35px);
+  }
+}
+
+@media (min-width: 768px) {
+  .hero-gallery.hero-height-medium {
+    min-height: min(70svh, 720px) !important;
+  }
+
+  .hero-gallery.hero-height-tall {
+    min-height: min(84svh, 900px) !important;
+  }
+
+  .hero-gallery.hero-height-full {
+    min-height: min(94svh, 1000px) !important;
+  }
+
+  .hero-gallery-inner {
+    padding-bottom: clamp(2.5rem, 7vh, 5rem);
+  }
+}
+
+@media (max-width: 639px) {
+  .hero-gallery-orbit {
+    top: -10%;
+    right: -42%;
+    width: 100vw;
+    opacity: 0.55;
+  }
+
+  .hero-gallery-footer {
+    align-items: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-gallery-media-active,
+  .hero-gallery-orbit {
+    animation: none;
+  }
+
+  .hero-gallery-media,
+  .hero-gallery-progress span,
+  .hero-copy-enter-active,
+  .hero-copy-leave-active {
+    transition: none;
+  }
+}
+</style>

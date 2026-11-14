@@ -187,7 +187,7 @@
     <!-- Full-width content (no sidebar gutter) -->
     <div class="flex-1 w-full max-w-[1600px] mx-auto">
       <!-- Main Display Route Target Space Slot -->
-      <main class="w-full min-w-0 bg-white" :class="route.path === '/' ? '' : 'px-4 sm:px-6 py-6'">
+      <main class="storefront-main w-full min-w-0" :class="route.path === '/' ? 'storefront-main-home' : 'storefront-main-page px-4 py-6 sm:px-6'">
         <router-view />
       </main>
     </div>

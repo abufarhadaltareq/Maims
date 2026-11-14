@@ -5,6 +5,7 @@ import App from './App.vue'
 import router from './router'
 import { useAuthStore } from './stores/auth'
 import './assets/style.css'
+import './assets/storefront.css'
 
 // In dev, Vite proxy handles /api/* -> 127.0.0.1:8000.
 // In production (Vercel), VITE_API_URL points at the deployed Django backend.

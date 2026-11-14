@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-md mx-auto my-12 p-8 bg-purple-500/10 backdrop-blur-md rounded-2xl shadow-xl border border-purple-500/20">
+  <div class="auth-panel max-w-md mx-auto my-12 p-8">
     <h2 class="text-3xl font-black text-gray-800 mb-2 text-center">Forgot your password?</h2>
     <p class="text-sm text-gray-500 text-center mb-6">
       Enter the email of your account and we'll send you a link to set a new password.

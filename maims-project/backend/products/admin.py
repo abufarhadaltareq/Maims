@@ -1284,7 +1284,8 @@ class HeroSlideAdmin(MaimsModelAdmin):
     readonly_fields = ('image_preview',)
     fieldsets = (
         ('Media', {
-            'fields': ('media_type', 'title', 'image', 'external_image_url', 'video', 'external_video_url', 'image_preview'),
+            'fields': ('media_type', 'title', 'subtitle', 'badge_text', 'button_text', 'button_link',
+                       'image', 'external_image_url', 'video', 'external_video_url', 'image_preview'),
             'description': 'Choose an image or video slide. Upload a file or paste a hosted URL.'}),
         ('Position', {
             'fields': ('order', 'is_active'),
@@ -1342,7 +1343,7 @@ class SiteSettingsAdmin(MaimsModelAdmin):
         }),
         ('Top scrolling messages', {
             'fields': ('announcement_enabled', 'announcement_messages', 'announcement_speed'),
-            'description': 'The running ticker above the header. Write one message per line — they scroll one after another. Untick to hide the bar; speed is seconds per loop (10 = fast, 60 = slow).'}),
+            'description': 'The optional ticker above the header is off by default. Turn it on and write one message per line to display it; speed is seconds per loop (10 = fast, 60 = slow).'}),
         ('Payments', {
             'fields': ('stripe_enabled', 'paypal_enabled'),
             'description': 'Untick a method to hide it at checkout. Card payments also need a valid '
@@ -1668,8 +1669,8 @@ class HeroBannerSettingsAdmin(MaimsModelAdmin):
 
     fieldsets = (
         ('Show / hide', {
-            'fields': ('hero_enabled', 'autoplay'),
-            'description': 'Untick <b>hero enabled</b> to hide the entire banner — the page then starts at the category strip. Untick <b>autoplay</b> to stop the slides rotating (useful for a single announcement).'}),
+            'fields': ('hero_enabled', 'show_hero_copy', 'hero_eyebrow', 'show_slide_navigation', 'show_progress_bar', 'autoplay'),
+            'description': 'Control whether slide text appears, the intro label, navigation, progress and autoplay. Slide text is off by default. Untick <b>hero enabled</b> to hide the entire banner.'}),
         ('Layout', {
             'fields': ('height_preset', 'overlay_strength', 'kenburns_intensity'),
             'description': '<b>Height</b> fills more of the viewport. <b>Overlay</b> is the dark layer over the slide image, 0-95 — higher makes the text more readable but hides more of the photo. <b>Ken burns</b> is how much each slide zooms in during its rotation, 0-40.'}),
@@ -1680,8 +1681,8 @@ class HeroBannerSettingsAdmin(MaimsModelAdmin):
             'fields': ('rotation_seconds', 'transition_ms'),
             'description': 'Seconds between slides and the crossfade duration in milliseconds.'}),
         ('Design tokens', {
-            'fields': ('accent_color',),
-            'description': 'Re-skin the banner without touching the stylesheet. <b>Accent colour</b> is used by the navigation dots and progress bars.'}),
+            'fields': ('accent_color', 'text_shadow', 'glass_cards'),
+            'description': 'Re-skin the banner without touching the stylesheet. The accent colour is used by navigation and highlights; text shadow and the glass card improve headline contrast.'}),
     )
 
 

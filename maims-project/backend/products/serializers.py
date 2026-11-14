@@ -26,10 +26,11 @@ class HeroBannerSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = HeroBannerSettings
         fields = (
-            'hero_enabled', 'height_preset', 'overlay_strength', 'kenburns_intensity',
+            'hero_enabled', 'hero_eyebrow', 'show_slide_navigation', 'show_progress_bar', 'show_hero_copy',
+            'height_preset', 'overlay_strength', 'kenburns_intensity',
             'hero_3d_enabled', 'hero_3d_opacity', 'hero_3d_blend',
             'rotation_seconds', 'transition_ms', 'autoplay',
-            'accent_color',
+            'accent_color', 'text_shadow', 'glass_cards',
         )
 
 

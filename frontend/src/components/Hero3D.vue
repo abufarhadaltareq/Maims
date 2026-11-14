@@ -1,9 +1,9 @@
 <template>
-  <div ref="canvasContainer" class="w-full h-full absolute inset-0 z-0 pointer-events-none" :style="{ opacity: siteStore.hero3DOpacity / 100, mixBlendMode: siteStore.hero3DBlend ? 'screen' : 'normal' }"></div>
+  <div ref="canvasContainer" class="w-full h-full absolute inset-0 z-0 pointer-events-none" :style="{ opacity: siteStore.hero3DOpacity / 100, mixBlendMode: siteStore.hero3DBlend ? 'screen' : 'normal' }" aria-hidden="true"></div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useSiteStore } from '../stores/site'
 
 const canvasContainer = ref(null)
@@ -12,6 +12,11 @@ const siteStore = useSiteStore()
 // Teardown handles, collected while onMounted runs asynchronously and released
 // by a hook registered here during setup.
 let disposeScene = null
+let accentMaterials = []
+
+watch(() => siteStore.heroAccent, (color) => {
+  accentMaterials.forEach((material) => material.color.set(color))
+})
 
 onMounted(async () => {
   const container = canvasContainer.value
@@ -42,7 +47,7 @@ onMounted(async () => {
 
     renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
     renderer.setSize(container.clientWidth, container.clientHeight)
-    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     container.appendChild(renderer.domElement)
 
     const geometry = new THREE.IcosahedronGeometry(2, 0)
@@ -61,7 +66,8 @@ onMounted(async () => {
 
     // Floating accent orbs that drift in front of the wireframe, giving the
     // hero depth without competing with the slide image.
-    const orbMat = new THREE.MeshBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.55 })
+    const accentColor = siteStore.heroAccent || '#ffffff'
+    const orbMat = new THREE.MeshBasicMaterial({ color: accentColor, transparent: true, opacity: 0.55 })
     const orb1 = new THREE.Mesh(new THREE.SphereGeometry(0.45, 24, 24), orbMat)
     const orb2 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 24, 24), orbMat)
     orb1.position.set(-3.2, 0.8, 1.5)
@@ -71,8 +77,9 @@ onMounted(async () => {
 
     // Add some cool glowing spheres
     const sphereGeo = new THREE.SphereGeometry(0.1, 16, 16)
-    const sphereMat1 = new THREE.MeshBasicMaterial({ color: 0xff0055 })
-    const sphereMat2 = new THREE.MeshBasicMaterial({ color: 0x00d2ff })
+    const sphereMat1 = new THREE.MeshBasicMaterial({ color: accentColor })
+    const sphereMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff })
+    accentMaterials = [orbMat, sphereMat1]
 
     const sphere1 = new THREE.Mesh(sphereGeo, sphereMat1)
     const sphere2 = new THREE.Mesh(sphereGeo, sphereMat2)
@@ -111,12 +118,15 @@ onMounted(async () => {
       renderer.render(scene, camera)
     }
 
-    animate()
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reducedMotion) renderer.render(scene, camera)
+    else animate()
 
     const handleResize = () => {
       camera.aspect = container.clientWidth / container.clientHeight
       camera.updateProjectionMatrix()
       renderer.setSize(container.clientWidth, container.clientHeight)
+      if (reducedMotion) renderer.render(scene, camera)
     }
 
     window.addEventListener('resize', handleResize)
@@ -134,6 +144,7 @@ onMounted(async () => {
       sphereGeo.dispose()
       sphereMat1.dispose()
       sphereMat2.dispose()
+      accentMaterials = []
       geometry.dispose()
       material.dispose()
       orbMat.dispose()
