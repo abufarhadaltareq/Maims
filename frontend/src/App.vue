@@ -248,14 +248,68 @@
           </div>
         </div>
       </div>
+      <form
+        v-if="site.contactFormEnabled"
+        @submit.prevent="sendContactMessage"
+        class="mx-auto grid max-w-7xl grid-cols-1 gap-3 border-b border-white/10 py-7 sm:grid-cols-2 sm:gap-4"
+        aria-labelledby="footer-contact-title"
+      >
+        <div class="sm:col-span-2">
+          <h2 id="footer-contact-title" class="text-[11px] font-extrabold uppercase tracking-[0.2em] text-slate-300">Contact us</h2>
+          <p class="mt-1 text-xs text-slate-300">Send us a message and our team will get back to you.</p>
+        </div>
+        <label class="sr-only" for="footer-contact-name">Your name</label>
+        <input
+          id="footer-contact-name"
+          v-model="contactName"
+          type="text"
+          maxlength="120"
+          required
+          autocomplete="name"
+          placeholder="Your name"
+          class="min-w-0 rounded-lg border border-white/25 bg-white/10 px-4 py-3 text-white placeholder:text-slate-300 outline-none focus:border-white focus:ring-2 focus:ring-white/30 disabled:opacity-60"
+          :disabled="contactSubmitting || contactDone"
+        />
+        <label class="sr-only" for="footer-contact-email">Your email</label>
+        <input
+          id="footer-contact-email"
+          v-model="contactEmail"
+          type="email"
+          maxlength="254"
+          required
+          autocomplete="email"
+          placeholder="Your email"
+          class="min-w-0 rounded-lg border border-white/25 bg-white/10 px-4 py-3 text-white placeholder:text-slate-300 outline-none focus:border-white focus:ring-2 focus:ring-white/30 disabled:opacity-60"
+          :disabled="contactSubmitting || contactDone"
+        />
+        <label class="sr-only" for="footer-contact-message">Your message</label>
+        <textarea
+          id="footer-contact-message"
+          v-model="contactMessage"
+          maxlength="5000"
+          required
+          rows="4"
+          placeholder="How can we help?"
+          class="min-w-0 resize-y rounded-lg border border-white/25 bg-white/10 px-4 py-3 text-white placeholder:text-slate-300 outline-none focus:border-white focus:ring-2 focus:ring-white/30 disabled:opacity-60 sm:col-span-2"
+          :disabled="contactSubmitting || contactDone"
+        ></textarea>
+        <div class="flex flex-wrap items-center gap-4 sm:col-span-2">
+          <button
+            type="submit"
+            :disabled="contactSubmitting || contactDone"
+            class="rounded-full bg-white px-5 py-2.5 text-xs font-extrabold uppercase tracking-wider text-slate-900 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {{ contactSubmitting ? 'Sending…' : contactDone ? 'Message sent' : 'Send message' }}
+          </button>
+          <p v-if="contactDone" role="status" class="text-xs font-semibold text-emerald-400">Thanks — your message has been sent.</p>
+          <p v-else-if="contactError" role="alert" class="text-xs font-semibold text-rose-400">{{ contactError }}</p>
+        </div>
+      </form>
       <div class="max-w-7xl mx-auto pt-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-300">
         <span class="font-semibold">© {{ new Date().getFullYear() }} {{ site.storeName }} · All rights reserved</span>
         <span class="text-slate-300">{{ site.footerBottomNote }}</span>
       </div>
     </footer>
-
-    <!-- AI chat assistant -->
-    <ChatbotWidget />
   </div>
 </template>
 
@@ -269,7 +323,6 @@ import { useSiteStore } from './stores/site'
 import { useWishlistStore } from './stores/wishlist'
 import BrandLogo from './components/BrandLogo.vue'
 import SocialIcon from './components/SocialIcon.vue'
-import ChatbotWidget from './components/ChatbotWidget.vue'
 import CategoryMenuItem from './components/CategoryMenuItem.vue'
 import { BRAND_CONFIG } from './brand.config'
 
@@ -302,6 +355,12 @@ const headerHeight = ref(72)
 const newsletterEmail = ref('')
 const newsletterDone = ref(false)
 const newsletterError = ref('')
+const contactName = ref('')
+const contactEmail = ref('')
+const contactMessage = ref('')
+const contactSubmitting = ref(false)
+const contactDone = ref(false)
+const contactError = ref('')
 let categoryMenuCloseTimer = null
 let headerResizeObserver = null
 
@@ -318,6 +377,27 @@ const subscribeNewsletter = async () => {
   } catch (err) {
     newsletterError.value = err.response?.data?.error ||
       'Could not sign you up right now. Please try again later.'
+  }
+}
+
+const sendContactMessage = async () => {
+  contactError.value = ''
+  contactSubmitting.value = true
+  try {
+    await axios.post('/api/v1/contact/', {
+      name: contactName.value,
+      email: contactEmail.value,
+      message: contactMessage.value,
+    })
+    contactDone.value = true
+    contactName.value = ''
+    contactEmail.value = ''
+    contactMessage.value = ''
+  } catch (err) {
+    contactError.value = err.response?.data?.error ||
+      'Could not send your message right now. Please try again later.'
+  } finally {
+    contactSubmitting.value = false
   }
 }
 

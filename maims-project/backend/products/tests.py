@@ -2413,6 +2413,55 @@ class NewsletterSubscribeTests(TestCase):
         self.assertIn('consent_text', block)
 
 
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class ContactFormTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.store = SiteSettings.get()
+        self.store.notification_email = 'shop@example.com'
+        self.store.email_from_address = 'store@example.com'
+        self.store.save()
+        self.url = '/api/v1/contact/'
+
+    def test_valid_contact_message_is_sent_to_the_admin_mailbox(self):
+        response = self.client.post(self.url, {
+            'name': 'Shopper',
+            'email': 'Shopper@Example.COM',
+            'message': 'I have a question about an order.',
+        })
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['shop@example.com'])
+        self.assertEqual(mail.outbox[0].from_email, 'store@example.com')
+        self.assertEqual(mail.outbox[0].reply_to, ['shopper@example.com'])
+        self.assertIn('I have a question about an order.', mail.outbox[0].body)
+
+    def test_invalid_or_oversized_fields_are_rejected(self):
+        payload = {'name': 'Shopper', 'email': 'invalid', 'message': 'Hello'}
+        response = self.client.post(self.url, payload)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)
+
+        payload['email'] = 'shopper@example.com'
+        payload['message'] = 'x' * 5001
+        response = self.client.post(self.url, payload)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_missing_admin_recipient_disables_form_and_submission(self):
+        self.store.notification_email = ''
+        self.store.save()
+
+        settings_response = self.client.get('/api/v1/site-settings/')
+        self.assertFalse(settings_response.data['contact_form_enabled'])
+        response = self.client.post(self.url, {
+            'name': 'Shopper', 'email': 'shopper@example.com', 'message': 'Hello',
+        })
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(len(mail.outbox), 0)
+
+
 class FacebookWebhookSecurityTests(TestCase):
     """The webhook must fail closed: only correctly signed requests get through."""
     URL = '/api/v1/facebook/webhook/'

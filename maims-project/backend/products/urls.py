@@ -25,6 +25,7 @@ urlpatterns = [
     path('stripe-webhook/', views.stripe_webhook, name='stripe_webhook'),
     path('site-settings/', views.site_settings, name='site_settings'),
     path('newsletter/subscribe/', views.newsletter_subscribe, name='newsletter_subscribe'),
+    path('contact/', views.contact_form_submit, name='contact_form_submit'),
     # Meta Page webhook: verifies the URL (GET) and receives feed
     # changes (POST) for the Facebook product sync.
     path('facebook/webhook/', views.facebook_webhook, name='facebook_webhook'),
@@ -50,8 +51,4 @@ urlpatterns = [
     # --- Wishlist ---
     path('wishlist/', views.WishlistList.as_view(), name='wishlist'),
     path('wishlist/<int:pk>/', views.WishlistDetail.as_view(), name='wishlist_detail'),
-
-    # --- 🤖 AI Chatbot Agent ---
-    path('chatbot/chat/', views.ChatbotView.as_view(), name='chatbot_chat'),
-    path('chatbot/suggestions/', views.ChatbotSuggestionsView.as_view(), name='chatbot_suggestions'),
 ]

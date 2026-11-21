@@ -220,6 +220,7 @@ class OrderSerializer(serializers.ModelSerializer):
 class SiteSettingsSerializer(serializers.ModelSerializer):
     whatsapp_link = serializers.SerializerMethodField()
     logo_url = serializers.SerializerMethodField()
+    contact_form_enabled = serializers.SerializerMethodField()
 
     class Meta:
         model = SiteSettings
@@ -229,11 +230,14 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             "facebook_page_url", "facebook_shop_url",
             "instagram_url", "tiktok_url", "twitter_url", "youtube_url", "linkedin_url",
             "whatsapp_number", "whatsapp_enabled", "whatsapp_greeting",
-            "stripe_enabled", "paypal_enabled", "whatsapp_link",
+            "stripe_enabled", "paypal_enabled", "whatsapp_link", "contact_form_enabled",
         )
 
     def get_whatsapp_link(self, obj):
         return obj.whatsapp_link()
+
+    def get_contact_form_enabled(self, obj):
+        return bool((obj.notification_email or '').strip())
 
     def get_logo_url(self, obj):
         logo = getattr(obj, 'logo', None)

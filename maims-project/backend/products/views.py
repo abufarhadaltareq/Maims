@@ -31,8 +31,6 @@ from .serializers import (
     ReviewSerializer, SiteSettingsSerializer, UserProfileSerializer,
     RegisterSerializer, UserSerializer, WishlistAddSerializer, WishlistItemSerializer,
 )
-from .chatbot import ChatbotAgent
-
 logger = logging.getLogger(__name__)
 DELIVERY_FEE_SEK = Decimal('85.00')
 RATES_TO_USD = {
@@ -76,9 +74,9 @@ class NewsletterThrottle(_ScopedThrottle):
     scope = 'newsletter'
 
 
-class ChatbotThrottle(_ScopedThrottle):
-    """Caps AI chatbot requests to prevent scraping and abuse."""
-    scope = 'chatbot'
+class ContactThrottle(_ScopedThrottle):
+    """Limits anonymous contact form submissions."""
+    scope = 'contact'
 
 
 # --- 🌟 RESTORED: PRODUCT VIEWS ---
@@ -734,6 +732,59 @@ def newsletter_subscribe(request):
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     return Response({'ok': True}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([ContactThrottle])
+def contact_form_submit(request):
+    """Send a storefront contact message to the admin-configured store inbox."""
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from django.core.validators import validate_email
+
+    store = SiteSettings.get()
+    recipient = (store.notification_email or '').strip()
+    if not recipient:
+        return Response({'error': 'Contact messages are not configured yet.'},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    if not isinstance(request.data, dict):
+        return Response({'error': 'Please submit a valid contact form.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    if any(not isinstance(request.data.get(field), str) for field in ('name', 'email', 'message')):
+        return Response({'error': 'Please provide your name, email, and message.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    name = request.data['name'].strip()
+    email = request.data['email'].strip().lower()
+    message = request.data['message'].strip()
+    if not name or len(name) > 120:
+        return Response({'error': 'Please provide your name (up to 120 characters).'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    if not email or len(email) > 254:
+        return Response({'error': 'Please provide a valid email address.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    try:
+        validate_email(email)
+    except DjangoValidationError:
+        return Response({'error': 'Please provide a valid email address.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+    if not message or len(message) > 5000:
+        return Response({'error': 'Please provide a message (up to 5000 characters).'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    sent = notifications.send_contact_email(
+        recipient=recipient,
+        name=name,
+        email=email,
+        message=message,
+        store=store,
+    )
+    if not sent:
+        return Response({'error': 'Could not send your message. Please try again later.'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response({'ok': True}, status=status.HTTP_201_CREATED)
+
 
 def _as_bool(value):
     """Coerce the checkbox/JSON value the client sent into a real boolean."""
@@ -1633,60 +1684,3 @@ def hero_banner_settings(request):
     """
     settings = HeroBannerSettings.get()
     return Response(HeroBannerSettingsSerializer(settings).data)
-
-
-# --- 🤖 AI CHATBOT AGENT VIEWS --------------------------------------------------
-
-class ChatbotView(APIView):
-    """
-    POST /api/v1/chatbot/chat/
-    Accepts: { "message": "...", "session_id": "...", "currency": "EUR" }
-    Returns: { "reply": "...", "products": [...], "suggestions": [...], "action": {...} }
-    """
-    permission_classes = [AllowAny]
-    throttle_classes = [ChatbotThrottle]
-
-    def post(self, request):
-        message = str(request.data.get('message') or '').strip()
-        if not message:
-            return Response({'error': 'Message cannot be empty.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Cap message length to prevent memory abuse
-        if len(message) > 1000:
-            message = message[:1000]
-
-        session_id = str(request.data.get('session_id') or '').strip()[:64]
-        currency = str(request.data.get('currency') or 'EUR').strip().upper()
-        if currency not in ('EUR', 'USD', 'PKR', 'SEK', 'BDT'):
-            currency = 'EUR'
-
-        user = request.user if request.user and request.user.is_authenticated else None
-
-        agent = ChatbotAgent(currency=currency, user=user, session_id=session_id)
-        response_payload = agent.respond(message)
-
-        return Response(response_payload, status=status.HTTP_200_OK)
-
-
-class ChatbotSuggestionsView(APIView):
-    """
-    GET /api/v1/chatbot/suggestions/
-    Returns initial quick-prompts and greeting for the storefront chat assistant.
-    """
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        store = SiteSettings.get()
-        store_name = store.store_name or 'Maims'
-        return Response({
-            'store_name': store_name,
-            'greeting': f"Hello and welcome to {store_name}! ✨ I am your personal AI shopping stylist and order assistant. How can I assist you today?",
-            'suggestions': [
-                "Show latest arrivals",
-                "Pure silk sarees under €100",
-                "Unstitched festive suits",
-                "Track my order",
-                "How long does shipping take?",
-                "Chat on WhatsApp",
-            ]
-        })

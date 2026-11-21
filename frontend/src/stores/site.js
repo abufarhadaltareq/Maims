@@ -49,6 +49,7 @@ export const useSiteStore = defineStore('site', {
     whatsappEnabled: (s) => !!(s.settings?.whatsapp_enabled && s.settings?.whatsapp_number),
     stripeEnabled: (s) => s.settings?.stripe_enabled !== false,
     paypalEnabled: (s) => s.settings?.paypal_enabled !== false,
+    contactFormEnabled: (s) => !!s.settings?.contact_form_enabled,
     // --- Email-marketing consent row (Admin → Customer notification settings) ---
     /** Footer sign-up form: its toggle on AND the shop can actually receive sign-ups. */
     newsletterSignupEnabled: (s) =>

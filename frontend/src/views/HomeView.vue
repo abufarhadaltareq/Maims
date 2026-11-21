@@ -16,7 +16,7 @@
             v-if="slide.media_type === 'video' && slide.video_url"
             :src="slide.video_url"
             :poster="slide.image_url || undefined"
-            class="hero-gallery-media absolute inset-0 h-full w-full object-cover"
+            class="hero-gallery-media absolute inset-0 h-full w-full object-contain"
             :class="{
               'hero-gallery-media-active': index === currentSlide,
             }"
@@ -28,7 +28,7 @@
             v-else
             :src="slide.image_url"
             :alt="slide.title || `Hero image ${index + 1}`"
-            class="hero-gallery-media absolute inset-0 h-full w-full object-cover"
+            class="hero-gallery-media absolute inset-0 h-full w-full object-contain"
             :class="{
               'hero-gallery-media-active': index === currentSlide,
             }"
@@ -109,19 +109,9 @@
       class="mx-auto mt-4 max-w-[1500px] px-4 py-6 sm:mt-6 sm:px-7 sm:py-8"
     >
       <div class="relative mx-auto" :class="mainCategories.length >= 5 ? 'sm:max-w-[700px]' : ''">
-        <button
-          v-if="mainCategories.length > 1"
-          @click="scrollMainCategories(-1)"
-          aria-label="Previous main categories"
-          class="absolute left-1 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center border border-black/20 bg-white hover:bg-black hover:text-white sm:left-2"
-          :class="mainCategories.length >= 5 ? 'sm:flex' : 'sm:hidden'"
-        >
-          ←
-        </button>
         <div
-          ref="mainCategoriesTrack"
-          class="no-scrollbar flex snap-x snap-mandatory gap-x-5 overflow-x-auto scroll-smooth px-8 sm:gap-x-9 sm:px-0"
-          :class="mainCategories.length >= 5 ? 'sm:flex-nowrap sm:justify-start sm:px-12' : 'sm:flex-wrap sm:justify-center sm:overflow-visible'"
+          class="no-scrollbar flex snap-x snap-mandatory gap-x-5 overflow-x-auto scroll-smooth px-0 sm:gap-x-9"
+          :class="mainCategories.length >= 5 ? 'sm:flex-nowrap sm:justify-start' : 'sm:flex-wrap sm:justify-center sm:overflow-visible'"
         >
           <router-link
             v-for="category in mainCategories"
@@ -142,15 +132,6 @@
             <span class="text-xs font-semibold uppercase tracking-wide text-black sm:text-sm">{{ category.name }}</span>
           </router-link>
         </div>
-        <button
-          v-if="mainCategories.length > 1"
-          @click="scrollMainCategories(1)"
-          aria-label="Next main categories"
-          class="absolute right-1 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center border border-black/20 bg-white hover:bg-black hover:text-white sm:right-2"
-          :class="mainCategories.length >= 5 ? 'sm:flex' : 'sm:hidden'"
-        >
-          →
-        </button>
       </div>
     </nav>
 
@@ -314,7 +295,6 @@ const heroSlides = ref([])
 const showcase = ref([])
 const showcaseLoading = ref(true)
 const mainCategories = ref([])
-const mainCategoriesTrack = ref(null)
 const newArrivalsTrack = ref(null)
 
 // Deshi-besh style filters (category pages).
@@ -449,13 +429,6 @@ const startImageRotation = () => {
 const scrollNewArrivals = (direction) => {
   newArrivalsTrack.value?.scrollBy({
     left: direction * newArrivalsTrack.value.clientWidth * 0.8,
-    behavior: 'smooth',
-  })
-}
-
-const scrollMainCategories = (direction) => {
-  mainCategoriesTrack.value?.scrollBy({
-    left: direction * mainCategoriesTrack.value.clientWidth * 0.8,
     behavior: 'smooth',
   })
 }

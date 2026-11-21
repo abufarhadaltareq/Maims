@@ -454,6 +454,29 @@ def _send_email(recipient, subject, body, from_email=None, html='', store=None):
         return False, _shorten(str(exc))
 
 
+def send_contact_email(recipient, name, email, message, store=None):
+    """Send a storefront contact message using the store's configured mail transport."""
+    store = store or _store()
+    sender = (store.email_from_address or '').strip() or settings.DEFAULT_FROM_EMAIL
+    if not sender:
+        sender = None
+
+    try:
+        mail = EmailMessage(
+            subject='Storefront contact form message',
+            body=f'From: {name}\nEmail: {email}\n\n{message}',
+            from_email=sender,
+            to=[recipient],
+            reply_to=[email],
+            connection=_email_connection(store),
+        )
+        mail.send(fail_silently=False)
+        return True
+    except Exception:
+        logger.exception('Storefront contact form email failed')
+        return False
+
+
 def _send_whatsapp(to_digits, body, store=None):
     store = store or _store()
     if not whatsapp_is_configured(store):

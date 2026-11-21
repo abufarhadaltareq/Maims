@@ -1349,6 +1349,10 @@ class SiteSettingsAdmin(MaimsModelAdmin):
             'description': 'Untick a method to hide it at checkout. Card payments also need a valid '
                            'STRIPE_SECRET_KEY in the environment; PayPal orders are confirmed '
                            'manually until a PayPal client ID is configured.'}),
+        ('Contact form email', {
+            'fields': ('notification_email', 'email_from_address'),
+            'description': 'Contact form messages are sent to the notification email address. '
+                           'Set this address to show the contact form in the storefront footer.'}),
         ('WhatsApp Business', {
             'fields': ('whatsapp_enabled', 'whatsapp_number', 'whatsapp_greeting'),
             'description': 'Digits only with the country code, e.g. 351912345678. This powers the '

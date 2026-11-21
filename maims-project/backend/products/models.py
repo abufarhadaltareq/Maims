@@ -568,9 +568,10 @@ class SiteSettings(models.Model):
     # up from the admin. Any blank value disables that channel: a notifier that is
     # not configured logs a 'skipped' row and moves on, it never raises.
 
-    # Who receives the "new order" alert.
+    # Store inbox for order and contact-form alerts.
     notification_email = models.EmailField(blank=True, null=True,
-        help_text="Address that receives a new-order alert. Falls back to ADMIN_RECEIVER_EMAIL.")
+        help_text="Address that receives order alerts and storefront contact messages. "
+                  "Set this to enable the storefront footer contact form.")
     admin_whatsapp_number = models.CharField(max_length=20, blank=True, null=True,
         help_text="Digits with country code, e.g. 351912345678 — receives the new-order alert on WhatsApp")
     # Tell the customer about their own order automatically (confirmation + every

@@ -533,13 +533,8 @@ REST_FRAMEWORK = {
         'auth': os.environ.get('THROTTLE_AUTH', '10/min'),
         'checkout': os.environ.get('THROTTLE_CHECKOUT', '30/hour'),
         'newsletter': os.environ.get('THROTTLE_NEWSLETTER', '5/hour'),
-        'chatbot': os.environ.get('THROTTLE_CHATBOT', '60/min'),
+        'contact': os.environ.get('THROTTLE_CONTACT', '5/hour'),
     },
 }
-
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
-LLM_API_KEY = os.environ.get('LLM_API_KEY', '')
-LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
-LLM_MODEL = os.environ.get('LLM_MODEL', 'gpt-4o-mini')
 
 AUTH_TOKEN_MAX_AGE_DAYS = int(os.environ.get('AUTH_TOKEN_MAX_AGE_DAYS', '90'))

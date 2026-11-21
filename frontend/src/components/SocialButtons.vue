@@ -1,5 +1,5 @@
 <template>
-  <!-- Floating social dock: WhatsApp chat + admin-controlled social pages (left side, clear of the chatbot) -->
+  <!-- Floating social dock: WhatsApp chat + admin-controlled social pages. -->
   <div class="fixed bottom-5 left-5 z-40 flex flex-col items-start gap-3 print:hidden">
     <a
       v-if="site.whatsappEnabled"
