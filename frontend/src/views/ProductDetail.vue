@@ -6,87 +6,121 @@
 
     <div v-if="product" class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:gap-8">
       <div class="space-y-5">
-        <div class="overflow-hidden border border-black/10 bg-white shadow-sm">
-          <div class="relative flex h-[min(82svh,900px)] min-h-[360px] items-center justify-center overflow-hidden bg-[#f7f6f3] sm:min-h-[480px]">
-            <template v-if="activeMedia">
-              <button
-                v-if="activeMedia.media_type !== 'video'"
-                type="button"
-                class="group absolute inset-0 flex h-full w-full cursor-zoom-in items-center justify-center overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-black"
-                :aria-label="`Zoom in on ${product.name}`"
-                @click="openLightbox"
-                @mousemove="updateZoomOrigin"
-              >
-                <img
-                  :key="'i-' + activeMediaIndex"
-                  :src="activeMedia.url"
-                  :alt="product.name"
-                  :style="{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }"
-                  class="h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-[1.8] group-focus-visible:scale-[1.8] motion-reduce:transition-none"
-                />
-                <span class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap border border-black/10 bg-white/90 px-3 py-1.5 text-[11px] font-medium text-gray-700 shadow-sm">
-                  Hover to zoom · Click to enlarge
-                </span>
-              </button>
-              <video
-                v-else
-                :key="'v-' + activeMediaIndex"
-                :src="activeMedia.url"
-                controls
-                class="h-full w-full object-contain"
-                @click.stop
-              ></video>
-            </template>
-            <button
-              v-else
-              type="button"
-              class="h-full w-full cursor-zoom-in"
-              :aria-label="`View ${product.name} image`"
-              @click="openLightbox"
-            >
-              <img :src="product.get_image || 'https://placehold.co/600x800'" :alt="product.name" class="h-full w-full object-contain" />
-            </button>
-
-            <div class="absolute right-3 top-3 z-10">
-              <WishlistHeart
-                :product="product"
-                tip-below
-                className="w-10 h-10 border border-black/15 !bg-white shadow-sm hover:!bg-gray-100 transition-all duration-200"
-              />
-            </div>
-            <div v-if="galleryItems.length > 1" class="absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-between px-3 sm:px-5">
-              <button
-                type="button"
-                class="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/90 text-xl shadow-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-black"
-                aria-label="Previous image"
-                @click.stop="showPreviousImage"
-              >‹</button>
-              <button
-                type="button"
-                class="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/90 text-xl shadow-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-black"
-                aria-label="Next image"
-                @click.stop="showNextImage"
-              >›</button>
-            </div>
-          </div>
-
-          <div v-if="galleryItems.length > 1" class="flex gap-2 overflow-x-auto border-t border-black/10 bg-white p-3 no-scrollbar sm:gap-3 sm:p-4">
+        <div class="grid min-w-0 gap-3 lg:grid-cols-[76px_minmax(0,1fr)]">
+          <div
+            v-if="galleryItems.length > 1"
+            class="order-2 flex gap-2 overflow-x-auto py-1 no-scrollbar lg:order-1 lg:flex-col lg:overflow-x-visible lg:overflow-y-auto lg:py-0"
+            aria-label="Product images"
+          >
             <button
               v-for="(media, index) in galleryItems"
               :key="index"
-              @click.stop="setActiveMedia(index)"
               type="button"
               :aria-label="`Show image ${index + 1} of ${galleryItems.length}`"
               :aria-pressed="index === activeMediaIndex"
               :class="index === activeMediaIndex ? 'border-black ring-1 ring-black' : 'border-gray-200 hover:border-gray-500'"
-              class="h-[76px] w-[68px] shrink-0 overflow-hidden border-2 bg-[#f7f6f3] transition-colors duration-200 sm:h-[92px] sm:w-[82px]"
+              class="h-[68px] w-[60px] shrink-0 overflow-hidden rounded-lg border-2 bg-[#f7f6f3] transition-colors sm:h-[76px] sm:w-[68px] lg:h-[84px] lg:w-full"
+              @click="setActiveMedia(index)"
             >
               <video v-if="media.media_type === 'video'" :src="media.url" muted class="h-full w-full object-cover"></video>
               <img v-else :src="media.url" :alt="`${product.name} thumbnail ${index + 1}`" class="h-full w-full object-cover" />
             </button>
-            <span class="ml-auto hidden shrink-0 self-center text-xs tabular-nums text-gray-500 sm:block">
-              {{ activeMediaIndex + 1 }} / {{ galleryItems.length }}
-            </span>
+          </div>
+
+          <div class="group relative order-1 min-w-0 overflow-hidden rounded-2xl bg-[#f7f6f3] ring-1 ring-black/5 lg:order-2">
+            <div
+              class="relative flex h-[min(68svh,620px)] min-h-[320px] items-center justify-center overflow-hidden sm:h-[min(76svh,760px)] sm:min-h-[440px] lg:h-[min(78vh,820px)]"
+              @touchstart.passive="startGallerySwipe"
+              @touchend.passive="finishGallerySwipe"
+            >
+              <template v-if="activeMedia">
+                <img
+                  v-if="activeMedia.media_type !== 'video'"
+                  :key="'i-' + activeMediaIndex"
+                  :src="activeMedia.url"
+                  :alt="product.name"
+                  :style="{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }"
+                  :class="isImageZoomed ? 'scale-[2]' : ''"
+                  :data-zoomed="isImageZoomed"
+                  class="product-gallery-image h-full w-full cursor-zoom-in object-contain p-2 transition-transform duration-300 ease-out sm:p-4"
+                  :aria-label="`${product.name} image. Activate to toggle zoom, then move to inspect details.`"
+                  role="button"
+                  tabindex="0"
+                  @click="toggleImageZoom"
+                  @pointermove="updateZoomOrigin"
+                  @keydown.enter.prevent="toggleImageZoom"
+                  @keydown.space.prevent="toggleImageZoom"
+                />
+                <video
+                  v-else
+                  :key="'v-' + activeMediaIndex"
+                  :src="activeMedia.url"
+                  controls
+                  class="h-full w-full object-contain p-2 sm:p-4"
+                ></video>
+              </template>
+              <img
+                v-else
+                :src="product.get_image || 'https://placehold.co/800x1000'"
+                :alt="product.name"
+                class="h-full w-full cursor-zoom-in object-contain p-2 sm:p-4"
+                @click="toggleImageZoom"
+              />
+
+              <div class="absolute right-3 top-3 z-10 flex gap-2 sm:right-4 sm:top-4">
+                <button
+                  v-if="activeMedia?.media_type !== 'video'"
+                  type="button"
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-lg shadow-md ring-1 ring-black/5 transition hover:bg-white"
+                  :aria-label="isImageZoomed ? 'Zoom out' : 'Zoom in'"
+                  :aria-pressed="isImageZoomed"
+                  @click="toggleImageZoom"
+                >{{ isImageZoomed ? '−' : '+' }}</button>
+                <button
+                  type="button"
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 shadow-md ring-1 ring-black/5 transition hover:bg-white"
+                  aria-label="Open full-screen image viewer"
+                  @click="openLightbox"
+                >
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3" stroke-width="1.7" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <WishlistHeart
+                  :product="product"
+                  tip-below
+                  className="w-10 h-10 border border-black/10 !bg-white shadow-md hover:!bg-gray-100 transition-all duration-200"
+                />
+              </div>
+
+              <div v-if="galleryItems.length > 1" class="absolute inset-x-2 top-1/2 z-10 hidden -translate-y-1/2 justify-between px-1 sm:flex sm:px-3">
+                <button
+                  type="button"
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-xl shadow-md ring-1 ring-black/5 transition hover:bg-white"
+                  aria-label="Previous image"
+                  @click.stop="showPreviousImage"
+                >‹</button>
+                <button
+                  type="button"
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-xl shadow-md ring-1 ring-black/5 transition hover:bg-white"
+                  aria-label="Next image"
+                  @click.stop="showNextImage"
+                >›</button>
+              </div>
+
+              <div class="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between bg-gradient-to-t from-black/35 to-transparent px-4 pb-4 pt-12 text-white sm:px-5">
+                <span class="text-xs font-medium drop-shadow">
+                  <template v-if="isImageZoomed">Move image to inspect details</template>
+                  <template v-else>
+                    <span class="gallery-hint-touch">Tap image to zoom</span>
+                    <span class="gallery-hint-pointer">Hover or tap image to zoom</span>
+                  </template>
+                </span>
+                <span v-if="galleryItems.length > 1" class="rounded-full bg-black/35 px-2.5 py-1 text-xs tabular-nums backdrop-blur-sm">
+                  {{ activeMediaIndex + 1 }} / {{ galleryItems.length }}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -305,6 +339,30 @@
   </div>
 </template>
 
+<style scoped>
+@media (hover: hover) and (pointer: fine) {
+  .gallery-hint-touch {
+    display: none;
+  }
+  .gallery-hint-pointer {
+    display: inline;
+  }
+  .product-gallery-image:not([data-zoomed='true']):hover {
+    scale: 1.65;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .gallery-hint-pointer {
+    display: none;
+  }
+}
+
+.product-gallery-image[data-zoomed='true'] {
+  transition-duration: 80ms;
+}
+</style>
+
 <script setup>
 import { ref, onMounted, computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -329,6 +387,8 @@ const activeMediaIndex = ref(0)
 const isLightboxOpen = ref(false)
 const lightboxIndex = ref(0)
 const zoomOrigin = ref({ x: 50, y: 50 })
+const isImageZoomed = ref(false)
+const swipeStartX = ref(null)
 
 const route = useRoute()
 const cartStore = useCartStore()
@@ -423,6 +483,7 @@ watch(() => route.params.slug, () => {
   activeMediaIndex.value = 0
   lightboxIndex.value = 0
   isLightboxOpen.value = false
+  isImageZoomed.value = false
   fetchProductData()
 })
 
@@ -459,14 +520,40 @@ const currentLightboxMedia = computed(() => galleryItems.value[lightboxIndex.val
 function setActiveMedia(index) {
   activeMediaIndex.value = index
   lightboxIndex.value = index
+  isImageZoomed.value = false
+  zoomOrigin.value = { x: 50, y: 50 }
 }
 
 function updateZoomOrigin(event) {
-  const bounds = event.currentTarget.getBoundingClientRect()
+  const bounds = event.currentTarget.parentElement.getBoundingClientRect()
   zoomOrigin.value = {
     x: Math.max(0, Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100)),
     y: Math.max(0, Math.min(100, ((event.clientY - bounds.top) / bounds.height) * 100)),
   }
+}
+
+function toggleImageZoom() {
+  if (activeMedia.value?.media_type === 'video') return
+  isImageZoomed.value = !isImageZoomed.value
+  if (!isImageZoomed.value) zoomOrigin.value = { x: 50, y: 50 }
+}
+
+function startGallerySwipe(event) {
+  swipeStartX.value = event.changedTouches[0]?.clientX ?? null
+}
+
+function finishGallerySwipe(event) {
+  const endX = event.changedTouches[0]?.clientX
+  if (swipeStartX.value === null || endX === undefined || isImageZoomed.value) {
+    swipeStartX.value = null
+    return
+  }
+  const distance = endX - swipeStartX.value
+  if (Math.abs(distance) > 48) {
+    if (distance < 0) showNextImage()
+    else showPreviousImage()
+  }
+  swipeStartX.value = null
 }
 
 function showNextImage() {
@@ -479,6 +566,7 @@ function showPreviousImage() {
 
 function openLightbox() {
   lightboxIndex.value = activeMediaIndex.value
+  isImageZoomed.value = false
   isLightboxOpen.value = true
 }
 
