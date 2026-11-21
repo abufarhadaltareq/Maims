@@ -1,7 +1,7 @@
 <template>
   <div class="home-page font-brand text-brand-text">
 
-    <!-- ===== Immersive, responsive hero gallery ===== -->
+    <!-- ===== Responsive featured collection hero ===== -->
     <section
       v-if="isHomePage && siteStore.heroEnabled && heroSlides.length"
       class="hero-gallery relative isolate w-full overflow-hidden bg-[#10100f] text-white"
@@ -9,8 +9,6 @@
       :style="{
         minHeight: heroHeightStyle,
         '--hero-accent': siteStore.heroAccent,
-        '--hero-transition': `${siteStore.heroTransition}ms`,
-        '--hero-zoom-scale': siteStore.heroKenburns ? 1.03 + siteStore.heroKenburns / 100 : 1,
       }"
       aria-label="Featured collections"
     >
@@ -23,7 +21,6 @@
             class="hero-gallery-media absolute inset-0 h-full w-full object-cover"
             :class="{
               'hero-gallery-media-active': index === currentSlide,
-              'hero-gallery-media-static': !siteStore.heroKenburns,
             }"
             :autoplay="index === currentSlide"
             muted loop playsinline preload="metadata"
@@ -36,52 +33,43 @@
             class="hero-gallery-media absolute inset-0 h-full w-full object-cover"
             :class="{
               'hero-gallery-media-active': index === currentSlide,
-              'hero-gallery-media-static': !siteStore.heroKenburns,
             }"
+            decoding="async"
           />
         </template>
       </div>
 
-      <Hero3D v-if="siteStore.hero3DEnabled" />
       <div class="hero-gallery-shade absolute inset-0" :style="{ opacity: siteStore.heroOverlay / 100 }" aria-hidden="true"></div>
-      <div class="hero-gallery-grain absolute inset-0" aria-hidden="true"></div>
-      <div v-if="siteStore.hero3DEnabled" class="hero-gallery-orbit absolute" aria-hidden="true"><span></span></div>
 
-      <div class="hero-gallery-inner relative z-10 mx-auto flex h-full min-h-[inherit] max-w-[1600px] flex-col justify-end px-5 pb-6 pt-16 sm:px-10 sm:pb-9 lg:px-16 lg:pb-12">
+      <div class="hero-gallery-inner relative z-10 mx-auto flex h-full min-h-[inherit] max-w-[1500px] flex-col justify-end px-4 pb-8 pt-16 sm:px-7 sm:pb-10 lg:pb-12">
         <div
           v-if="siteStore.heroShowCopy"
           class="hero-gallery-copy max-w-3xl"
           :class="{
             'hero-gallery-copy-shadow': siteStore.heroTextShadow,
-            'hero-gallery-copy-glass': siteStore.heroGlassCards,
           }"
-          aria-live="polite"
         >
-          <p v-if="siteStore.heroEyebrow" class="mb-4 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-white/80 sm:text-xs">
+          <p v-if="siteStore.heroEyebrow" class="mb-4 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/85 sm:text-xs sm:tracking-[0.32em]">
             <span class="h-px w-8 bg-[var(--hero-accent)]"></span>
             {{ siteStore.storeName }} <span class="text-[var(--hero-accent)]">/</span> {{ siteStore.heroEyebrow }}
           </p>
-          <Transition name="hero-copy" mode="out-in">
-            <div :key="currentSlide">
-              <p v-if="currentHeroSlide.badge_text" class="mt-4 inline-flex border border-white/35 bg-black/20 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/90 backdrop-blur-sm sm:text-xs">
-                {{ currentHeroSlide.badge_text }}
-              </p>
-              <h1 class="max-w-3xl font-brand text-4xl font-medium leading-[1.03] tracking-[-0.045em] text-white sm:text-6xl lg:text-7xl xl:text-[5.5rem]">
-                {{ currentHeroSlide.title || config.heroBannerTitle }}
-              </h1>
-              <p v-if="currentHeroSlide.subtitle || config.heroBannerSubtitle" class="mt-4 max-w-xl text-sm leading-relaxed text-white/80 sm:mt-6 sm:text-base lg:text-lg">
-                {{ currentHeroSlide.subtitle || config.heroBannerSubtitle }}
-              </p>
-              <a
-                v-if="currentHeroSlide.button_text"
-                :href="currentHeroSlide.button_link || '#latest-products'"
-                class="group mt-6 inline-flex min-h-12 items-center gap-5 border border-white/70 bg-white px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-black transition hover:border-[var(--hero-accent)] hover:bg-[var(--hero-accent)] sm:mt-8 sm:px-7"
-              >
-                {{ currentHeroSlide.button_text }}
-                <span class="text-lg leading-none transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
-              </a>
-            </div>
-          </Transition>
+          <p v-if="currentHeroSlide.badge_text" class="mb-4 inline-flex rounded-full border border-white/40 bg-black/20 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/90 sm:text-xs">
+            {{ currentHeroSlide.badge_text }}
+          </p>
+          <h1 class="max-w-3xl font-brand text-4xl font-medium leading-[1.03] tracking-[-0.04em] text-white sm:text-6xl lg:text-7xl xl:text-[5.25rem]">
+            {{ currentHeroSlide.title || config.heroBannerTitle }}
+          </h1>
+          <p v-if="currentHeroSlide.subtitle || config.heroBannerSubtitle" class="mt-4 max-w-xl text-sm leading-relaxed text-white/85 sm:mt-5 sm:text-base lg:text-lg">
+            {{ currentHeroSlide.subtitle || config.heroBannerSubtitle }}
+          </p>
+          <a
+            v-if="currentHeroSlide.button_text"
+            :href="currentHeroSlide.button_link || '#latest-products'"
+            class="group mt-6 inline-flex min-h-12 items-center gap-5 rounded-full bg-white px-6 py-3 text-xs font-bold uppercase tracking-[0.12em] text-black transition-colors hover:bg-[var(--hero-accent)] sm:px-7"
+          >
+            {{ currentHeroSlide.button_text }}
+            <span class="text-lg leading-none" aria-hidden="true">→</span>
+          </a>
         </div>
 
         <div v-if="siteStore.heroShowProgress || (siteStore.heroShowNavigation && heroSlides.length > 1)" class="hero-gallery-footer mt-9 flex items-end justify-between gap-5 sm:mt-12">
@@ -314,7 +302,6 @@ import { useRoute } from 'vue-router'
 import axios from 'axios'
 import ProductCard from '../components/ProductCard.vue'
 import FilterSidebar from '../components/FilterSidebar.vue'
-import Hero3D from '../components/Hero3D.vue'
 import { BRAND_CONFIG } from '../brand.config.js'
 import { useSiteStore } from '../stores/site'
 
@@ -552,83 +539,27 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .hero-gallery {
-  perspective: 1400px;
+  min-height: inherit;
 }
 
 .hero-gallery-backdrop {
   z-index: 0;
-  transform-style: preserve-3d;
 }
 
 .hero-gallery-media {
   opacity: 0;
-  transform: scale(1.03);
-  transition: opacity var(--hero-transition, 1100ms) ease;
+  transition: opacity 500ms ease;
 }
 
 .hero-gallery-media-active {
   opacity: 1;
-  animation: hero-gallery-zoom 16s ease-out both;
-}
-
-.hero-gallery-media-static.hero-gallery-media-active {
-  animation: none;
-  transform: none;
 }
 
 .hero-gallery-shade {
   z-index: 2;
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.48) 43%, rgba(0, 0, 0, 0.08) 100%),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.58) 0%, transparent 52%);
-  transition: opacity 400ms ease;
-}
-
-.hero-gallery-grain {
-  z-index: 3;
-  pointer-events: none;
-  opacity: 0.14;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.45) 0.5px, transparent 0.7px);
-  background-size: 4px 4px;
-  mix-blend-mode: soft-light;
-}
-
-.hero-gallery-orbit {
-  z-index: 4;
-  top: -34%;
-  right: -9%;
-  width: min(57vw, 880px);
-  aspect-ratio: 1;
-  border: 1px solid color-mix(in srgb, var(--hero-accent) 42%, transparent);
-  border-radius: 50%;
-  transform: rotateX(68deg) rotateZ(-24deg);
-  animation: hero-orbit-drift 18s ease-in-out infinite alternate;
-  pointer-events: none;
-}
-
-.hero-gallery-orbit::before,
-.hero-gallery-orbit::after,
-.hero-gallery-orbit span {
-  position: absolute;
-  inset: 9%;
-  border: 1px solid color-mix(in srgb, var(--hero-accent) 20%, transparent);
-  border-radius: 50%;
-  content: "";
-}
-
-.hero-gallery-orbit::before {
-  inset: 20%;
-  transform: rotateY(62deg);
-}
-
-.hero-gallery-orbit::after {
-  inset: 31%;
-  transform: rotateY(-62deg);
-}
-
-.hero-gallery-orbit span {
-  inset: 4%;
-  transform: rotateX(90deg);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0.36) 48%, rgba(0, 0, 0, 0.08) 100%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.48) 0%, transparent 58%);
 }
 
 .hero-gallery-inner {
@@ -636,14 +567,7 @@ onBeforeUnmount(() => {
 }
 
 .hero-gallery-copy-shadow h1 {
-  text-shadow: 0 3px 30px rgba(0, 0, 0, 0.38);
-}
-
-.hero-gallery-copy-glass {
-  padding: clamp(0rem, 2vw, 1.75rem);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(115deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.04));
-  backdrop-filter: blur(2px);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.32);
 }
 
 .hero-gallery-progress {
@@ -654,7 +578,7 @@ onBeforeUnmount(() => {
   display: block;
   height: 100%;
   background: #fff;
-  transition: width 450ms ease;
+  transition: width 200ms ease;
 }
 
 .hero-gallery-dot::before {
@@ -669,80 +593,29 @@ onBeforeUnmount(() => {
   background: #111;
 }
 
-.hero-copy-enter-active,
-.hero-copy-leave-active {
-  transition: opacity 260ms ease, transform 260ms ease;
-}
-
-.hero-copy-enter-from {
-  opacity: 0;
-  transform: translateY(14px);
-}
-
-.hero-copy-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
-@keyframes hero-gallery-zoom {
-  from {
-    transform: scale(1.03);
-  }
-  to {
-    transform: scale(var(--hero-zoom-scale, 1.15)) translate3d(-1%, -0.5%, 0);
-  }
-}
-
-@keyframes hero-orbit-drift {
-  from {
-    transform: rotateX(68deg) rotateZ(-24deg) translate3d(0, 0, 0);
-  }
-  to {
-    transform: rotateX(68deg) rotateZ(-9deg) translate3d(-1%, 2%, 35px);
-  }
-}
-
 @media (min-width: 768px) {
   .hero-gallery.hero-height-medium {
-    min-height: min(70svh, 720px) !important;
+    min-height: min(64svh, 680px) !important;
   }
 
   .hero-gallery.hero-height-tall {
-    min-height: min(84svh, 900px) !important;
+    min-height: min(74svh, 780px) !important;
   }
 
   .hero-gallery.hero-height-full {
-    min-height: min(94svh, 1000px) !important;
-  }
-
-  .hero-gallery-inner {
-    padding-bottom: clamp(2.5rem, 7vh, 5rem);
+    min-height: min(86svh, 900px) !important;
   }
 }
 
 @media (max-width: 639px) {
-  .hero-gallery-orbit {
-    top: -10%;
-    right: -42%;
-    width: 100vw;
-    opacity: 0.55;
-  }
-
   .hero-gallery-footer {
     align-items: center;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-gallery-media-active,
-  .hero-gallery-orbit {
-    animation: none;
-  }
-
   .hero-gallery-media,
-  .hero-gallery-progress span,
-  .hero-copy-enter-active,
-  .hero-copy-leave-active {
+  .hero-gallery-progress span {
     transition: none;
   }
 }

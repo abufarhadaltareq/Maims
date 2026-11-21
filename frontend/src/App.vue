@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen flex flex-col font-brand text-gray-900 bg-white">
     <!-- Header Block -->
-    <header ref="headerRef" class="sticky top-0 z-50 bg-white border-b border-black/10">
+    <header ref="headerRef" class="sticky top-0 z-50 border-b border-black/10 bg-white/75 backdrop-blur-xl">
       <!-- Scrolling admin ticker: Admin → Store settings → Top scrolling messages.
            One message per line, loops seamlessly; hidden when disabled or empty. -->
       <div v-if="site.tickerEnabled && site.tickerMessages.length" class="bg-gradient-brand text-white overflow-hidden" role="marquee" aria-label="Store announcements">
@@ -175,7 +175,7 @@
     </div>
 
     <!-- Full-width content (no sidebar gutter) -->
-    <div class="flex-1 w-full max-w-[1600px] mx-auto">
+    <div class="mx-auto w-full flex-1" :class="route.path === '/' ? 'max-w-none' : 'max-w-[1600px]'">
       <!-- Main Display Route Target Space Slot -->
       <main class="storefront-main w-full min-w-0" :class="route.path === '/' ? 'storefront-main-home' : 'storefront-main-page px-4 py-6 sm:px-6'">
         <router-view />
@@ -183,7 +183,7 @@
     </div>
 
     <!-- Footer -->
-    <footer class="site-footer bg-black text-slate-200 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
+    <footer class="site-footer border-t border-white/10 bg-slate-950/80 px-4 pt-10 pb-6 font-brand text-sm text-slate-200 backdrop-blur-xl sm:px-6">
       <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 pb-8 border-b border-white/10">
         <div class="col-span-2 lg:col-span-2">
           <BrandLogo size="sm" light />
