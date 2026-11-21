@@ -346,7 +346,7 @@ class CategoryShowcase(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, format=None):
-        cats = Category.objects.filter(
+        cats = list(Category.objects.filter(
             parent__isnull=False,
             show_on_homepage=True,
         ).annotate(
@@ -355,18 +355,39 @@ class CategoryShowcase(APIView):
                 filter=Q(products__is_visible=True),
                 distinct=True,
             )
-        ).prefetch_related('children').order_by('homepage_order', 'name')
-        payload = []
+        ).prefetch_related('children').order_by('homepage_order', 'name'))
+
+        category_ids = {cat.id for cat in cats}
+        product_category_to_showcase = {}
         for cat in cats:
-            child_ids = list(cat.children.values_list('id', flat=True))
-            products = product_queryset().filter(
-                Q(category=cat) | Q(category_id__in=child_ids),
-                is_visible=True,
-            )[:8]
-            payload.append({
-                'category': CategorySerializer(cat).data,
-                'products': ProductSerializer(products, many=True, context={'request': request}).data,
+            for category_id in [cat.id, *(child.id for child in cat.children.all())]:
+                product_category_to_showcase[category_id] = cat.id
+                category_ids.add(category_id)
+
+        preview_products = Product.objects.filter(
+            category_id__in=category_ids,
+            is_visible=True,
+        ).only(
+            'category_id', 'slug', 'image', 'thumbnail', 'facebook_image_url',
+        ).order_by('-date_added')
+        products_by_showcase = {cat.id: [] for cat in cats}
+        for product in preview_products:
+            showcase_id = product_category_to_showcase.get(product.category_id)
+            if showcase_id is None or len(products_by_showcase[showcase_id]) >= 8:
+                continue
+            products_by_showcase[showcase_id].append({
+                'slug': product.slug,
+                'get_image': product.get_image(),
+                'get_thumbnail': product.get_thumbnail(),
             })
+
+        payload = [
+            {
+                'category': CategorySerializer(cat).data,
+                'products': products_by_showcase[cat.id],
+            }
+            for cat in cats
+        ]
         return Response(payload)
 
 

@@ -190,14 +190,16 @@
       <p v-else class="py-8 text-sm text-gray-500">No new arrivals yet.</p>
     </section>
 
-    <section v-if="isHomePage && showcase.length" v-reveal class="mx-auto max-w-[1500px] px-4 py-7 sm:px-7 sm:py-10">
+    <section v-if="isHomePage" class="mx-auto max-w-[1500px] px-4 py-7 sm:px-7 sm:py-10">
       <h2 class="mb-4 border-b border-black pb-3 text-xl font-semibold tracking-tight sm:mb-6 sm:text-2xl">Shop by Category</h2>
-      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div v-if="showcaseLoading" class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-label="Loading categories">
+        <div v-for="i in 2" :key="`category-placeholder-${i}`" class="aspect-[4/5] animate-pulse bg-gray-100"></div>
+      </div>
+      <div v-else-if="showcase.length" class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <router-link
-          v-for="(entry, i) in showcase"
+          v-for="entry in showcase"
           :key="'category-' + entry.category.id"
           :to="`/category/${entry.category.slug}`"
-          v-reveal="i * 70"
           class="group flex min-w-0 flex-col"
         >
           <div class="relative aspect-[4/5] w-full overflow-hidden bg-gray-100">
@@ -206,6 +208,7 @@
               :alt="entry.category.name"
               class="absolute inset-0 h-full w-full object-cover object-center"
               loading="lazy"
+              decoding="async"
             />
           </div>
           <div class="flex items-center justify-between gap-2 pt-3">
@@ -324,6 +327,7 @@ const categorySlug = ref(route.params.category_slug || '')
 const categoryTitle = ref('New Arrivals')
 const heroSlides = ref([])
 const showcase = ref([])
+const showcaseLoading = ref(true)
 const mainCategories = ref([])
 const mainCategoriesTrack = ref(null)
 const newArrivalsTrack = ref(null)
@@ -410,13 +414,19 @@ const fetchHeroSlides = async () => {
 }
 
 const fetchShowcase = async () => {
-  if (!isHomePage.value) return
+  if (!isHomePage.value) {
+    showcaseLoading.value = false
+    return
+  }
+  showcaseLoading.value = true
   try {
     const res = await axios.get('/api/v1/category-showcase/')
     showcase.value = Array.isArray(res.data) ? res.data : []
   } catch (e) {
     console.error('Error loading category showcase:', e)
     showcase.value = []
+  } finally {
+    showcaseLoading.value = false
   }
 }
 
@@ -505,12 +515,12 @@ const fetchLatestProducts = async () => {
 }
 
 onMounted(async () => {
+  fetchShowcase()
   await fetchHeroSlides()
   siteStore.fetchHero()
   siteStore.fetchSettings()
   fetchFacets()
   fetchLatestProducts()
-  fetchShowcase()
   fetchMainCategories()
   startImageRotation()
 })
