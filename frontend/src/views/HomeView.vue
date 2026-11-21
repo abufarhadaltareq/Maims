@@ -4,7 +4,7 @@
     <!-- ===== Responsive featured collection hero ===== -->
     <section
       v-if="isHomePage && siteStore.heroEnabled && heroSlides.length"
-      class="hero-gallery relative isolate w-full overflow-hidden bg-[#10100f] text-white"
+      class="hero-gallery relative isolate w-full overflow-hidden bg-transparent text-white"
       :style="{
         '--hero-accent': siteStore.heroAccent,
       }"
@@ -36,8 +36,6 @@
           />
         </template>
       </div>
-
-      <div class="hero-gallery-shade absolute inset-0" :style="{ opacity: siteStore.heroOverlay / 100 }" aria-hidden="true"></div>
 
       <div class="hero-gallery-inner relative z-10 mx-auto flex h-full min-h-[inherit] max-w-[1500px] flex-col justify-end px-4 pb-8 pt-16 sm:px-7 sm:pb-10 lg:pb-12">
         <div
@@ -515,13 +513,6 @@ onBeforeUnmount(() => {
 
 .hero-gallery-media-active {
   opacity: 1;
-}
-
-.hero-gallery-shade {
-  z-index: 2;
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0.36) 48%, rgba(0, 0, 0, 0.08) 100%),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.48) 0%, transparent 58%);
 }
 
 .hero-gallery-inner {
