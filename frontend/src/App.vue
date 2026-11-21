@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen flex flex-col font-brand text-gray-900 bg-white" :style="{ '--header-height': `${headerHeight}px` }">
     <!-- Header Block -->
-    <header ref="headerRef" class="sticky top-0 z-50 border-b border-white/10 bg-slate-950/75 text-slate-100 backdrop-blur-xl">
+    <header ref="headerRef" class="sticky top-0 z-50 border-b border-black/10 bg-white/75 text-gray-900 backdrop-blur-xl">
       <!-- Scrolling admin ticker: Admin → Store settings → Top scrolling messages.
            One message per line, loops seamlessly; hidden when disabled or empty. -->
       <div v-if="site.tickerEnabled && site.tickerMessages.length" class="bg-gradient-brand text-white overflow-hidden" role="marquee" aria-label="Store announcements">
@@ -20,7 +20,7 @@
             @click.stop="toggleCategoryMenu"
             @mouseenter="openCategoryMenu"
             @mouseleave="scheduleCategoryMenuClose"
-            class="flex h-9 w-9 shrink-0 items-center justify-center border border-white/20 text-slate-100 transition-colors hover:bg-white/15 sm:h-10 sm:w-10"
+            class="flex h-9 w-9 shrink-0 items-center justify-center border border-black/15 text-black transition-colors hover:bg-black hover:text-white sm:h-10 sm:w-10"
             :aria-expanded="isCatMenuOpen"
             aria-label="Open category menu"
             aria-controls="category-menu"
@@ -31,7 +31,7 @@
           </button>
           <router-link
             to="/search"
-            class="flex h-9 w-9 shrink-0 items-center justify-center border border-transparent transition-colors hover:border-white/20 sm:h-10 sm:w-10"
+            class="flex h-9 w-9 shrink-0 items-center justify-center border border-transparent transition-colors hover:border-black/15 sm:h-10 sm:w-10"
             aria-label="Search products"
           >
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,19 +42,19 @@
           <div class="relative shrink-0 select-none">
             <button
               @click.stop="isCurrencyOpen = !isCurrencyOpen"
-              class="flex h-9 items-center gap-0.5 border border-transparent px-1 transition-colors hover:border-white/20 sm:h-10 sm:px-2"
+              class="flex h-9 items-center gap-0.5 border border-transparent px-1 transition-colors hover:border-black/15 sm:h-10 sm:px-2"
               :aria-label="`Change currency, currently ${cartStore.currentCurrency}`"
               :aria-expanded="isCurrencyOpen"
             >
               <span class="text-xs leading-none sm:text-sm">{{ countryFlag }}</span>
             </button>
-            <div v-if="isCurrencyOpen" class="absolute left-0 z-50 mt-2 w-40 border border-white/15 bg-slate-950/95 py-1 text-slate-100 shadow-xl backdrop-blur-xl">
-              <p class="border-b border-white/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Currency</p>
+            <div v-if="isCurrencyOpen" class="absolute left-0 z-50 mt-2 w-40 border border-black/15 bg-white py-1 text-gray-900 shadow-xl">
+              <p class="border-b border-black/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">Currency</p>
               <button
                 v-for="c in currencies"
                 :key="c.code"
                 @click.stop="setCurrency(c.code)"
-                class="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-white/10"
+                class="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100"
               >
                 <span>{{ currencyFlag(c) }} {{ c.code }} ({{ c.symbol }})</span>
                 <span v-if="c.code === cartStore.currentCurrency" class="font-bold">✓</span>
@@ -82,7 +82,7 @@
           </svg>
         </router-link>
         <div class="flex shrink-0 items-center justify-end gap-0 sm:gap-2">
-          <router-link to="/wishlist" class="relative flex h-8 w-8 items-center justify-center sm:h-10 sm:w-10 border border-transparent hover:border-white/20 transition-colors" aria-label="Wishlist">
+          <router-link to="/wishlist" class="relative flex h-8 w-8 items-center justify-center sm:h-10 sm:w-10 border border-transparent hover:border-black/15 transition-colors" aria-label="Wishlist">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20.8 8.8c0 5.2-8.8 10.1-8.8 10.1S3.2 14 3.2 8.8A4.3 4.3 0 0 1 12 6.9a4.3 4.3 0 0 1 8.8 1.9Z"></path>
             </svg>
@@ -91,7 +91,7 @@
             </span>
           </router-link>
 
-          <router-link to="/cart" class="relative flex h-8 w-8 items-center justify-center sm:h-10 sm:w-10 border border-transparent hover:border-white/20 transition-colors" aria-label="View cart">
+          <router-link to="/cart" class="relative flex h-8 w-8 items-center justify-center sm:h-10 sm:w-10 border border-transparent hover:border-black/15 transition-colors" aria-label="View cart">
             <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
               <path d="M3 6h18" stroke-width="2" stroke-linecap="round"></path>
@@ -104,21 +104,21 @@
 
           <!-- Account menu -->
           <div class="relative">
-            <button @click.stop="isAccountOpen = !isAccountOpen" class="flex h-8 w-8 items-center justify-center sm:h-10 sm:w-10 border border-transparent hover:border-white/20 transition-colors" aria-label="Account menu" :aria-expanded="isAccountOpen">
+            <button @click.stop="isAccountOpen = !isAccountOpen" class="flex h-8 w-8 items-center justify-center sm:h-10 sm:w-10 border border-transparent hover:border-black/15 transition-colors" aria-label="Account menu" :aria-expanded="isAccountOpen">
               <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
               </svg>
             </button>
-            <div v-if="isAccountOpen" class="absolute right-0 z-50 mt-2 w-48 overflow-hidden border border-white/15 bg-slate-950/95 py-1.5 text-slate-100 shadow-xl backdrop-blur-xl">
+            <div v-if="isAccountOpen" class="absolute right-0 z-50 mt-2 w-48 overflow-hidden border border-black/15 bg-white py-1.5 text-gray-900 shadow-xl">
               <template v-if="auth.isAuthenticated">
-                <p class="border-b border-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-400">Hi, {{ auth.username }}</p>
-                <router-link to="/profile" class="block px-4 py-2 text-sm hover:bg-white/10">Profile</router-link>
-                <router-link to="/order-history" class="block px-4 py-2 text-sm hover:bg-white/10">Orders</router-link>
-                <button @click.stop="logout" class="block w-full px-4 py-2 text-left text-sm font-semibold text-rose-300 hover:bg-white/10">Log Out</button>
+                <p class="border-b border-gray-100 px-4 py-2 text-xs font-bold uppercase tracking-wider text-gray-400">Hi, {{ auth.username }}</p>
+                <router-link to="/profile" class="block px-4 py-2 text-sm hover:bg-gray-100">Profile</router-link>
+                <router-link to="/order-history" class="block px-4 py-2 text-sm hover:bg-gray-100">Orders</router-link>
+                <button @click.stop="logout" class="block w-full px-4 py-2 text-left text-sm font-semibold text-red-600 hover:bg-gray-50">Log Out</button>
               </template>
               <template v-else>
-                <router-link to="/log-in" class="block px-4 py-2 text-sm font-semibold hover:bg-white/10">Log In</router-link>
-                <router-link to="/sign-up" class="block px-4 py-2 text-sm hover:bg-white/10">Sign Up</router-link>
+                <router-link to="/log-in" class="block px-4 py-2 text-sm font-semibold hover:bg-gray-100">Log In</router-link>
+                <router-link to="/sign-up" class="block px-4 py-2 text-sm hover:bg-gray-100">Sign Up</router-link>
               </template>
             </div>
           </div>
@@ -134,25 +134,25 @@
       @mouseenter="clearCategoryMenuClose"
       @mouseleave="scheduleCategoryMenuClose"
     >
-      <aside id="category-menu" class="flex h-full w-[min(88vw,24rem)] flex-col overflow-y-auto border-r border-white/15 bg-slate-950/75 px-4 py-5 text-slate-100 shadow-2xl backdrop-blur-2xl sm:w-[min(75vw,28rem)] sm:px-7 lg:w-[min(34vw,30rem)]" aria-label="Shop categories">
-        <div class="flex items-center justify-between border-b border-white/10 pb-3">
+      <aside id="category-menu" class="flex h-full w-[min(88vw,24rem)] flex-col overflow-y-auto border-r border-black/10 bg-white/80 px-4 py-5 text-gray-900 shadow-2xl backdrop-blur-2xl sm:w-[min(75vw,28rem)] sm:px-7 lg:w-[min(34vw,30rem)]" aria-label="Shop categories">
+        <div class="flex items-center justify-between border-b border-black/10 pb-3">
           <h2 class="font-semibold uppercase tracking-[0.16em] text-sm">Shop</h2>
-          <button class="flex h-9 w-9 items-center justify-center border border-white/20 text-xl" @click="closeCategoryMenu" aria-label="Close category menu">×</button>
+          <button class="flex h-9 w-9 items-center justify-center border border-black/15 text-xl" @click="closeCategoryMenu" aria-label="Close category menu">×</button>
         </div>
         <nav class="flex-1 py-3">
-          <router-link to="/all-products" class="block border-b border-white/10 py-3 text-sm font-medium hover:text-white" @click="closeCategoryMenu">All Products</router-link>
-          <router-link to="/new-arrivals" class="block border-b border-white/10 py-3 text-sm font-medium hover:text-white" @click="closeCategoryMenu">New Arrivals</router-link>
+          <router-link to="/all-products" class="block border-b border-black/10 py-3 text-sm font-medium" @click="closeCategoryMenu">All Products</router-link>
+          <router-link to="/new-arrivals" class="block border-b border-black/10 py-3 text-sm font-medium" @click="closeCategoryMenu">New Arrivals</router-link>
           <CategoryMenuItem
             v-for="category in navCats"
             :key="category.slug"
             :category="category"
             root
-            class="border-b border-white/10 py-1"
+            class="border-b border-black/10 py-1"
             @navigate="closeCategoryMenu"
           />
         </nav>
-        <div class="mt-3 border-t border-white/15 pt-4">
-          <p class="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Account</p>
+        <div class="mt-3 border-t border-black/15 pt-4">
+          <p class="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Account</p>
           <template v-if="auth.isAuthenticated">
             <p class="mb-2 text-sm">Signed in as {{ auth.username }}</p>
             <router-link to="/profile" class="block py-2 text-sm" @click="closeCategoryMenu">Profile</router-link>
@@ -164,7 +164,7 @@
             <router-link to="/sign-up" class="py-2 text-sm underline" @click="closeCategoryMenu">Sign Up</router-link>
           </template>
           <div v-if="site.socialLinks.length || site.whatsappEnabled" class="mt-4 flex items-center gap-3" aria-label="Social media links">
-            <span class="mr-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Follow</span>
+            <span class="mr-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">Follow</span>
             <a
               v-for="link in site.socialLinks"
               :key="`sidebar-${link.key}`"
@@ -173,7 +173,7 @@
               rel="noopener noreferrer"
               :aria-label="link.label"
               :title="link.label"
-              class="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-slate-200 transition hover:bg-white/15 hover:text-white"
+              class="flex h-9 w-9 items-center justify-center rounded-full border border-black/15 text-gray-700 transition hover:bg-black hover:text-white"
             ><SocialIcon :name="link.key" class="h-4 w-4" /></a>
             <a
               v-if="site.whatsappEnabled"
@@ -182,12 +182,12 @@
               rel="noopener noreferrer"
               aria-label="WhatsApp"
               title="WhatsApp"
-              class="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-slate-200 transition hover:bg-white/15 hover:text-white"
+              class="flex h-9 w-9 items-center justify-center rounded-full border border-black/15 text-gray-700 transition hover:bg-black hover:text-white"
             ><SocialIcon name="whatsapp" class="h-4 w-4" /></a>
           </div>
         </div>
-        <div class="mt-auto flex justify-center border-t border-white/10 pt-5">
-          <BrandLogo size="sm" light class="justify-center" />
+        <div class="mt-auto flex justify-center border-t border-black/10 pt-5">
+          <BrandLogo size="sm" class="justify-center" />
         </div>
       </aside>
     </div>
