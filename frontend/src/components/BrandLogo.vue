@@ -8,14 +8,20 @@
       :alt="`${storeName} logo`"
       :class="size === 'sm'
         ? 'h-7 sm:h-8 max-w-[6rem] sm:max-w-[7rem]'
-        : 'h-8 sm:h-10 max-w-[7rem] sm:max-w-[9rem]'"
+        : size === 'footer'
+          ? 'h-10 sm:h-12 max-w-[8rem] sm:max-w-[10rem]'
+          : 'h-8 sm:h-10 max-w-[7rem] sm:max-w-[9rem]'"
       class="shrink-0 object-contain"
       @error="logoBroken = true"
     />
     <!-- Monogram badge -->
     <svg
       v-else
-      :class="size === 'sm' ? 'h-7 w-7 sm:h-8 sm:w-8' : 'h-8 w-8 sm:h-10 sm:w-10'"
+      :class="size === 'sm'
+        ? 'h-7 w-7 sm:h-8 sm:w-8'
+        : size === 'footer'
+          ? 'h-10 w-10 sm:h-12 sm:w-12'
+          : 'h-8 w-8 sm:h-10 sm:w-10'"
       class="shrink-0"
       viewBox="0 0 40 40"
       fill="none"
@@ -42,14 +48,21 @@
     <span class="flex flex-col leading-none">
       <span
         class="brand-wordmark font-semibold uppercase transition-colors"
-        :class="[size === 'sm' ? 'text-base' : 'text-lg', gold ? 'text-amber-400 group-hover:text-amber-300' : 'text-[var(--color-brand)] group-hover:[color:var(--color-brand)]']"
+        :class="[size === 'footer' ? 'text-xl sm:text-2xl' : size === 'sm' ? 'text-base' : 'text-lg', gold ? 'text-amber-300 group-hover:text-amber-200' : 'text-[var(--color-brand)] group-hover:[color:var(--color-brand)]']"
       >
         {{ wordmarkStart }}<span class="transition-colors" :class="gold ? 'group-hover:text-amber-300' : 'group-hover:[color:var(--color-brand)]'">{{ wordmarkAccent }}</span>{{ wordmarkEnd }}
       </span>
       <span
         v-if="showTagline && tagline"
-        class="hidden sm:block mt-1 font-semibold uppercase"
-        :class="[size === 'sm' ? 'text-[0.5rem] tracking-[0.3em]' : 'text-[0.55rem] tracking-[0.4em]', gold ? 'text-amber-300' : 'text-[var(--color-brand)]/70']"
+        class="mt-1 font-semibold uppercase"
+        :class="[
+          size === 'footer'
+            ? 'block text-[0.6rem] tracking-[0.3em]'
+            : size === 'sm'
+              ? 'hidden text-[0.5rem] tracking-[0.3em] sm:block'
+              : 'hidden text-[0.55rem] tracking-[0.4em] sm:block',
+          gold ? 'text-amber-400' : 'text-[var(--color-brand)]/70',
+        ]"
       >
         {{ tagline }}
       </span>
@@ -63,7 +76,7 @@ import { BRAND_CONFIG } from '../brand.config'
 import { useSiteStore } from '../stores/site'
 
 defineProps({
-  size: { type: String, default: 'md' }, // 'md' | 'sm'
+  size: { type: String, default: 'md' }, // 'md' | 'sm' | 'footer'
   showTagline: { type: Boolean, default: true },
   gold: { type: Boolean, default: false },
 })

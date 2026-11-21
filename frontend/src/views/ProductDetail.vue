@@ -6,37 +6,87 @@
 
     <div v-if="product" class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:gap-8">
       <div class="space-y-5">
-        <div class="relative overflow-hidden border border-black/10 bg-white">
-          <div class="absolute top-4 right-4 z-10">
-            <WishlistHeart
-              :product="product"
-              tip-below
-              className="w-9 h-9 border border-black/15 !bg-white shadow-sm hover:!bg-gray-100 transition-all duration-200"
-            />
-          </div>
-          
-          <div class="h-[min(78svh,760px)] min-h-[360px] bg-gray-50 flex items-center justify-center overflow-hidden cursor-zoom-in group" @click="openLightbox">
+        <div class="overflow-hidden border border-black/10 bg-white shadow-sm">
+          <div class="relative flex h-[min(82svh,900px)] min-h-[360px] items-center justify-center overflow-hidden bg-[#f7f6f3] sm:min-h-[480px]">
             <template v-if="activeMedia">
-              <video v-if="activeMedia.media_type === 'video'" :key="'v-' + activeMediaIndex" :src="activeMedia.url" controls class="w-full h-full object-cover animate-media-switch" @click.stop></video>
-              <img v-else :key="'i-' + activeMediaIndex" :src="activeMedia.url" :alt="product.name" class="w-full h-full object-cover animate-media-switch transition-transform duration-700 group-hover:scale-105" />
+              <button
+                v-if="activeMedia.media_type !== 'video'"
+                type="button"
+                class="group absolute inset-0 flex h-full w-full cursor-zoom-in items-center justify-center overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-black"
+                :aria-label="`Zoom in on ${product.name}`"
+                @click="openLightbox"
+                @mousemove="updateZoomOrigin"
+              >
+                <img
+                  :key="'i-' + activeMediaIndex"
+                  :src="activeMedia.url"
+                  :alt="product.name"
+                  :style="{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }"
+                  class="h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-[1.8] group-focus-visible:scale-[1.8] motion-reduce:transition-none"
+                />
+                <span class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap border border-black/10 bg-white/90 px-3 py-1.5 text-[11px] font-medium text-gray-700 shadow-sm">
+                  Hover to zoom · Click to enlarge
+                </span>
+              </button>
+              <video
+                v-else
+                :key="'v-' + activeMediaIndex"
+                :src="activeMedia.url"
+                controls
+                class="h-full w-full object-contain"
+                @click.stop
+              ></video>
             </template>
-            <template v-else>
-              <img :src="product.get_image || 'https://placehold.co/600x800'" :alt="product.name" class="w-full h-full object-cover" />
-            </template>
+            <button
+              v-else
+              type="button"
+              class="h-full w-full cursor-zoom-in"
+              :aria-label="`View ${product.name} image`"
+              @click="openLightbox"
+            >
+              <img :src="product.get_image || 'https://placehold.co/600x800'" :alt="product.name" class="h-full w-full object-contain" />
+            </button>
+
+            <div class="absolute right-3 top-3 z-10">
+              <WishlistHeart
+                :product="product"
+                tip-below
+                className="w-10 h-10 border border-black/15 !bg-white shadow-sm hover:!bg-gray-100 transition-all duration-200"
+              />
+            </div>
+            <div v-if="galleryItems.length > 1" class="absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-between px-3 sm:px-5">
+              <button
+                type="button"
+                class="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/90 text-xl shadow-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-black"
+                aria-label="Previous image"
+                @click.stop="showPreviousImage"
+              >‹</button>
+              <button
+                type="button"
+                class="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/90 text-xl shadow-sm transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-black"
+                aria-label="Next image"
+                @click.stop="showNextImage"
+              >›</button>
+            </div>
           </div>
 
-          <div v-if="galleryItems.length > 1" class="absolute bottom-4 left-4 right-4 flex gap-3 overflow-x-auto no-scrollbar">
+          <div v-if="galleryItems.length > 1" class="flex gap-2 overflow-x-auto border-t border-black/10 bg-white p-3 no-scrollbar sm:gap-3 sm:p-4">
             <button
               v-for="(media, index) in galleryItems"
               :key="index"
               @click.stop="setActiveMedia(index)"
               type="button"
-              :class="index === activeMediaIndex ? 'border-black scale-95 shadow-inner' : 'border-white/80'"
-              class="min-w-[72px] h-[76px] border bg-white/90 shadow-sm overflow-hidden transition-all duration-200"
+              :aria-label="`Show image ${index + 1} of ${galleryItems.length}`"
+              :aria-pressed="index === activeMediaIndex"
+              :class="index === activeMediaIndex ? 'border-black ring-1 ring-black' : 'border-gray-200 hover:border-gray-500'"
+              class="h-[76px] w-[68px] shrink-0 overflow-hidden border-2 bg-[#f7f6f3] transition-colors duration-200 sm:h-[92px] sm:w-[82px]"
             >
-              <video v-if="media.media_type === 'video'" :src="media.url" muted class="w-full h-full object-cover"></video>
-              <img v-else :src="media.url" class="w-full h-full object-cover" />
+              <video v-if="media.media_type === 'video'" :src="media.url" muted class="h-full w-full object-cover"></video>
+              <img v-else :src="media.url" :alt="`${product.name} thumbnail ${index + 1}`" class="h-full w-full object-cover" />
             </button>
+            <span class="ml-auto hidden shrink-0 self-center text-xs tabular-nums text-gray-500 sm:block">
+              {{ activeMediaIndex + 1 }} / {{ galleryItems.length }}
+            </span>
           </div>
         </div>
 
@@ -199,51 +249,55 @@
 
   <!-- Lightbox Modal Layout -->
   <div v-if="isLightboxOpen" 
-       class="fixed inset-0 z-50 bg-[var(--color-brand)]/95 flex flex-col items-center justify-center p-4 backdrop-blur-md select-none"
+       class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 p-3 backdrop-blur-md select-none sm:p-5"
        @click="isLightboxOpen = false">
     
-    <div class="absolute top-6 left-6 right-6 flex justify-between items-center text-white text-lg font-medium">
+    <div class="absolute left-4 right-4 top-4 flex items-center justify-between text-base font-medium text-white sm:left-7 sm:right-7 sm:top-6 sm:text-lg">
       <div>{{ lightboxIndex + 1 }} / {{ galleryItems.length }}</div>
-      <button class="text-5xl font-light hover:text-gray-300 transition" @click="isLightboxOpen = false">
+      <button class="flex h-11 w-11 items-center justify-center text-4xl font-light transition hover:text-gray-300" aria-label="Close image viewer" @click="isLightboxOpen = false">
         &times;
       </button>
     </div>
 
-    <div class="w-full max-w-5xl flex items-center justify-between gap-4" @click.stop>
+    <div class="flex w-full max-w-7xl items-center justify-between gap-1 sm:gap-4" @click.stop>
       <button v-if="galleryItems.length > 1" 
               @click="prevMedia" 
-              class="text-white text-5xl hover:text-gray-400 transition-colors p-4 select-none">
+              aria-label="Previous image"
+              class="shrink-0 p-2 text-3xl text-white transition-colors hover:text-gray-400 sm:p-4 sm:text-5xl">
         &#10094;
       </button>
-      <div v-else class="w-16"></div>
+      <div v-else class="w-6 shrink-0 sm:w-16"></div>
 
-      <div class="flex-1 flex justify-center items-center max-h-[88vh]">
+      <div class="flex min-h-0 flex-1 items-center justify-center">
         <video v-if="currentLightboxMedia?.media_type === 'video'" 
                :src="currentLightboxMedia.url" 
                controls 
                autoplay
-               class="max-w-full max-h-[88vh] object-contain rounded-xl shadow-2xl"></video>
+               class="max-h-[82vh] max-w-full object-contain shadow-2xl sm:max-h-[86vh]"></video>
         
         <img v-else 
              :src="currentLightboxMedia?.url" 
              :alt="product?.name" 
-             class="max-w-full max-h-[88vh] object-contain rounded-xl shadow-2xl" />
+             class="max-h-[82vh] max-w-full object-contain shadow-2xl sm:max-h-[86vh]" />
       </div>
 
       <button v-if="galleryItems.length > 1" 
               @click="nextMedia" 
-              class="text-white text-5xl hover:text-gray-400 transition-colors p-4 select-none">
+              aria-label="Next image"
+              class="shrink-0 p-2 text-3xl text-white transition-colors hover:text-gray-400 sm:p-4 sm:text-5xl">
         &#10095;
       </button>
-      <div v-else class="w-16"></div>
+      <div v-else class="w-6 shrink-0 sm:w-16"></div>
     </div>
 
-    <div v-if="galleryItems.length > 1" class="mt-6 flex gap-2 overflow-x-auto p-2 max-w-2xl no-scrollbar" @click.stop>
+    <div v-if="galleryItems.length > 1" class="mt-4 flex max-w-full gap-2 overflow-x-auto p-2 no-scrollbar sm:mt-6" @click.stop>
       <button v-for="(med, idx) in galleryItems" 
               :key="'lb-'+idx" 
-              @click="lightboxIndex = idx"
+              @click="setActiveMedia(idx)"
+              :aria-label="`Show image ${idx + 1} of ${galleryItems.length}`"
+              :aria-pressed="idx === lightboxIndex"
               :class="idx === lightboxIndex ? 'border-white scale-105 opacity-100' : 'border-transparent opacity-50'"
-              class="w-16 h-16 rounded-xl overflow-hidden border-2 transition-all duration-200 bg-neutral-900 flex-shrink-0">
+              class="h-14 w-14 shrink-0 overflow-hidden border-2 bg-neutral-900 transition-all duration-200 sm:h-16 sm:w-16">
         <video v-if="med.media_type === 'video'" :src="med.url" muted class="w-full h-full object-cover"></video>
         <img v-else :src="med.url" class="w-full h-full object-cover" />
       </button>
@@ -274,6 +328,7 @@ const showSuccessMessage = ref(false)
 const activeMediaIndex = ref(0)
 const isLightboxOpen = ref(false)
 const lightboxIndex = ref(0)
+const zoomOrigin = ref({ x: 50, y: 50 })
 
 const route = useRoute()
 const cartStore = useCartStore()
@@ -365,6 +420,9 @@ onBeforeUnmount(() => {
 
 watch(() => route.params.slug, () => {
   product.value = null
+  activeMediaIndex.value = 0
+  lightboxIndex.value = 0
+  isLightboxOpen.value = false
   fetchProductData()
 })
 
@@ -400,6 +458,23 @@ const currentLightboxMedia = computed(() => galleryItems.value[lightboxIndex.val
 
 function setActiveMedia(index) {
   activeMediaIndex.value = index
+  lightboxIndex.value = index
+}
+
+function updateZoomOrigin(event) {
+  const bounds = event.currentTarget.getBoundingClientRect()
+  zoomOrigin.value = {
+    x: Math.max(0, Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100)),
+    y: Math.max(0, Math.min(100, ((event.clientY - bounds.top) / bounds.height) * 100)),
+  }
+}
+
+function showNextImage() {
+  setActiveMedia((activeMediaIndex.value + 1) % galleryItems.value.length)
+}
+
+function showPreviousImage() {
+  setActiveMedia((activeMediaIndex.value - 1 + galleryItems.value.length) % galleryItems.value.length)
 }
 
 function openLightbox() {
@@ -408,11 +483,11 @@ function openLightbox() {
 }
 
 function nextMedia() {
-  lightboxIndex.value = (lightboxIndex.value + 1) % galleryItems.value.length
+  showNextImage()
 }
 
 function prevMedia() {
-  lightboxIndex.value = (lightboxIndex.value - 1 + galleryItems.value.length) % galleryItems.value.length
+  showPreviousImage()
 }
 
 function handleKeyDown(e) {

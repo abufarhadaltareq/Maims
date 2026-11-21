@@ -67,6 +67,7 @@ class CategorySerializer(serializers.ModelSerializer):
             "id": category.id,
             "name": category.name,
             "slug": category.slug,
+            "product_count": getattr(category, 'product_count', 0),
             "image_url": category.get_image(),
             "show_on_homepage": category.show_on_homepage,
             "homepage_order": category.homepage_order,

@@ -72,9 +72,9 @@
             v-if="site.logoUrl"
             :src="site.logoUrl"
             :alt="site.storeName + ' logo'"
-            class="block h-12 w-[min(7rem,calc(100vw-220px))] object-contain sm:h-14 sm:w-auto sm:max-w-[15rem] md:h-16 md:max-w-[18rem]"
+            class="block h-[52px] w-[min(8.5rem,calc(100vw-220px))] object-contain sm:h-[60px] sm:w-auto sm:max-w-[17rem] md:h-[68px] md:max-w-[20rem]"
           />
-          <svg v-else class="block h-11 w-11 sm:h-12 sm:w-12 md:h-14 md:w-14" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <svg v-else class="block h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16" viewBox="0 0 40 40" fill="none" aria-hidden="true">
             <defs>
               <linearGradient id="maimsLogoGradMobile" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0" stop-color="#111111" />
@@ -132,13 +132,13 @@
 
     <div
       v-if="isCatMenuOpen"
-      class="fixed inset-x-0 bottom-0 z-[60] bg-black/30"
+      class="fixed inset-x-0 bottom-0 z-[60] bg-black/20 backdrop-blur-sm"
       :style="{ top: `${headerHeight}px` }"
       @click.self="closeCategoryMenu"
       @mouseenter="clearCategoryMenuClose"
       @mouseleave="scheduleCategoryMenuClose"
     >
-      <aside id="category-menu" class="h-full w-full max-w-md overflow-y-auto border-r border-black/15 bg-white px-5 py-5 sm:px-8" aria-label="Shop categories">
+      <aside id="category-menu" class="h-full w-full max-w-lg overflow-y-auto border-r border-white/40 bg-white/90 px-4 py-5 shadow-2xl backdrop-blur-2xl sm:px-7" aria-label="Shop categories">
         <div class="flex items-center justify-between border-b border-black/10 pb-3">
           <h2 class="font-semibold uppercase tracking-[0.16em] text-sm">Shop</h2>
           <button class="flex h-9 w-9 items-center justify-center border border-black/15 text-xl" @click="closeCategoryMenu" aria-label="Close category menu">×</button>
@@ -183,9 +183,9 @@
     <footer class="site-footer bg-black text-slate-200 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
       <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 pb-8 border-b border-white/10">
         <div class="col-span-2 lg:col-span-2">
-          <BrandLogo size="sm" gold />
+          <BrandLogo size="footer" gold />
           <!-- About line: Admin → Site settings → Brand & header → Footer about -->
-          <p class="text-slate-200 text-[13px] leading-relaxed mt-3 max-w-xs">{{ site.footerAbout }}</p>
+          <p class="mt-3 max-w-xs text-[13px] leading-relaxed text-amber-400">{{ site.footerAbout }}</p>
           <!-- Newsletter (shown only when Admin → Customer notification settings allow it) -->
           <form v-if="site.newsletterSignupEnabled" @submit.prevent="subscribeNewsletter" class="mt-4 max-w-xs">
             <div class="flex gap-2">
