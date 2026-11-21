@@ -5,9 +5,7 @@
     <section
       v-if="isHomePage && siteStore.heroEnabled && heroSlides.length"
       class="hero-gallery relative isolate w-full overflow-hidden bg-[#10100f] text-white"
-      :class="`hero-height-${siteStore.heroHeight}`"
       :style="{
-        minHeight: heroHeightStyle,
         '--hero-accent': siteStore.heroAccent,
       }"
       aria-label="Featured collections"
@@ -448,15 +446,6 @@ const startImageRotation = () => {
   }, interval)
 }
 
-// Admin-controlled hero height: big gallery.
-const heroHeightStyle = computed(() => {
-  switch (siteStore.heroHeight) {
-    case 'medium': return 'clamp(320px, 55svh, 620px)'
-    case 'full': return 'min(82svh, 820px)'
-    default: return 'clamp(360px, 68svh, 740px)'
-  }
-})
-
 const scrollNewArrivals = (direction) => {
   newArrivalsTrack.value?.scrollBy({
     left: direction * newArrivalsTrack.value.clientWidth * 0.8,
@@ -539,7 +528,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .hero-gallery {
-  min-height: inherit;
+  min-height: calc(100svh - var(--header-height, 72px));
 }
 
 .hero-gallery-backdrop {
@@ -591,20 +580,6 @@ onBeforeUnmount(() => {
 
 .hero-gallery-dot[aria-current="true"]::before {
   background: #111;
-}
-
-@media (min-width: 768px) {
-  .hero-gallery.hero-height-medium {
-    min-height: min(64svh, 680px) !important;
-  }
-
-  .hero-gallery.hero-height-tall {
-    min-height: min(74svh, 780px) !important;
-  }
-
-  .hero-gallery.hero-height-full {
-    min-height: min(86svh, 900px) !important;
-  }
 }
 
 @media (max-width: 639px) {

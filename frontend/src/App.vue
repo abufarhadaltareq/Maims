@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex flex-col font-brand text-gray-900 bg-white">
+  <div class="min-h-screen flex flex-col font-brand text-gray-900 bg-white" :style="{ '--header-height': `${headerHeight}px` }">
     <!-- Header Block -->
     <header ref="headerRef" class="sticky top-0 z-50 border-b border-black/10 bg-white/75 backdrop-blur-xl">
       <!-- Scrolling admin ticker: Admin → Store settings → Top scrolling messages.
@@ -183,7 +183,7 @@
     </div>
 
     <!-- Footer -->
-    <footer class="site-footer border-t border-white/10 bg-slate-950/80 px-4 pt-10 pb-6 font-brand text-sm text-slate-200 backdrop-blur-xl sm:px-6">
+    <footer class="site-footer border-t border-white/10 bg-slate-950/60 px-4 pt-10 pb-6 font-brand text-sm text-slate-200 backdrop-blur-xl sm:px-6">
       <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 pb-8 border-b border-white/10">
         <div class="col-span-2 lg:col-span-2">
           <BrandLogo size="sm" light />
@@ -231,7 +231,21 @@
             <a v-for="link in site.socialLinks" :key="link.key" :href="link.url" target="_blank" rel="noopener" :title="link.label" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"><SocialIcon :name="link.key" class="w-4 h-4 text-white" /></a>
             <a v-if="site.whatsappEnabled" :href="site.whatsappBaseLink" target="_blank" rel="noopener" title="WhatsApp Chat" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"><SocialIcon name="whatsapp" class="w-4 h-4 text-white" /></a>
           </div>
-          <p class="text-slate-300 text-xs mt-4 leading-relaxed">Secure checkout<br/><span v-if="site.stripeEnabled">Stripe</span><span v-if="site.stripeEnabled && (site.paypalEnabled || site.whatsappEnabled)"> · </span><span v-if="site.paypalEnabled">PayPal</span><span v-if="site.paypalEnabled && site.whatsappEnabled"> · </span><span v-if="site.whatsappEnabled">WhatsApp</span><span v-if="!site.stripeEnabled && !site.paypalEnabled && !site.whatsappEnabled">Contact us to order</span></p>
+          <div class="mt-4 text-xs leading-relaxed text-slate-300">
+            <p>Secure checkout</p>
+            <div v-if="site.stripeEnabled" class="mt-2 flex items-center gap-2" aria-label="Accepted cards: Stripe, Visa, Mastercard">
+              <span class="rounded bg-[#635bff] px-2 py-1 text-[11px] font-bold tracking-tight text-white">stripe</span>
+              <span class="rounded bg-white px-2 py-1 font-bold italic tracking-tight text-[#1434cb]">VISA</span>
+              <svg class="h-[26px] w-[42px] rounded bg-white px-1" viewBox="0 0 42 26" role="img" aria-label="Mastercard">
+                <circle cx="17" cy="13" r="8" fill="#EB001B" />
+                <circle cx="25" cy="13" r="8" fill="#F79E1B" fill-opacity="0.92" />
+              </svg>
+            </div>
+            <p v-if="site.paypalEnabled || site.whatsappEnabled" class="mt-2">
+              <span v-if="site.paypalEnabled">PayPal</span><span v-if="site.paypalEnabled && site.whatsappEnabled"> · </span><span v-if="site.whatsappEnabled">WhatsApp</span>
+            </p>
+            <p v-if="!site.stripeEnabled && !site.paypalEnabled && !site.whatsappEnabled">Contact us to order</p>
+          </div>
         </div>
       </div>
       <div class="max-w-7xl mx-auto pt-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-300">
@@ -284,7 +298,7 @@ const isAccountOpen = ref(false)
 const isCatMenuOpen = ref(false)
 const navCats = ref([])
 const headerRef = ref(null)
-const headerHeight = ref(0)
+const headerHeight = ref(72)
 const newsletterEmail = ref('')
 const newsletterDone = ref(false)
 const newsletterError = ref('')
