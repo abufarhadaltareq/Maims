@@ -60,17 +60,23 @@ class CategorySerializer(serializers.ModelSerializer):
         children = getattr(obj, '_prefetched_children', None)
         if children is None:
             children = obj.children.all()
-        return [
-            {
-                "id": c.id,
-                "name": c.name,
-                "slug": c.slug,
-                "image_url": c.get_image(),
-                "show_on_homepage": c.show_on_homepage,
-                "homepage_order": c.homepage_order,
-            }
-            for c in children
-        ]
+        return [self.serialize_child(child) for child in children]
+
+    def serialize_child(self, category):
+        child = {
+            "id": category.id,
+            "name": category.name,
+            "slug": category.slug,
+            "image_url": category.get_image(),
+            "show_on_homepage": category.show_on_homepage,
+            "homepage_order": category.homepage_order,
+        }
+        if self.context.get('include_nested_categories'):
+            children = getattr(category, '_prefetched_children', None)
+            if children is None:
+                children = category.children.all()
+            child["children"] = [self.serialize_child(item) for item in children]
+        return child
 
 
 # 3. Product Media Serializer (For Multiple Gallery Images/Videos)

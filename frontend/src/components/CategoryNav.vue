@@ -32,19 +32,39 @@
           </router-link>
           <span v-else class="nav-link cursor-default">{{ item.name.toUpperCase() }}</span>
 
-          <!-- Hover dropdown for subcategories -->
+          <!-- Hover dropdown for subcategories and their nested categories -->
           <div
             v-if="item.subcategories?.length"
-            class="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 absolute left-1/2 -translate-x-1/2 top-full min-w-[200px] bg-white border border-gray-100 shadow-xl rounded-b-xl py-2 z-50"
+            class="invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 transition-all duration-200 absolute left-1/2 -translate-x-1/2 top-full min-w-[200px] bg-white border border-gray-100 shadow-xl rounded-b-xl py-2 z-50"
           >
-            <router-link
-              v-for="sub in item.subcategories"
-              :key="sub.slug"
-              :to="`/category/${sub.slug}`"
-              class="block px-5 py-2 text-[13px] font-medium text-[var(--color-content-secondary)] hover:text-[var(--color-content)] hover:bg-gray-50 capitalize whitespace-nowrap"
-            >
-              {{ sub.name }}
-            </router-link>
+            <ul>
+              <li
+                v-for="sub in item.subcategories"
+                :key="sub.slug"
+                class="category-submenu relative"
+              >
+                <router-link
+                  :to="`/category/${sub.slug}`"
+                  class="flex items-center justify-between gap-5 px-5 py-2 text-[13px] font-medium text-[var(--color-content-secondary)] hover:text-[var(--color-content)] hover:bg-gray-50 focus-visible:text-[var(--color-content)] focus-visible:bg-gray-50 capitalize whitespace-nowrap"
+                >
+                  {{ sub.name }}
+                  <span v-if="sub.subcategories?.length" class="text-[9px]" aria-hidden="true">▶</span>
+                </router-link>
+                <div
+                  v-if="sub.subcategories?.length"
+                  class="category-grandchildren invisible opacity-0 transition-all duration-150 absolute left-full top-0 min-w-[190px] bg-white border border-gray-100 shadow-xl rounded-r-xl py-2"
+                >
+                  <router-link
+                    v-for="grandchild in sub.subcategories"
+                    :key="grandchild.slug"
+                    :to="`/category/${grandchild.slug}`"
+                    class="block px-5 py-2 text-[13px] font-medium text-[var(--color-content-secondary)] hover:text-[var(--color-content)] hover:bg-gray-50 focus-visible:text-[var(--color-content)] focus-visible:bg-gray-50 capitalize whitespace-nowrap"
+                  >
+                    {{ grandchild.name }}
+                  </router-link>
+                </div>
+              </li>
+            </ul>
           </div>
         </li>
       </ul>
@@ -106,11 +126,12 @@ const fallbackNames = ['WOMEN', 'MEN', 'KIDS', 'HOME DÉCOR', 'JEWELLERY']
 
 const menuStructure = computed(() => {
   if (!backendCategories.value.length) return []
-  return backendCategories.value.map((cat) => ({
+  const mapCategory = (cat) => ({
     name: cat.name,
     slug: cat.slug,
-    subcategories: (cat.children || []).map((c) => ({ name: c.name, slug: c.slug })),
-  }))
+    subcategories: (cat.children || []).map(mapCategory),
+  })
+  return backendCategories.value.map(mapCategory)
 })
 
 // --- Mobile/tablet scroll-row state (drives the right-edge fade hint) ---
@@ -183,6 +204,11 @@ onBeforeUnmount(() => {
 .nav-active {
   border-bottom-color: #111;
   font-weight: 700;
+}
+.category-submenu:hover > .category-grandchildren,
+.category-submenu:focus-within > .category-grandchildren {
+  visibility: visible;
+  opacity: 1;
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;

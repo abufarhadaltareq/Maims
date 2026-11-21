@@ -645,6 +645,20 @@ class ProductVisibilityTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data[0]['product_count'], 1)
 
+    def test_category_navigation_includes_grandchildren(self):
+        child = Category.objects.create(
+            name='Jewellery', slug='jewellery', parent=self.category,
+        )
+        Category.objects.create(name='Bangles', slug='bangles', parent=child)
+
+        response = self.client.get('/api/v1/categories/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data[0]['children'][0]['children'][0]['slug'],
+            'bangles',
+        )
+
 
 class HomepageMediaAndDeliveryTests(TestCase):
     def setUp(self):

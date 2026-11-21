@@ -146,27 +146,14 @@
         <nav class="py-3">
           <router-link to="/" class="block border-b border-black/10 py-3 text-sm font-medium" @click="closeCategoryMenu">All Products</router-link>
           <router-link to="/new-arrivals" class="block border-b border-black/10 py-3 text-sm font-medium" @click="closeCategoryMenu">New Arrivals</router-link>
-          <div v-for="category in navCats" :key="category.slug" class="border-b border-black/10">
-            <div class="flex items-center justify-between gap-3 py-3">
-              <router-link :to="`/category/${category.slug}`" class="text-sm font-semibold uppercase tracking-wide" @click="closeCategoryMenu">{{ category.name }}</router-link>
-              <button
-                v-if="category.children?.length"
-                @click="toggleSubcategory(category.slug)"
-                class="flex h-8 w-8 items-center justify-center border border-black/15 text-lg"
-                :aria-expanded="expandedCategory === category.slug"
-                :aria-label="`${expandedCategory === category.slug ? 'Hide' : 'Show'} ${category.name} subcategories`"
-              >{{ expandedCategory === category.slug ? '−' : '+' }}</button>
-            </div>
-            <div v-if="category.children?.length && expandedCategory === category.slug" class="grid grid-cols-2 gap-x-3 border-t border-black/10 py-2">
-              <router-link
-                v-for="subcategory in category.children"
-                :key="subcategory.slug"
-                :to="`/category/${subcategory.slug}`"
-                class="py-2 text-sm text-gray-600 hover:text-black"
-                @click="closeCategoryMenu"
-              >{{ subcategory.name }}</router-link>
-            </div>
-          </div>
+          <CategoryMenuItem
+            v-for="category in navCats"
+            :key="category.slug"
+            :category="category"
+            root
+            class="border-b border-black/10 py-1"
+            @navigate="closeCategoryMenu"
+          />
         </nav>
         <div class="mt-3 border-t border-black/15 pt-4">
           <p class="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Account</p>
@@ -266,6 +253,7 @@ import { useWishlistStore } from './stores/wishlist'
 import BrandLogo from './components/BrandLogo.vue'
 import SocialIcon from './components/SocialIcon.vue'
 import ChatbotWidget from './components/ChatbotWidget.vue'
+import CategoryMenuItem from './components/CategoryMenuItem.vue'
 import { BRAND_CONFIG } from './brand.config'
 
 const router = useRouter()
@@ -291,7 +279,6 @@ const countryFlag = computed(() => FLAGS[activeRegion.value.country] || '🌍')
 const isCurrencyOpen = ref(false)
 const isAccountOpen = ref(false)
 const isCatMenuOpen = ref(false)
-const expandedCategory = ref('')
 const navCats = ref([])
 const headerRef = ref(null)
 const headerHeight = ref(0)
@@ -336,9 +323,6 @@ const closeCategoryMenu = () => {
 const toggleCategoryMenu = () => {
   if (isCatMenuOpen.value) closeCategoryMenu()
   else openCategoryMenu()
-}
-const toggleSubcategory = (slug) => {
-  expandedCategory.value = expandedCategory.value === slug ? '' : slug
 }
 const updateHeaderHeight = () => {
   headerHeight.value = headerRef.value?.getBoundingClientRect().bottom || 0

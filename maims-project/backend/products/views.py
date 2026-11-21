@@ -304,18 +304,27 @@ class CategoryList(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, format=None):
-        qs = Category.objects.filter(parent__isnull=True).prefetch_related(
-            'children', 'children__children'
-        ).annotate(
+        categories = list(Category.objects.annotate(
             product_count=Count(
                 'products',
                 filter=Q(products__is_visible=True),
                 distinct=True,
             )
-        )
+        ))
+        children_by_parent = {}
+        for category in categories:
+            children_by_parent.setdefault(category.parent_id, []).append(category)
+        for category in categories:
+            category._prefetched_children = children_by_parent.get(category.id, [])
+
+        qs = [category for category in categories if category.parent_id is None]
         if request.query_params.get('homepage') == 'true':
-            qs = qs.filter(show_on_homepage=True)
-        serializer = CategorySerializer(qs, many=True)
+            qs = [category for category in qs if category.show_on_homepage]
+        serializer = CategorySerializer(
+            qs,
+            many=True,
+            context={'include_nested_categories': True},
+        )
         return Response(serializer.data)
 
 
