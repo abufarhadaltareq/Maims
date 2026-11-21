@@ -72,9 +72,9 @@
             v-if="site.logoUrl"
             :src="site.logoUrl"
             :alt="site.storeName + ' logo'"
-            class="block h-[52px] w-[min(8.5rem,calc(100vw-220px))] object-contain sm:h-[60px] sm:w-auto sm:max-w-[17rem] md:h-[68px] md:max-w-[20rem]"
+            class="block h-[54px] w-[min(9rem,calc(100vw-220px))] object-contain sm:h-[62px] sm:w-auto sm:max-w-[19rem] md:h-[70px] md:max-w-[22rem]"
           />
-          <svg v-else class="block h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <svg v-else class="block h-[52px] w-[52px] sm:h-[60px] sm:w-[60px] md:h-[68px] md:w-[68px]" viewBox="0 0 40 40" fill="none" aria-hidden="true">
             <defs>
               <linearGradient id="maimsLogoGradMobile" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0" stop-color="#111111" />
@@ -132,18 +132,18 @@
 
     <div
       v-if="isCatMenuOpen"
-      class="fixed inset-x-0 bottom-0 z-[60] bg-black/20 backdrop-blur-sm"
+      class="fixed inset-x-0 bottom-0 z-[60] bg-transparent"
       :style="{ top: `${headerHeight}px` }"
       @click.self="closeCategoryMenu"
       @mouseenter="clearCategoryMenuClose"
       @mouseleave="scheduleCategoryMenuClose"
     >
-      <aside id="category-menu" class="h-full w-full max-w-lg overflow-y-auto border-r border-white/40 bg-white/90 px-4 py-5 shadow-2xl backdrop-blur-2xl sm:px-7" aria-label="Shop categories">
+      <aside id="category-menu" class="flex h-full w-[min(88vw,24rem)] flex-col overflow-y-auto border-r border-white/50 bg-white/75 px-4 py-5 shadow-2xl backdrop-blur-2xl sm:w-[min(75vw,28rem)] sm:px-7 lg:w-[min(34vw,30rem)]" aria-label="Shop categories">
         <div class="flex items-center justify-between border-b border-black/10 pb-3">
           <h2 class="font-semibold uppercase tracking-[0.16em] text-sm">Shop</h2>
           <button class="flex h-9 w-9 items-center justify-center border border-black/15 text-xl" @click="closeCategoryMenu" aria-label="Close category menu">×</button>
         </div>
-        <nav class="py-3">
+        <nav class="flex-1 py-3">
           <router-link to="/" class="block border-b border-black/10 py-3 text-sm font-medium" @click="closeCategoryMenu">All Products</router-link>
           <router-link to="/new-arrivals" class="block border-b border-black/10 py-3 text-sm font-medium" @click="closeCategoryMenu">New Arrivals</router-link>
           <CategoryMenuItem
@@ -168,6 +168,9 @@
             <router-link to="/sign-up" class="py-2 text-sm underline" @click="closeCategoryMenu">Sign Up</router-link>
           </template>
         </div>
+        <div class="mt-auto flex justify-center border-t border-black/10 pt-5">
+          <BrandLogo size="sm" class="justify-center" />
+        </div>
       </aside>
     </div>
 
@@ -183,9 +186,9 @@
     <footer class="site-footer bg-black text-slate-200 px-4 sm:px-6 pt-10 pb-6 font-brand text-sm">
       <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 pb-8 border-b border-white/10">
         <div class="col-span-2 lg:col-span-2">
-          <BrandLogo size="footer" gold />
+          <BrandLogo size="sm" light />
           <!-- About line: Admin → Site settings → Brand & header → Footer about -->
-          <p class="mt-3 max-w-xs text-[13px] leading-relaxed text-amber-400">{{ site.footerAbout }}</p>
+          <p class="mt-3 max-w-xs text-[13px] leading-relaxed text-slate-200">{{ site.footerAbout }}</p>
           <!-- Newsletter (shown only when Admin → Customer notification settings allow it) -->
           <form v-if="site.newsletterSignupEnabled" @submit.prevent="subscribeNewsletter" class="mt-4 max-w-xs">
             <div class="flex gap-2">

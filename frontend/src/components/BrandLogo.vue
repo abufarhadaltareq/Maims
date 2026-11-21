@@ -48,9 +48,19 @@
     <span class="flex flex-col leading-none">
       <span
         class="brand-wordmark font-semibold uppercase transition-colors"
-        :class="[size === 'footer' ? 'text-xl sm:text-2xl' : size === 'sm' ? 'text-base' : 'text-lg', gold ? 'text-amber-300 group-hover:text-amber-200' : 'text-[var(--color-brand)] group-hover:[color:var(--color-brand)]']"
+        :class="[
+          size === 'footer' ? 'text-xl sm:text-2xl' : size === 'sm' ? 'text-base' : 'text-lg',
+          gold
+            ? 'text-amber-300 group-hover:text-amber-200'
+            : light
+              ? 'text-slate-200 group-hover:text-white'
+              : 'text-[var(--color-brand)] group-hover:[color:var(--color-brand)]',
+        ]"
       >
-        {{ wordmarkStart }}<span class="transition-colors" :class="gold ? 'group-hover:text-amber-300' : 'group-hover:[color:var(--color-brand)]'">{{ wordmarkAccent }}</span>{{ wordmarkEnd }}
+        {{ wordmarkStart }}<span
+          class="transition-colors"
+          :class="gold ? 'group-hover:text-amber-300' : light ? 'group-hover:text-white' : 'group-hover:[color:var(--color-brand)]'"
+        >{{ wordmarkAccent }}</span>{{ wordmarkEnd }}
       </span>
       <span
         v-if="showTagline && tagline"
@@ -61,7 +71,11 @@
             : size === 'sm'
               ? 'hidden text-[0.5rem] tracking-[0.3em] sm:block'
               : 'hidden text-[0.55rem] tracking-[0.4em] sm:block',
-          gold ? 'text-amber-400' : 'text-[var(--color-brand)]/70',
+          gold
+            ? 'text-amber-400'
+            : light
+              ? 'text-slate-300'
+              : 'text-[var(--color-brand)]/70',
         ]"
       >
         {{ tagline }}
@@ -79,6 +93,7 @@ defineProps({
   size: { type: String, default: 'md' }, // 'md' | 'sm' | 'footer'
   showTagline: { type: Boolean, default: true },
   gold: { type: Boolean, default: false },
+  light: { type: Boolean, default: false },
 })
 
 const site = useSiteStore()
