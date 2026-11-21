@@ -12,6 +12,14 @@
     >
       <div class="hero-gallery-backdrop absolute inset-0" aria-hidden="true">
         <template v-for="(slide, index) in heroSlides" :key="slide.id || index">
+          <img
+            v-if="slide.image_url"
+            :src="slide.image_url"
+            alt=""
+            class="hero-gallery-fill absolute inset-0 h-full w-full object-cover"
+            :class="{ 'hero-gallery-fill-active': index === currentSlide }"
+            decoding="async"
+          />
           <video
             v-if="slide.media_type === 'video' && slide.video_url"
             :src="slide.video_url"
@@ -135,10 +143,15 @@
 
     <section v-if="isHomePage" id="latest-products" class="mx-auto max-w-[1500px] px-4 pb-7 sm:px-7 sm:pb-10">
       <div class="mb-4 flex items-center justify-between border-b border-black pb-3 sm:mb-6">
-        <h2 class="text-xl font-semibold tracking-tight sm:text-2xl">New Arrivals</h2>
-        <div class="flex items-center gap-2">
-          <button @click="scrollNewArrivals(-1)" class="flex h-9 w-9 items-center justify-center border border-black/20 hover:bg-black hover:text-white" aria-label="Previous new arrivals">←</button>
-          <button @click="scrollNewArrivals(1)" class="flex h-9 w-9 items-center justify-center border border-black/20 hover:bg-black hover:text-white" aria-label="Next new arrivals">→</button>
+        <router-link to="/new-arrivals" class="text-xl font-semibold tracking-tight transition hover:opacity-70 sm:text-2xl">
+          New Arrivals
+        </router-link>
+        <div class="flex items-center gap-3">
+          <router-link to="/new-arrivals" class="hidden text-xs font-semibold uppercase tracking-wide text-gray-600 hover:text-black sm:block">View all</router-link>
+          <div class="flex items-center gap-2">
+            <button @click="scrollNewArrivals(-1)" class="flex h-9 w-9 items-center justify-center border border-black/20 hover:bg-black hover:text-white" aria-label="Previous new arrivals">←</button>
+            <button @click="scrollNewArrivals(1)" class="flex h-9 w-9 items-center justify-center border border-black/20 hover:bg-black hover:text-white" aria-label="Next new arrivals">→</button>
+          </div>
         </div>
       </div>
       <div v-if="isLoading" class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
@@ -146,7 +159,7 @@
       </div>
       <div v-else-if="products.length" ref="newArrivalsTrack" class="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
         <ProductCard
-          v-for="product in products.slice(0, 12)"
+          v-for="product in newestProducts.slice(0, 12)"
           :key="product.id"
           :product="product"
           class="w-[calc(50%-6px)] shrink-0 snap-start sm:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)] xl:w-[calc(20%-10px)]"
@@ -294,6 +307,9 @@ const showcase = ref([])
 const showcaseLoading = ref(true)
 const mainCategories = ref([])
 const newArrivalsTrack = ref(null)
+const newestProducts = computed(() => [...products.value].sort(
+  (a, b) => new Date(b.date_added || 0) - new Date(a.date_added || 0)
+))
 
 // Deshi-besh style filters (category pages).
 const filters = ref({ sizes: [], colors: [], lengths: [], fabrics: [] })
@@ -504,11 +520,27 @@ onBeforeUnmount(() => {
 
 .hero-gallery-backdrop {
   z-index: 0;
+  overflow: hidden;
+  background: #111827;
+}
+
+.hero-gallery-fill {
+  z-index: 0;
+  opacity: 0;
+  filter: blur(18px);
+  transform: scale(1.08);
+  transition: opacity 500ms ease;
+}
+
+.hero-gallery-fill-active {
+  opacity: 0.62;
 }
 
 .hero-gallery-media {
+  z-index: 1;
   opacity: 0;
   transition: opacity 500ms ease;
+  filter: drop-shadow(0 12px 40px rgb(0 0 0 / 20%));
 }
 
 .hero-gallery-media-active {
@@ -554,6 +586,7 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .hero-gallery-media,
+  .hero-gallery-fill,
   .hero-gallery-progress span {
     transition: none;
   }

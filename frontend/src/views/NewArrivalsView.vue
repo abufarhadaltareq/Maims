@@ -4,8 +4,8 @@
     <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
       <div>
         <p class="text-[11px] uppercase tracking-[0.3em] text-brand-accent font-bold mb-1.5">Catalog</p>
-        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">New Arrivals</h1>
-        <p class="text-gray-500 text-sm mt-1">{{ totalCount }} fresh pieces{{ socialCount ? ` · ${socialCount} synced from Facebook` : '' }}</p>
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">{{ pageTitle }}</h1>
+        <p class="text-gray-500 text-sm mt-1">{{ totalCount }} {{ isAllProducts ? 'products' : 'fresh pieces' }}{{ socialCount ? ` · ${socialCount} synced from Facebook` : '' }}</p>
       </div>
       <!-- Sort -->
       <div class="flex flex-wrap items-center gap-2 sm:flex-nowrap">
@@ -39,8 +39,8 @@
     </div>
 
     <div v-else-if="!sorted.length" class="text-center py-16 border border-dashed border-gray-200 rounded-2xl bg-gray-50/60">
-      <p class="font-bold text-lg text-gray-700">{{ showSocialOnly ? 'No Facebook drops yet' : 'No arrivals yet' }}</p>
-      <p class="text-gray-400 text-sm mt-1 mb-5">{{ showSocialOnly ? 'Sync the Page to fill this shelf.' : 'Fresh pieces are on the way.' }}</p>
+      <p class="font-bold text-lg text-gray-700">{{ showSocialOnly ? 'No Facebook drops yet' : isAllProducts ? 'No products yet' : 'No arrivals yet' }}</p>
+      <p class="text-gray-400 text-sm mt-1 mb-5">{{ showSocialOnly ? 'Sync the Page to fill this shelf.' : isAllProducts ? 'Products will appear here when available.' : 'Fresh pieces are on the way.' }}</p>
       <button v-if="showSocialOnly" @click="showSocialOnly = false" class="text-sm font-bold bg-[var(--color-brand)] text-white px-5 py-2.5 rounded-full hover:bg-[var(--color-brand)]/80 transition">Show everything</button>
       <router-link v-else to="/" class="inline-block text-sm font-bold bg-[var(--color-brand)] text-white px-5 py-2.5 rounded-full hover:bg-[var(--color-brand)]/80 transition">Back to homepage</router-link>
     </div>
@@ -53,16 +53,20 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
 import ProductCard from '../components/ProductCard.vue'
 import { getProductDisplayPrice } from '../utils/pricing.js'
 import { useCartStore } from '../stores/cart'
 
 const cartStore = useCartStore()
+const route = useRoute()
 const products = ref([])
 const loading = ref(true)
 const sortKey = ref('newest')
 const showSocialOnly = ref(false)
+const isAllProducts = computed(() => route.path === '/all-products')
+const pageTitle = computed(() => isAllProducts.value ? 'All Products' : 'New Arrivals')
 
 const priceOf = (p) => getProductDisplayPrice(p || {}, cartStore.currentCurrency).numeric || 0
 const isSocial = (p) => !!(p?.facebook_post_id || p?.facebook_image_url)
@@ -87,7 +91,7 @@ const totalCount = computed(() => visible.value.length)
 onMounted(async () => {
   loading.value = true
   try {
-    // One call returns newest-first for the whole catalog; social filter is client-side.
+    // Both catalog pages share the full visible catalog, with their own heading and sort controls.
     const res = await axios.get('/api/v1/products/')
     const data = res.data
     products.value = Array.isArray(data) ? data : (data.results || data.products || [])
