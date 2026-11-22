@@ -8,19 +8,22 @@ from django.db import migrations, models
 VIDEO_EXTENSIONS = {'.mp4', '.webm', '.ogv', '.ogg'}
 
 
+def has_video_extension(value):
+    name = getattr(value, 'name', value) or ''
+    return os.path.splitext(urlparse(str(name)).path)[1].lower() in VIDEO_EXTENSIONS
+
+
 def detect_existing_videos(apps, schema_editor):
     HeroSlide = apps.get_model('products', 'HeroSlide')
     ProductMedia = apps.get_model('products', 'ProductMedia')
     database = schema_editor.connection.alias
 
     for slide in HeroSlide.objects.using(database).iterator():
-        video_name = slide.video or slide.external_video_url or ''
-        if slide.video or os.path.splitext(urlparse(video_name).path)[1].lower() in VIDEO_EXTENSIONS:
+        if slide.video or has_video_extension(slide.external_video_url):
             HeroSlide.objects.using(database).filter(pk=slide.pk).update(media_type='video')
 
     for media in ProductMedia.objects.using(database).iterator():
-        media_name = media.file or media.external_url or ''
-        if os.path.splitext(urlparse(media_name).path)[1].lower() in VIDEO_EXTENSIONS:
+        if has_video_extension(media.file) or has_video_extension(media.external_url):
             ProductMedia.objects.using(database).filter(pk=media.pk).update(media_type='video')
 
 
