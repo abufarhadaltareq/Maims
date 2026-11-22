@@ -29,7 +29,7 @@
               'hero-gallery-media-active': index === currentSlide,
             }"
             :autoplay="index === currentSlide"
-            muted loop playsinline preload="metadata"
+            controls muted loop playsinline preload="metadata"
             :aria-label="slide.title || `Hero video ${index + 1}`"
           ></video>
           <img
@@ -88,8 +88,8 @@
               v-for="(item, index) in heroSlides"
               :key="item.id || index"
               @click="goToSlide(index)"
-              class="hero-gallery-dot flex h-9 w-9 items-center justify-center rounded-full transition sm:h-10 sm:w-10"
-              :class="index === currentSlide ? 'border border-white bg-white' : 'border border-white/50 bg-black/15 hover:border-white hover:bg-white/25'"
+              class="hero-gallery-dot h-2.5 w-2.5 shrink-0 rounded-full transition"
+              :class="index === currentSlide ? 'scale-110 bg-white' : 'bg-white/45 hover:bg-white/80'"
               :aria-label="`Show slide ${index + 1}: ${item.title || 'Featured collection'}`"
               :aria-current="index === currentSlide ? 'true' : undefined"
             ></button>
@@ -564,18 +564,6 @@ onBeforeUnmount(() => {
   height: 100%;
   background: #fff;
   transition: width 200ms ease;
-}
-
-.hero-gallery-dot::before {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 9999px;
-  background: #fff;
-  content: "";
-}
-
-.hero-gallery-dot[aria-current="true"]::before {
-  background: #111;
 }
 
 @media (max-width: 639px) {

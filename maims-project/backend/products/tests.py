@@ -667,7 +667,6 @@ class HomepageMediaAndDeliveryTests(TestCase):
     def test_active_video_slide_is_available_to_homepage(self):
         HeroSlide.objects.create(
             title='Campaign film',
-            media_type='video',
             external_video_url='https://example.com/campaign.mp4',
             is_active=True,
         )
@@ -677,6 +676,25 @@ class HomepageMediaAndDeliveryTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data[0]['media_type'], 'video')
         self.assertEqual(response.data[0]['video_url'], 'https://example.com/campaign.mp4')
+
+    def test_product_video_url_is_serialized_as_gallery_video(self):
+        category = Category.objects.create(name='Video products', slug='video-products')
+        product = Product.objects.create(
+            category=category, name='Video product', slug='video-product', stock=1,
+        )
+        ProductMedia.objects.create(
+            product=product,
+            external_url='https://example.com/product-clip.webm?download=1',
+        )
+
+        response = self.client.get('/api/v1/products/video-product/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['media'][0]['media_type'], 'video')
+        self.assertEqual(
+            response.data['media'][0]['url'],
+            'https://example.com/product-clip.webm?download=1',
+        )
 
     def test_delivery_fee_is_converted_from_sek(self):
         self.assertEqual(_delivery_fee('SEK'), Decimal('85.00'))

@@ -1,16 +1,32 @@
 from decimal import Decimal
+import os
+from urllib.parse import urlparse
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from .storage import ProductMediaStorage, VideoMediaStorage
 
 # --- CATEGORY & CATALOG MANAGEMENT ---
 
 # Stock at or below this is flagged as "needs restocking" in the admin. Not a
 # hard rule: the storefront keeps selling until the number reaches zero.
 RESTOCK_LEVEL = 3
+_VIDEO_EXTENSIONS = {'.mp4', '.webm', '.ogv', '.ogg'}
+
+
+def _is_video_media(value):
+    if not value:
+        return False
+    name = getattr(value, 'name', None) or urlparse(str(value)).path
+    content = getattr(value, 'file', value)
+    content_type = getattr(content, 'content_type', '')
+    return (
+        os.path.splitext(name)[1].lower() in _VIDEO_EXTENSIONS
+        or content_type.startswith('video/')
+    )
 
 
 class Category(models.Model):
@@ -60,10 +76,17 @@ class HeroSlide(models.Model):
         choices=(('image', 'Image'), ('video', 'Video')),
         default='image',
     )
-    video = models.FileField(upload_to='uploads/hero/videos/', blank=True, null=True)
+    video = models.FileField(
+        upload_to='uploads/hero/videos/',
+        blank=True,
+        null=True,
+        storage=VideoMediaStorage(),
+        help_text="Upload an MP4, WebM, Ogg, or OGV video. Uploading a video selects Video automatically.",
+    )
     external_video_url = models.URLField(
         blank=True, null=True,
-        help_text="Optional https:// video URL. Uploaded video takes precedence.",
+        help_text="Optional direct HTTPS link to an MP4, WebM, Ogg, or OGV video file. "
+                  "YouTube/Vimeo page links are not playable here.",
     )
     order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -84,6 +107,11 @@ class HeroSlide(models.Model):
         if self.video:
             return self.video.url
         return self.external_video_url or ''
+
+    def save(self, *args, **kwargs):
+        if self.video or _is_video_media(self.external_video_url):
+            self.media_type = 'video'
+        super().save(*args, **kwargs)
 
 
 class HeroBannerSettings(models.Model):
@@ -431,8 +459,18 @@ class ProductMedia(models.Model):
     product = models.ForeignKey(Product, related_name='media', on_delete=models.CASCADE)
     media_type = models.CharField(max_length=10, choices=MEDIA_TYPES, default='image')
     title = models.CharField(max_length=150, blank=True)
-    file = models.FileField(upload_to='uploads/', blank=True, null=True)
-    external_url = models.URLField(blank=True, null=True)
+    file = models.FileField(
+        upload_to='uploads/',
+        blank=True,
+        null=True,
+        storage=ProductMediaStorage(),
+        help_text="Upload an image or MP4/WebM/Ogg/OGV video. Video uploads are detected automatically.",
+    )
+    external_url = models.URLField(
+        blank=True,
+        null=True,
+        help_text="For video, use a direct HTTPS link to an MP4/WebM/Ogg/OGV file (not a YouTube/Vimeo page).",
+    )
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -447,6 +485,11 @@ class ProductMedia(models.Model):
         if self.file:
             return self.file.url
         return self.external_url or ''
+
+    def save(self, *args, **kwargs):
+        if _is_video_media(self.file) or _is_video_media(self.external_url):
+            self.media_type = 'video'
+        super().save(*args, **kwargs)
 
 
 # 🌟 MULTI-CURRENCY CONFIGURATION
