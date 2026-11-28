@@ -122,7 +122,7 @@ const wordmarkEnd = computed(() => {
   return upper.slice(3)
 })
 
-const tagline = computed(() => site.tagline || BRAND_CONFIG.tagline || 'Premium Fashion')
+const tagline = computed(() => site.tagline || BRAND_CONFIG.tagline || 'Traditional & Modern South Asian Wear')
 </script>
 
 <style scoped>

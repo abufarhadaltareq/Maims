@@ -73,9 +73,9 @@ export const useSiteStore = defineStore('site', {
     storeName: (s) => s.settings?.store_name || 'Maims',
     logoUrl: (s) => s.settings?.logo_url || '',
     /** Header tagline under the logo. Falls back to the legacy default. */
-    tagline: (s) => s.settings?.tagline ?? 'Premium Fashion',
-    footerAbout: (s) => s.settings?.footer_about || 'Curated premium fashion, delivered worldwide.',
-    footerBottomNote: (s) => s.settings?.footer_bottom_note || 'Premium fashion, delivered worldwide',
+    tagline: (s) => s.settings?.tagline ?? 'Traditional & Modern South Asian Wear',
+    footerAbout: (s) => s.settings?.footer_about || 'Traditional and modern South Asian wear, blending cultural style with contemporary fashion.',
+    footerBottomNote: (s) => s.settings?.footer_bottom_note || 'Traditional & Modern South Asian Wear',
     /** Scrolling top-bar messages: one per line in the admin textarea. */
     tickerMessages: (s) => {
       const raw = s.settings?.announcement_messages ?? ''

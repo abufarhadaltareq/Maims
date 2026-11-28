@@ -536,14 +536,15 @@ class SiteSettings(models.Model):
     announcement_speed = models.PositiveIntegerField(default=30,
         help_text="Scroll speed in seconds per loop (10 = fast, 60 = slow).")
     # Short line under the logo (header + footer wordmark). Blank hides it.
-    tagline = models.CharField(max_length=120, blank=True, null=True, default="Premium Fashion",
-        help_text="Short line under the logo, e.g. Premium Fashion.")
+    tagline = models.CharField(max_length=120, blank=True, null=True,
+        default="Traditional & Modern South Asian Wear",
+        help_text="Short line under the logo, e.g. Traditional & Modern South Asian Wear.")
     # Short footer paragraph + bottom legal line. Both fall back to defaults.
     footer_about = models.CharField(max_length=255, blank=True, null=True,
-        default="Curated premium fashion, delivered worldwide.",
+        default="Traditional and modern South Asian wear, blending cultural style with contemporary fashion.",
         help_text="One-line shop description in the footer.")
     footer_bottom_note = models.CharField(max_length=255, blank=True, null=True,
-        default="Premium fashion, delivered worldwide",
+        default="Traditional & Modern South Asian Wear",
         help_text="Small line at the very bottom of the footer.")
     store_name = models.CharField(max_length=120, default='Maims')
     # --- Brand color & content color (Admin → Site settings → Brand) ---

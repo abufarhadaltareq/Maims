@@ -6,14 +6,14 @@ export const BRAND_CONFIG = {
 
   // Logo tagline fallback (header/footer wordmark). The live value comes from
   // Admin → Site settings → Brand & header → Tagline; empty hides the line.
-  tagline: "Premium Fashion",
+  tagline: "Traditional & Modern South Asian Wear",
 
   apiBaseUrl: "",
 
   // Fallback hero content — used only until admin HeroSlides load
   // (or if the API is unreachable). Manage real slides in Admin → Hero slides.
   heroBannerTitle: "Elevate Your Everyday Style",
-  heroBannerSubtitle: "Discover curated premium clothing collections tailored just for you.",
+  heroBannerSubtitle: "Discover traditional and modern South Asian wear, made for every occasion.",
 
   // Fallback rotating images (premium fashion)
   heroImages: [
