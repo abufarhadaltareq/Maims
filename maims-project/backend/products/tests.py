@@ -102,11 +102,16 @@ class AdminPageTests(TestCase):
     def test_dashboard_renders(self):
         res = self.client.get('/admin/')
         self.assertEqual(res.status_code, 200)
-        # The home page is a work queue, not a list of statistics.
+        # The dashboard should put high-priority work and common store actions
+        # ahead of the less frequently used admin model index.
+        self.assertContains(res, 'Your store at a glance')
+        self.assertContains(res, 'Needs your attention')
         self.assertContains(res, 'Orders to handle')
-        # 'new' is the decision queue: staff accept or decline before packing.
         self.assertContains(res, 'Awaiting our decision')
         self.assertContains(res, 'Accepted, to pack')
+        self.assertContains(res, 'Products to restock')
+        self.assertContains(res, 'Manage your store')
+        self.assertContains(res, 'Add a product')
 
     def test_product_admin_can_sync_facebook_feed_manually(self):
         """Webhooks can't reach a laptop/firewalled host — the admin action is

@@ -53,7 +53,7 @@ def dashboard_callback(request, context):
     """
     from datetime import timedelta
     from django.db.models import Sum
-    from products.models import Category, Product
+    from products.models import RESTOCK_LEVEL, Category, Product
 
     today = timezone.localdate()
     week_start = today - timedelta(days=6)
@@ -69,6 +69,8 @@ def dashboard_callback(request, context):
         'product_count': Product.objects.count(),
         'visible_products': Product.objects.filter(is_visible=True).count(),
         'category_count': Category.objects.count(),
+        'low_stock_products': Product.objects.filter(
+            stock__lte=RESTOCK_LEVEL).count(),
         # The number that actually needs a human decision right now.
         'awaiting_decision': Order.objects.filter(status='new').count(),
         # Sends that did not get through. Surfaced because a silently failed

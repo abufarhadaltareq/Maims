@@ -1,8 +1,7 @@
 """Custom admin site for Maims.
 
-The home page is deliberately plain. It shows three things and nothing else:
-what arrived today, which order queue needs working on, and where to edit the data
-that the storefront displays. Everything else is a click away from the model list.
+The home page is a responsive store dashboard for daily order work, stock alerts,
+and common catalogue and settings tasks.
 
 The site subclasses :class:`unfold.sites.UnfoldAdminSite` so every page is served
 with Unfold's Tailwind shell. The numbers on the home page are supplied by

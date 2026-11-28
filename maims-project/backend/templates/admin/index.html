@@ -3,143 +3,171 @@
 
 {% block content %}
 <div id="content-main" class="maims-home">
-
-  <p class="maims-home__summary">
-    <strong>{{ orders_today }}</strong> order{{ orders_today|pluralize }} today
-    &middot; <strong>{{ open_orders }}</strong> still to fulfil
-    &middot; <strong>{{ orders_week }}</strong> in the last 7 days
-    &middot; <a href="{% url 'admin:products_order_changelist' %}">All orders</a>
-  </p>
-
-  {# KPI cards: one glance at sales, queue and catalogue health. #}
-  <section class="maims-cards">
-    <a class="maims-card" href="{% url 'admin:products_order_changelist' %}?status__exact=new">
-      <span class="maims-card__label">Needs decision</span>
-      <span class="maims-card__value">{{ awaiting_decision }}</span>
-      <span class="maims-card__hint">Accept or decline new orders</span>
-    </a>
-    <a class="maims-card" href="{% url 'admin:products_order_changelist' %}">
-      <span class="maims-card__label">Open orders</span>
-      <span class="maims-card__value">{{ open_orders }}</span>
-      <span class="maims-card__hint">Not yet delivered</span>
-    </a>
-    <div class="maims-card">
-      <span class="maims-card__label">Paid revenue · 7 days</span>
-      <span class="maims-card__value maims-card__value--small">{% if revenue_week %}{% for row in revenue_week %}€{{ row.total }} {{ row.currency }}{% if not forloop.last %} · {% endif %}{% endfor %}{% else %}—{% endif %}</span>
-      <span class="maims-card__hint">{{ orders_week }} order{{ orders_week|pluralize }} this week</span>
+  <header class="maims-dashboard-head">
+    <div>
+      <p class="maims-eyebrow">MAIMS STORE</p>
+      <h1>Your store at a glance</h1>
+      <p class="maims-dashboard-intro">The important things to handle today, all in one place.</p>
     </div>
-    <a class="maims-card" href="{% url 'admin:products_product_changelist' %}">
-      <span class="maims-card__label">Catalogue</span>
-      <span class="maims-card__value">{{ visible_products }}/{{ product_count }}</span>
-      <span class="maims-card__hint">Visible of total · {{ category_count }} categories</span>
+    <div class="maims-dashboard-head__date">{% now "l, j F Y" %}</div>
+  </header>
+
+  <section class="maims-metrics" aria-label="Store overview">
+    <a class="maims-metric maims-metric--urgent" href="{% url 'admin:products_order_changelist' %}?status__exact=new">
+      <span class="maims-metric__label">Awaiting your decision</span>
+      <span class="maims-metric__value">{{ awaiting_decision }}</span>
+      <span class="maims-metric__hint">Accept or decline new orders</span>
+    </a>
+    <a class="maims-metric" href="{% url 'admin:products_order_changelist' %}">
+      <span class="maims-metric__label">Orders to fulfil</span>
+      <span class="maims-metric__value">{{ open_orders }}</span>
+      <span class="maims-metric__hint">Accepted through delivery</span>
+    </a>
+    <div class="maims-metric">
+      <span class="maims-metric__label">Paid sales · 7 days</span>
+      <span class="maims-metric__value maims-metric__value--sales">
+        {% if revenue_week %}
+          {% for row in revenue_week %}{{ row.total|floatformat:2 }} {{ row.currency }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+        {% else %}—{% endif %}
+      </span>
+      <span class="maims-metric__hint">{{ orders_week }} order{{ orders_week|pluralize }} placed</span>
+    </div>
+    <a class="maims-metric {% if low_stock_products %}maims-metric--warning{% endif %}"
+       href="{% url 'admin:products_product_changelist' %}?stock__lte=3">
+      <span class="maims-metric__label">Products to restock</span>
+      <span class="maims-metric__value">{{ low_stock_products }}</span>
+      <span class="maims-metric__hint">Low or out of stock</span>
+    </a>
+    <a class="maims-metric" href="{% url 'admin:products_product_changelist' %}">
+      <span class="maims-metric__label">Visible products</span>
+      <span class="maims-metric__value">{{ visible_products }}<span class="maims-metric__total"> / {{ product_count }}</span></span>
+      <span class="maims-metric__hint">{{ category_count }} product categories</span>
     </a>
   </section>
 
-  {# Anything that needs a human right now, called out before the routine queues. #}
-  {% if awaiting_decision or pending_notifications or unanswered_reviews %}
-    <section class="maims-block maims-alerts">
-      <h2>Needs your attention</h2>
-      <ul class="maims-storelist">
+  {% if awaiting_decision or pending_notifications or unanswered_reviews or low_stock_products %}
+    <section class="maims-attention" aria-labelledby="maims-attention-title">
+      <div class="maims-section-heading">
+        <div>
+          <p class="maims-eyebrow">PRIORITY</p>
+          <h2 id="maims-attention-title">Needs your attention</h2>
+        </div>
+        <span class="maims-attention__badge">Action needed</span>
+      </div>
+      <div class="maims-attention__items">
         {% if awaiting_decision %}
-          <li>
-            <a href="{% url 'admin:products_order_changelist' %}?status__exact=new">{{ awaiting_decision }} order{{ awaiting_decision|pluralize }}</a>
-            <span>Waiting for you to accept or decline.</span>
-          </li>
+          <a class="maims-attention__item" href="{% url 'admin:products_order_changelist' %}?status__exact=new">
+            <span class="maims-attention__number">{{ awaiting_decision }}</span>
+            <span><strong>New order{{ awaiting_decision|pluralize }} to review</strong><small>Choose whether to accept or decline.</small></span>
+            <span class="maims-arrow" aria-hidden="true">→</span>
+          </a>
+        {% endif %}
+        {% if low_stock_products %}
+          <a class="maims-attention__item" href="{% url 'admin:products_product_changelist' %}?stock__lte=3">
+            <span class="maims-attention__number">{{ low_stock_products }}</span>
+            <span><strong>Product{{ low_stock_products|pluralize }} running low</strong><small>Review stock and update quantities.</small></span>
+            <span class="maims-arrow" aria-hidden="true">→</span>
+          </a>
         {% endif %}
         {% if pending_notifications %}
-          <li>
-            <a href="{% url 'admin:products_ordernotification_changelist' %}?status__exact=failed">{{ pending_notifications }} notification{{ pending_notifications|pluralize }}</a>
-            <span>A customer or the shop was not reached (email, WhatsApp or Facebook). Select the orders and use "Resend failed notifications".</span>
-          </li>
+          <a class="maims-attention__item" href="{% url 'admin:products_ordernotification_changelist' %}?status__exact=failed">
+            <span class="maims-attention__number">{{ pending_notifications }}</span>
+            <span><strong>Failed customer notification{{ pending_notifications|pluralize }}</strong><small>Review and resend messages that did not get through.</small></span>
+            <span class="maims-arrow" aria-hidden="true">→</span>
+          </a>
         {% endif %}
         {% if unanswered_reviews %}
-          <li>
-            <a href="{% url 'admin:products_review_changelist' %}?is_approved__exact=0">{{ unanswered_reviews }} hidden review{{ unanswered_reviews|pluralize }}</a>
-            <span>Reviews that are not shown on the storefront.</span>
-          </li>
+          <a class="maims-attention__item" href="{% url 'admin:products_review_changelist' %}?is_approved__exact=0">
+            <span class="maims-attention__number">{{ unanswered_reviews }}</span>
+            <span><strong>Review{{ unanswered_reviews|pluralize }} waiting to be checked</strong><small>Approve reviews to show them in your store.</small></span>
+            <span class="maims-arrow" aria-hidden="true">→</span>
+          </a>
         {% endif %}
-      </ul>
+      </div>
     </section>
   {% endif %}
 
-  {# The queues the shop works through, in the order they must be handled. #}
-  <section class="maims-block">
-    <h2>Orders to handle</h2>
-    <table class="maims-queue-table">
-      <tbody>
-        {% for queue in queues %}
-          <tr>
-            <td><a href="{{ queue.url }}">{{ queue.label }}</a></td>
-            <td class="maims-queue-table__count">{{ queue.count }}</td>
-          </tr>
-        {% endfor %}
-        <tr>
-          <td><a href="{% url 'admin:products_order_changelist' %}?status__exact=new&amp;status__exact=accepted&amp;status__exact=packed&amp;status__exact=shipped">Everything not yet delivered</a></td>
-          <td class="maims-queue-table__count">{{ open_orders }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
-
-  {# What each model controls on the storefront. #}
-  <section class="maims-block">
-    <h2>Store data</h2>
-    <ul class="maims-storelist">
-      <li>
-        <a href="{% url 'admin:products_product_changelist' %}">Products</a>
-        <span>Name, price per currency, stock, bust sizes, colours, lengths, photos and videos. Stock is editable from the list.</span>
-      </li>
-      <li>
-        <a href="{% url 'admin:products_category_changelist' %}">Categories</a>
-        <span>The product sections. Tick "show on homepage" and set the order to control the "Shop by Category" strip.</span>
-      </li>
-      <li>
-        <a href="{% url 'admin:products_collection_changelist' %}">Collections</a>
-        <span>Seasonal groups such as "Festive" or "Summer basics", used to group products.</span>
-      </li>
-      <li>
-        <a href="{% url 'admin:products_heroslide_changelist' %}">Homepage hero slides</a>
-        <span>The rotating banner at the top of the home page: image, heading and button.</span>
-      </li>
-      <li>
-        <a href="{% url 'admin:products_sitesettings_changelist' %}">Store settings</a>
-        <span>Store name and logo, WhatsApp number, which payment methods are offered, the Facebook and social links in the header and footer, and where order notifications go (email, WhatsApp, Facebook page).</span>
-      </li>
-      <li>
-        <a href="{% url 'admin:products_review_changelist' %}">Product reviews</a>
-        <span>Star ratings and comments customers leave. Publish or hide them here.</span>
-      </li>
-      <li>
-        <a href="{% url 'admin:auth_user_changelist' %}">Customers</a>
-        <span>Registered customers, their saved delivery address and their order history.</span>
-      </li>
-    </ul>
-  </section>
-
-  {# Full model index: the sidebar only shows Daily work + Shop, so every
-     CRUD model gets an explicit link here. This is the fallback that makes
-     sure nothing registered in the admin is unreachable. #}
-  {% if app_list %}
-  <section class="maims-block">
-    <h2>All models</h2>
-    <ul class="maims-storelist">
-      {% for app in app_list %}
-        {% for model in app.models %}
-          <li>
-            {% if model.admin_url %}
-              <a href="{{ model.admin_url }}">{{ model.name }}</a>
-            {% else %}
-              {{ model.name }}
-            {% endif %}
-            {% if model.add_url %}
-              &middot; <a href="{{ model.add_url }}">Add</a>
-            {% endif %}
-          </li>
-        {% endfor %}
+  <section class="maims-dashboard-section" aria-labelledby="maims-orders-title">
+    <div class="maims-section-heading">
+      <div>
+        <p class="maims-eyebrow">DAILY WORK</p>
+        <h2 id="maims-orders-title">Orders to handle</h2>
+      </div>
+      <a class="maims-text-link" href="{% url 'admin:products_order_changelist' %}">View all orders <span aria-hidden="true">→</span></a>
+    </div>
+    <div class="maims-queue-grid">
+      {% for queue in queues %}
+        <a class="maims-queue-card" href="{{ queue.url }}">
+          <span class="maims-queue-card__label">{{ queue.label }}</span>
+          <span class="maims-queue-card__count">{{ queue.count }}</span>
+          <span class="maims-queue-card__link">View orders <span aria-hidden="true">→</span></span>
+        </a>
       {% endfor %}
-    </ul>
+    </div>
   </section>
-  {% endif %}
 
+  <section class="maims-dashboard-section" aria-labelledby="maims-manage-title">
+    <div class="maims-section-heading">
+      <div>
+        <p class="maims-eyebrow">SHOP MANAGEMENT</p>
+        <h2 id="maims-manage-title">Manage your store</h2>
+      </div>
+    </div>
+    <div class="maims-manage-grid">
+      <article class="maims-manage-card">
+        <span class="maims-manage-card__icon" aria-hidden="true">◈</span>
+        <h3>Products & stock</h3>
+        <p>Add clothing, update prices, manage sizes and keep stock accurate.</p>
+        <div class="maims-manage-card__links">
+          <a href="{% url 'admin:products_product_changelist' %}">Manage products <span aria-hidden="true">→</span></a>
+          {% if perms.products.add_product %}
+            <a href="{% url 'admin:products_product_add' %}">Add a product <span aria-hidden="true">→</span></a>
+          {% endif %}
+          {% if perms.products.change_product %}
+            <a href="{% url 'admin:products_product_import_csv' %}">Update prices & stock by CSV <span aria-hidden="true">→</span></a>
+          {% endif %}
+        </div>
+      </article>
+      <article class="maims-manage-card">
+        <span class="maims-manage-card__icon" aria-hidden="true">✦</span>
+        <h3>Storefront</h3>
+        <p>Choose what shoppers see: categories, collections, homepage slides and reviews.</p>
+        <div class="maims-manage-card__links">
+          <a href="{% url 'admin:products_category_changelist' %}">Categories <span aria-hidden="true">→</span></a>
+          <a href="{% url 'admin:products_collection_changelist' %}">Collections <span aria-hidden="true">→</span></a>
+          <a href="{% url 'admin:products_heroslide_changelist' %}">Homepage slides <span aria-hidden="true">→</span></a>
+          <a href="{% url 'admin:products_review_changelist' %}">Product reviews <span aria-hidden="true">→</span></a>
+        </div>
+      </article>
+      <article class="maims-manage-card">
+        <span class="maims-manage-card__icon" aria-hidden="true">⚙</span>
+        <h3>Customers & settings</h3>
+        <p>Find customer details and control payments, contact channels and store settings.</p>
+        <div class="maims-manage-card__links">
+          <a href="{% url 'admin:auth_user_changelist' %}">Customers <span aria-hidden="true">→</span></a>
+          <a href="{% url 'admin:products_sitesettings_changelist' %}">Store settings <span aria-hidden="true">→</span></a>
+          <a href="{% url 'admin:products_customernotificationsettings_changelist' %}">Notification settings <span aria-hidden="true">→</span></a>
+          <a href="{% url 'admin:products_productretentionsettings_changelist' %}">Product retention <span aria-hidden="true">→</span></a>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  {% if app_list %}
+    <details class="maims-all-models">
+      <summary>Advanced & all admin areas</summary>
+      <p>Open a specific data list or configuration page.</p>
+      <ul>
+        {% for app in app_list %}
+          {% for model in app.models %}
+            <li>
+              {% if model.admin_url %}<a href="{{ model.admin_url }}">{{ model.name }}</a>{% else %}{{ model.name }}{% endif %}
+              {% if model.add_url %}<a class="maims-all-models__add" href="{{ model.add_url }}">Add</a>{% endif %}
+            </li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </details>
+  {% endif %}
 </div>
 {% endblock %}
