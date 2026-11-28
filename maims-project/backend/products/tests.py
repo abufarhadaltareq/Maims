@@ -1257,25 +1257,13 @@ class ExpiringTokenTests(TestCase):
 
 
 class HealthCheckTests(TestCase):
-    """The orchestrator probe must answer 200 only when the DB is reachable."""
+    """The orchestrator liveness probe must not depend on the database."""
 
     def test_health_reports_ok(self):
-        res = self.client.get('/health/')
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()['status'], 'ok')
-        self.assertEqual(res.json()['database'], 'ok')
-
-    def test_health_reports_503_when_database_is_down(self):
-        from unittest import mock
-
-        with mock.patch('core.views.connections') as conns:
-            conns.__getitem__.return_value.cursor.side_effect = Exception('boom')
+        with self.assertNumQueries(0):
             res = self.client.get('/health/')
-        self.assertEqual(res.status_code, 503)
-        body = res.json()
-        self.assertEqual(body['status'], 'unhealthy')
-        # The driver's message could leak host/port/database names.
-        self.assertNotIn('boom', res.content.decode())
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {'status': 'ok'})
 
     def test_health_needs_no_authentication(self):
         """A load balancer calls this anonymously; a 401 would mean 'unhealthy'."""

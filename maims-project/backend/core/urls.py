@@ -13,10 +13,9 @@ urlpatterns = [
     # the default admin.site.
     path('admin/', maims_admin.urls),
     path('api/v1/', include('products.urls')),
-    # Container/orchestrator probe: unauthenticated, cheap, DB-aware.
+    # Container/orchestrator liveness probe; intentionally does not touch the DB.
     path('health/', health, name='health'),
     path('ping/', ping, name='ping'),
-    path("health/", health),
 ]
 
 if settings.DEBUG:
